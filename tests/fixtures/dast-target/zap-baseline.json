@@ -1,0 +1,106 @@
+{
+  "@version": "2.15.0",
+  "@generated": "Mon, 21 Apr 2026 14:00:00",
+  "site": [
+    {
+      "@name": "http://localhost:8080",
+      "@host": "localhost",
+      "@port": "8080",
+      "@ssl": "false",
+      "alerts": [
+        {
+          "pluginid": "40018",
+          "alertRef": "40018",
+          "alert": "SQL Injection",
+          "name": "SQL Injection",
+          "riskcode": "3",
+          "confidence": "2",
+          "riskdesc": "High (Medium)",
+          "desc": "<p>SQL injection may be possible. The application appears to include unsanitized user input in a SQL query, allowing an attacker to alter query semantics and potentially read or modify database contents.</p>",
+          "instances": [
+            {
+              "uri": "http://localhost:8080/search?q=test",
+              "method": "GET",
+              "evidence": "syntax error"
+            }
+          ],
+          "count": "1",
+          "solution": "<p>Do not trust client side input, even if there is client side validation in place. Use parameterized queries or prepared statements for all database access, and apply strict input validation on the server side.</p>",
+          "reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</p><p>https://owasp.org/www-community/attacks/SQL_Injection</p>",
+          "cweid": "89",
+          "wascid": "19",
+          "sourceid": "3"
+        },
+        {
+          "pluginid": "10020",
+          "alertRef": "10020",
+          "alert": "X-Frame-Options Header Not Set",
+          "name": "X-Frame-Options Header Not Set",
+          "riskcode": "2",
+          "confidence": "2",
+          "riskdesc": "Medium (Medium)",
+          "desc": "<p>X-Frame-Options header is not included in the HTTP response to protect against 'ClickJacking' attacks.</p>",
+          "instances": [
+            {
+              "uri": "http://localhost:8080/",
+              "method": "GET",
+              "evidence": ""
+            }
+          ],
+          "count": "1",
+          "solution": "<p>Most modern Web browsers support the X-Frame-Options HTTP header. Ensure it is set on all web pages returned by your site (if you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY).</p>",
+          "reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options</p>",
+          "cweid": "1021",
+          "wascid": "15",
+          "sourceid": "1"
+        },
+        {
+          "pluginid": "10021",
+          "alertRef": "10021",
+          "alert": "X-Content-Type-Options Header Missing",
+          "name": "X-Content-Type-Options Header Missing",
+          "riskcode": "1",
+          "confidence": "2",
+          "riskdesc": "Low (Medium)",
+          "desc": "<p>The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type.</p>",
+          "instances": [
+            {
+              "uri": "http://localhost:8080/api/items",
+              "method": "GET",
+              "evidence": ""
+            }
+          ],
+          "count": "1",
+          "solution": "<p>Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.</p>",
+          "reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options</p><p>https://owasp.org/www-project-secure-headers/</p>",
+          "cweid": "693",
+          "wascid": "15",
+          "sourceid": "3"
+        },
+        {
+          "pluginid": "10036",
+          "alertRef": "10036",
+          "alert": "Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+          "name": "Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+          "riskcode": "0",
+          "confidence": "3",
+          "riskdesc": "Informational (High)",
+          "desc": "<p>The web/application server is leaking version information via the \"Server\" HTTP response header. Access to such information may facilitate attackers identifying other vulnerabilities your web/application server is subject to.</p>",
+          "instances": [
+            {
+              "uri": "http://localhost:8080/",
+              "method": "GET",
+              "evidence": "Apache/2.4.41"
+            }
+          ],
+          "count": "1",
+          "solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to suppress the \"Server\" header or provide generic details.</p>",
+          "reference": "<p>https://httpd.apache.org/docs/current/mod/core.html#servertokens</p>",
+          "cweid": "",
+          "wascid": "13",
+          "sourceid": "1"
+        }
+      ]
+    }
+  ]
+}
