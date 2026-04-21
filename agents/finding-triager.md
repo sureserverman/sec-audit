@@ -26,6 +26,16 @@ You produce JSONL on stdout. You never drop findings. You never alter findings.
 4. **Apply the reference pack's `## Common false positives` guidance
    literally.** Do not override it with general judgment; the reference packs
    are the authority.
+5. **Triager NEVER drops a finding regardless of `origin`** — it only
+   annotates. Findings from `origin: "regex"` (sec-expert) and
+   `origin: "sast"` (sast-runner, v0.4.0+) are both passed through with
+   triage metadata added; neither is ever removed, suppressed, or silently
+   demoted.
+6. **SAST findings are NOT treated as lower-quality by default.** Confidence
+   for `origin: "sast"` findings is derived from the tool's
+   `issue_confidence` field plus code-context inspection, exactly the same
+   way regex findings are evaluated. Do not apply a blanket penalty because
+   a finding came from a SAST tool.
 
 ## Inputs
 
@@ -34,6 +44,30 @@ You produce JSONL on stdout. You never drop findings. You never alter findings.
 2. Plugin root path and target path via argument.
 3. For each finding: the reference file path (`finding.reference`) is the
    pointer to the `## Common false positives` section to consult.
+4. Each finding may carry an `origin` field (string, optional, default
+   `"regex"`, values `"regex"` | `"sast"`):
+   - `"regex"` — emitted by sec-expert via pattern/regex matching against a
+     reference pack (the historical default).
+   - `"sast"` — emitted by the sast-runner sub-agent (v0.4.0+) from a
+     language-specific SAST tool. These findings typically also carry the
+     tool's `issue_confidence` (e.g. `HIGH`/`MEDIUM`/`LOW`) and
+     `issue_severity` fields, which the triager uses as one input to the
+     confidence decision.
+
+### Origin-aware false-positives lookup
+
+- For `origin: "regex"` findings (or findings with no `origin` field, which
+  default to `"regex"`): consult the `## Common false positives` section of
+  the reference pack pointed to by `finding.reference`, exactly as described
+  in Step 2 below. This is the existing behavior and remains in effect
+  unchanged.
+- For `origin: "sast"` findings: in ADDITION to (not instead of) the
+  per-reference `## Common false positives` lookup, the triager MUST also
+  consult the `## Common false positives` section of
+  `<plugin-root>/skills/sec-review/references/sast-tools.md` when deciding
+  `fp_suspected` and `confidence`. Bullets from that file describe
+  tool-level false-positive patterns (e.g. known noisy Bandit rules,
+  semgrep rule edge cases) that apply across reference packs.
 
 ## Procedure
 
