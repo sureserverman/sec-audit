@@ -88,6 +88,12 @@ For each detected stack (usually one, multiple for monorepos), dispatch the
 more than one independent stack, follow the `dispatching-parallel-agents`
 skill: dispatch them concurrently as long as they don't share source files.
 
+`sec-expert` is pinned to `model: sonnet` in its frontmatter — caller-model
+choice (e.g. an Opus-session invocation of `/sec-review`) does NOT inflate
+the agent's cost. The same pinning applies to `finding-triager` and
+`report-writer` (both sonnet); `cve-enricher` is pinned to `haiku` because
+its work is high-volume JSON extraction over HTTP.
+
 Each `sec-expert` call receives:
 
 - The stack-scoped `target_path` (subdir for monorepos, whole tree otherwise).
@@ -100,45 +106,65 @@ The agent returns JSONL findings per the schema documented in
 `__dep_inventory__` object) into a list called `findings`. The dep
 inventory feeds step 4.
 
-## 4. CVE enrichment — NVD 2.0 + OSV.dev + GitHub GHSA
+### 3.5 Triage findings — dispatch finding-triager
 
-Read endpoint details from `references/cve-feeds.md` — **do not inline the
-URLs here**. That file is the single choke-point when feed schemas change.
+Before CVE enrichment, run the raw findings through the `finding-triager`
+agent (`agents/finding-triager.md`, pinned to sonnet). It reads the
+surrounding code/config context at each `file:line`, applies the
+`## Common false positives` guidance from the matched reference pack, and
+annotates each finding with:
 
-Algorithm for each `(ecosystem, package, version)` tuple in the dep
-inventory:
+- `confidence` — `high` / `medium` / `low`
+- `fp_suspected` — boolean
+- `triage_notes` — one short sentence of justification
 
-1. **Primary: OSV.dev** — `POST https://api.osv.dev/v1/query` with the
-   package/version. OSV covers ~15 ecosystems (PyPI, npm, Maven, Go,
-   RubyGems, NuGet, crates.io, Packagist, Debian, Alpine, Ubuntu, ...) in
-   one endpoint. No auth, no per-request rate limit to worry about at
-   typical review volumes. If `.vulns` is non-empty, capture each vuln's
-   `id`, `summary`, `severity`, `references`, and `affected.ranges`.
-2. **Fallback: NVD 2.0** — `GET
-   https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=<pkg>&virtualMatchString=cpe:2.3:a:*:<pkg>:<version>`.
-   Used when OSV returns empty for an ecosystem it doesn't cover, or when
-   cross-referencing is warranted. Unauth rate limit ~5 req / 30s — use
-   `nvd_api_key` if available.
-3. **Fallback: GHSA REST** — `GET
-   https://api.github.com/advisories?ecosystem=<eco>&affects=<pkg>@<version>`
-   for repo-native advisories (including GitHub-only issues not yet in
-   NVD). Pass `Authorization: Bearer $GITHUB_TOKEN` if available.
-4. **Record source and fetched_at** per CVE so the report is reproducible.
-   Structure each enriched finding as `{id, source: "OSV|NVD|GHSA", cvss,
-   summary, fixed_versions, references, fetched_at}`.
-5. **Degradation on HTTP error / rate-limit**:
-   - On 429 or 5xx: retry ONCE with 2-second backoff.
-   - On second failure: mark that specific package `cve_enrichment:
-     "offline"` and continue — do NOT fail the whole review.
-   - If ALL three feeds fail for the entire run, write the report with
-     an "⚠ CVE enrichment offline — re-run with network to populate"
-     banner at the top. Do NOT fabricate CVE IDs from training data.
-6. **Cap lookups at 500 per review**. If the cap is exceeded, warn the
-   user and ask them to narrow scope (e.g. review one service at a time).
+The triager **only annotates** — it never drops findings and never
+alters the `fix_recipe` string. The rubric in section 5 is the only
+thing that downgrades a finding into the LOW bucket, driven by the
+`confidence` field the triager sets here. The `__dep_inventory__` line
+passes through unchanged.
 
-Attach any matching CVE entries to the corresponding dep-level finding in
-the `findings` list. Also promote HIGH/CRITICAL CVSS CVEs to top-level
-findings (not just footnotes on the dep inventory).
+Input to finding-triager: the raw JSONL stream from sec-expert plus the
+plugin root path. Output: the same JSONL stream with the three extra
+fields appended to each finding line.
+
+## 4. CVE enrichment — dispatch cve-enricher
+
+Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
+haiku). It consumes the dep inventory emitted by sec-expert and returns a
+structured JSON document — one object per package with its CVEs and a
+`status` field (`ok` / `offline` / `capped`). Moving CVE enrichment into a
+haiku-pinned agent keeps the main skill context small and makes the
+per-package I/O loop cheap.
+
+The agent uses the OSV `querybatch` endpoint for the primary lookup (up
+to 1000 queries per call, returning vuln IDs only), follows up with
+per-id detail fetches, and falls back to NVD 2.0 and GHSA for packages
+OSV doesn't cover. Endpoint URLs live in `references/cve-feeds.md` —
+`cve-enricher` reads them at runtime; they are NOT inlined here or in
+the agent body. That file is the single choke-point when feed schemas
+change.
+
+Skill-level invariants the orchestrator still enforces (the agent
+reports these states; the skill decides what to do with them):
+
+- **Per-package `status: "offline"`** — keep the package in the report,
+  but mark `CVE(s): Unknown — feed offline` in its finding block.
+- **Per-package `status: "capped"`** — we hit the 500-lookup cap; emit a
+  `Limits hit: cve_lookup_cap_500` entry in the Review metadata section
+  and ask the user to narrow scope on re-run.
+- **All-feeds-offline run** — when every package has `status: "offline"`,
+  add the `⚠ CVE enrichment offline — re-run with network to populate`
+  banner at the top of the report. The report still lists the full
+  finding set from sec-expert. Never fabricate CVE IDs from training
+  data under any circumstance.
+- **Retry and cap** — the agent enforces retry-once-with-2s-backoff and
+  the 500 cap itself; the skill just validates the shape of what comes
+  back.
+
+Attach each CVE entry to the corresponding dep-level finding, and
+promote HIGH/CRITICAL CVSS CVEs to top-level findings (not just footnotes
+on the dep inventory).
 
 ## 5. Prioritize
 
@@ -160,7 +186,10 @@ Compute a numeric score 0–100 per finding and bucket it.
   must already control the host.
 
 Downgrade confidence one step if `cve_enrichment: "offline"` — an unknown
-CVSS can't count against the user.
+CVSS can't count against the user. Note: the base `confidence` field this
+rubric reads is set by the `finding-triager` agent (section 3.5), not by
+this skill. This skill's only confidence adjustment is the offline
+downgrade above; all other confidence decisions belong to the triager.
 
 **Buckets**:
 
@@ -173,10 +202,22 @@ CVSS can't count against the user.
 
 Order the report by descending score, CRITICAL first.
 
-## 6. Report
+## 6. Report — dispatch report-writer
 
-Write `<target_path>/sec-review-report-YYYYMMDD-HHMM.md` (timestamp in
-UTC). Structure:
+Dispatch the `report-writer` agent (`agents/report-writer.md`, pinned to
+sonnet) with the triaged findings, the cve-enricher output, and the
+inventory. The agent writes
+`<target_path>/sec-review-report-YYYYMMDD-HHMM.md` (timestamp in UTC) and
+returns the absolute path to stdout so the orchestrator can confirm
+placement.
+
+This section documents the report template so it remains readable in the
+skill source — but generation is **delegated** to the agent. Keeping the
+template here is for humans reading the skill; the agent is the single
+source of truth for actual report shape. Do not inline the markdown build
+into this skill's context.
+
+Template (the agent follows this exactly):
 
 ```markdown
 # Security Review — <target_basename>

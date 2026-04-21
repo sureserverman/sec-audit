@@ -1,0 +1,3 @@
+tool_uses_v0_1_0=30
+captured_at=2026-04-21
+method=single sec-expert sub-agent inline CVE enrichment (v0.1.0 SKILL.md)

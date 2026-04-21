@@ -1,0 +1,515 @@
+[
+  {
+    "ecosystem": "PyPI",
+    "name": "django",
+    "version": "2.2.0",
+    "cves": [
+      {
+        "id": "CVE-2019-12781",
+        "osv_id": "PYSEC-2019-10",
+        "cve_aliases": [
+          "CVE-2019-12781"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11 before 1.11.22, 2.1 before 2.1.10, and 2.2 before 2.2.3. An HTTP request is not redirected to HTTPS when the SECURE_PROXY_SSL_HEADER and SECURE_SSL_REDIRECT sett",
+        "fixed_versions": [
+          "1.11.22",
+          "2.1.10",
+          "2.2.3"
+        ],
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Is4kLY9ZcZQ",
+          "https://www.djangoproject.com/weblog/2019/jul/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "http://www.openwall.com/lists/oss-security/2019/07/01/3"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-14232",
+        "osv_id": "PYSEC-2019-11",
+        "cve_aliases": [
+          "CVE-2019-14232"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. If django.utils.text.Truncator's chars() and words() methods were passed the html=True argument, t",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-14233",
+        "osv_id": "PYSEC-2019-12",
+        "cve_aliases": [
+          "CVE-2019-14233"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. Due to the behaviour of the underlying HTMLParser, django.utils.html.strip_tags would be extremely",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-14234",
+        "osv_id": "PYSEC-2019-13",
+        "cve_aliases": [
+          "CVE-2019-14234"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. Due to an error in shallow key transformation, key and index lookups for django.contrib.postgres.f",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://seclists.org/bugtraq/2019/Aug/15"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-14235",
+        "osv_id": "PYSEC-2019-14",
+        "cve_aliases": [
+          "CVE-2019-14235"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. If passed certain inputs, django.utils.encoding.uri_to_iri could lead to significant memory usage ",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-19118",
+        "osv_id": "PYSEC-2019-15",
+        "cve_aliases": [
+          "CVE-2019-19118"
+        ],
+        "cvss": null,
+        "summary": "Django 2.1 before 2.1.15 and 2.2 before 2.2.8 allows unintended model editing. A Django model admin displaying inline related models, where the user has view-only permissions to a parent model but edi",
+        "fixed_versions": [
+          "2.1.15",
+          "2.2.8"
+        ],
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2019/12/02/1",
+          "https://groups.google.com/forum/#!topic/django-announce/GjGqDvtNmWQ",
+          "https://www.djangoproject.com/weblog/2019/dec/02/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-19844",
+        "osv_id": "PYSEC-2019-16",
+        "cve_aliases": [
+          "CVE-2019-19844"
+        ],
+        "cvss": null,
+        "summary": "Django before 1.11.27, 2.x before 2.2.9, and 3.x before 3.0.1 allows account takeover. A suitably crafted email address (that is equal to an existing user's email address after case transformation of ",
+        "fixed_versions": [
+          "1.11.27",
+          "2.2.9"
+        ],
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/3oaB2rVH3a0",
+          "https://www.djangoproject.com/weblog/2019/dec/18/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://usn.ubuntu.com/4224-1/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2019-12308",
+        "osv_id": "PYSEC-2019-79",
+        "cve_aliases": [
+          "CVE-2019-12308"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 1.11 before 1.11.21, 2.1 before 2.1.9, and 2.2 before 2.2.2. The clickable Current URL value displayed by the AdminURLFieldWidget displays the provided value without ",
+        "fixed_versions": [
+          "1.11.21",
+          "2.1.9",
+          "2.2.2"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/jun/03/security-releases/",
+          "https://groups.google.com/forum/#!topic/django-announce/GEbHU7YoVz8",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://docs.djangoproject.com/en/dev/releases/2.2.2/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-13254",
+        "osv_id": "PYSEC-2020-31",
+        "cve_aliases": [
+          "CVE-2020-13254"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 2.2 before 2.2.13 and 3.0 before 3.0.7. In cases where a memcached backend does not perform key validation, passing malformed cache keys could result in a key collisi",
+        "fixed_versions": [
+          "2.2.13",
+          "3.0.7"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://groups.google.com/d/msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
+          "https://usn.ubuntu.com/4381-1/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-13596",
+        "osv_id": "PYSEC-2020-32",
+        "cve_aliases": [
+          "CVE-2020-13596"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 2.2 before 2.2.13 and 3.0 before 3.0.7. Query parameters generated by the Django admin ForeignKeyRawIdWidget were not properly URL encoded, leading to a possibility o",
+        "fixed_versions": [
+          "2.2.13",
+          "3.0.7"
+        ],
+        "references": [
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
+          "https://groups.google.com/forum/#!msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://usn.ubuntu.com/4381-1/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-24583",
+        "osv_id": "PYSEC-2020-33",
+        "cve_aliases": [
+          "CVE-2020-24583"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 2.2 before 2.2.16, 3.0 before 3.0.10, and 3.1 before 3.1.1 (when Python 3.7+ is used). FILE_UPLOAD_DIRECTORY_PERMISSIONS mode was not applied to intermediate-level di",
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-24584",
+        "osv_id": "PYSEC-2020-34",
+        "cve_aliases": [
+          "CVE-2020-24584"
+        ],
+        "cvss": null,
+        "summary": "An issue was discovered in Django 2.2 before 2.2.16, 3.0 before 3.0.10, and 3.1 before 3.1.1 (when Python 3.7+ is used). The intermediate-level directories of the filesystem cache had the system's sta",
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-7471",
+        "osv_id": "PYSEC-2020-35",
+        "cve_aliases": [
+          "CVE-2020-7471"
+        ],
+        "cvss": null,
+        "summary": "Django 1.11 before 1.11.28, 2.2 before 2.2.10, and 3.0 before 3.0.3 allows SQL Injection if untrusted data is used as a StringAgg delimiter (e.g., in Django applications that offer downloads of data a",
+        "fixed_versions": [
+          "1.11.28",
+          "2.2.10",
+          "3.0.3",
+          "eb31d845323618d688ad429479c6dda973056136"
+        ],
+        "references": [
+          "https://www.openwall.com/lists/oss-security/2020/02/03/1",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/X45S86X5bZI",
+          "https://www.djangoproject.com/weblog/2020/feb/03/security-releases/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-9402",
+        "osv_id": "PYSEC-2020-36",
+        "cve_aliases": [
+          "CVE-2020-9402"
+        ],
+        "cvss": null,
+        "summary": "Django 1.11 before 1.11.29, 2.2 before 2.2.11, and 3.0 before 3.0.4 allows SQL Injection if untrusted data is used as a tolerance parameter in GIS functions and aggregates on Oracle. By passing a suit",
+        "fixed_versions": [
+          "1.11.29",
+          "2.2.11",
+          "3.0.4"
+        ],
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/fLUh_pOaKrY",
+          "https://www.djangoproject.com/weblog/2020/mar/04/security-releases/",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://usn.ubuntu.com/4296-1/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2021-44420",
+        "osv_id": "PYSEC-2021-439",
+        "cve_aliases": [
+          "CVE-2021-44420"
+        ],
+        "cvss": null,
+        "summary": "In Django 2.2 before 2.2.25, 3.1 before 3.1.14, and 3.2 before 3.2.10, HTTP requests for URLs with trailing newlines could bypass upstream access control based on URL paths.",
+        "fixed_versions": [
+          "2.2.25",
+          "3.1.14",
+          "3.2.10"
+        ],
+        "references": [
+          "https://docs.djangoproject.com/en/3.2/releases/security/",
+          "https://www.openwall.com/lists/oss-security/2021/12/07/1",
+          "https://www.djangoproject.com/weblog/2021/dec/07/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      }
+    ],
+    "status": "ok"
+  },
+  {
+    "ecosystem": "PyPI",
+    "name": "requests",
+    "version": "2.19.0",
+    "cves": [
+      {
+        "id": "CVE-2018-18074",
+        "osv_id": "PYSEC-2018-28",
+        "cve_aliases": [
+          "CVE-2018-18074"
+        ],
+        "cvss": null,
+        "summary": "The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to dis",
+        "fixed_versions": [
+          "2.20.0",
+          "c45d7c49ea75133e52ab22a8e9e13173938e36ff"
+        ],
+        "references": [
+          "https://github.com/requests/requests/pull/4718",
+          "https://github.com/requests/requests/issues/4716",
+          "https://github.com/requests/requests/commit/c45d7c49ea75133e52ab22a8e9e13173938e36ff",
+          "https://bugs.debian.org/910766"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2023-32681",
+        "osv_id": "PYSEC-2023-74",
+        "cve_aliases": [
+          "CVE-2023-32681"
+        ],
+        "cvss": null,
+        "summary": "Requests is a HTTP library. Since Requests 2.3.0, Requests has been leaking Proxy-Authorization headers to destination servers when redirected to an HTTPS endpoint. This is a product of how we use `re",
+        "fixed_versions": [
+          "2.31.0",
+          "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5"
+        ],
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q",
+          "https://github.com/psf/requests/releases/tag/v2.31.0",
+          "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/AW7HNFGYP44RT3DUDQXG2QT3OEV2PJ7Y/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2024-35195",
+        "osv_id": "GHSA-9wx4-h78v-vm56",
+        "cve_aliases": [
+          "CVE-2024-35195"
+        ],
+        "cvss": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+        "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
+        "fixed_versions": [
+          "2.32.0"
+        ],
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-35195",
+          "https://github.com/psf/requests/pull/6655",
+          "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2023-32681",
+        "osv_id": "GHSA-j8r2-6x86-q33q",
+        "cve_aliases": [
+          "CVE-2023-32681"
+        ],
+        "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+        "summary": "Unintended leak of Proxy-Authorization header in requests",
+        "fixed_versions": [
+          "2.31.0"
+        ],
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q",
+          "https://nvd.nist.gov/vuln/detail/CVE-2023-32681",
+          "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+          "https://github.com/psf/requests"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      }
+    ],
+    "status": "ok"
+  },
+  {
+    "ecosystem": "PyPI",
+    "name": "pyyaml",
+    "version": "5.3",
+    "cves": [
+      {
+        "id": "CVE-2020-1747",
+        "osv_id": "PYSEC-2020-96",
+        "cve_aliases": [
+          "CVE-2020-1747",
+          "CVE-2025-50460"
+        ],
+        "cvss": null,
+        "summary": "A vulnerability was discovered in the PyYAML library in versions before 5.3.1, where it is susceptible to arbitrary code execution when it processes untrusted YAML files through the full_load method o",
+        "fixed_versions": [
+          "5.3.1"
+        ],
+        "references": [
+          "https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2020-1747",
+          "https://github.com/yaml/pyyaml/pull/386",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/WORRFHPQVAFKKXXWLSSW6XKUYLWM6CSH/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZBJA3SGNJKCAYPSHOHWY3KBCWNM5NYK2/"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-14343",
+        "osv_id": "PYSEC-2021-142",
+        "cve_aliases": [
+          "CVE-2020-14343"
+        ],
+        "cvss": null,
+        "summary": "A vulnerability was discovered in the PyYAML library in versions before 5.4, where it is susceptible to arbitrary code execution when it processes untrusted YAML files through the full_load method or ",
+        "fixed_versions": [
+          "5.4"
+        ],
+        "references": [
+          "https://bugzilla.redhat.com/show_bug.cgi?id=1860466",
+          "https://github.com/advisories/GHSA-8q59-q68h-6hv4"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-14343",
+        "osv_id": "GHSA-8q59-q68h-6hv4",
+        "cve_aliases": [
+          "CVE-2020-14343"
+        ],
+        "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "summary": "Improper Input Validation in PyYAML",
+        "fixed_versions": [
+          "5.4"
+        ],
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-14343",
+          "https://github.com/SeldonIO/seldon-core/issues/2252",
+          "https://github.com/yaml/pyyaml/issues/420",
+          "https://github.com/yaml/pyyaml/issues/420#issuecomment-663673966"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      },
+      {
+        "id": "CVE-2020-1747",
+        "osv_id": "GHSA-6757-jp84-gxfx",
+        "cve_aliases": [
+          "CVE-2020-1747",
+          "CVE-2025-50460"
+        ],
+        "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "summary": "Improper Input Validation in PyYAML",
+        "fixed_versions": [
+          "5.3.1"
+        ],
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-1747",
+          "https://github.com/github/advisory-database/pull/4942",
+          "https://github.com/yaml/pyyaml/pull/386",
+          "https://github.com/yaml/pyyaml/commit/0cedb2a0697b2bc49e4f3841b8d4590b6b15657e"
+        ],
+        "source": "OSV",
+        "fetched_at": "2026-04-21T11:35Z"
+      }
+    ],
+    "status": "ok"
+  }
+]

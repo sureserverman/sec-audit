@@ -1,0 +1,7 @@
+tool_uses_v0_2_0=23
+captured_at=2026-04-21
+method=v0.2.0 SKILL.md orchestrator, 4-agent pipeline (sec-expert, finding-triager, cve-enricher, report-writer)
+baseline_v0_1_0=30
+delta=-7
+notes=OSV querybatch single call replaced 3 individual queries; context reuse across steps reduced sec-expert read count
+breakdown=sec-expert:17 triager:1 enricher:2 writer:3

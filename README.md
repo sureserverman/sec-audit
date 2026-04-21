@@ -1,6 +1,6 @@
 # sec-review
 
-A Claude Code plugin that performs **citation-grounded cybersecurity reviews** of web services and servers. It pairs a domain-expert subagent with **live CVE feeds** (NVD 2.0, OSV.dev, GitHub GHSA) to produce a prioritized markdown report of reliable, primary-source-cited fixes.
+A Claude Code plugin that performs **citation-grounded cybersecurity reviews** of web services and servers. It pairs a **four-agent pipeline** (domain-expert + triager + CVE enricher + report-writer, each model-pinned for cost efficiency) with **live CVE feeds** (NVD 2.0, OSV.dev, GitHub GHSA) to produce a prioritized markdown report of reliable, primary-source-cited fixes.
 
 The plugin is arranged as its own single-plugin marketplace — one `/plugin marketplace add` makes it installable.
 
@@ -104,6 +104,57 @@ To contribute a new reference pack:
 3. Add 3–6 `### <Pattern> — CWE-XXX` entries and 2–4 `### Recipe:` entries.
 4. Run the header-presence check from the plan document.
 
+## Architecture
+
+v0.2.0 splits the review into four specialist agents, each pinned to the
+right model class, glued together by the `sec-review` orchestrator skill:
+
+```
+   /sec-review <path>
+          │
+          ▼
+  ┌───────────────────────┐
+  │  skills/sec-review    │    orchestrator: scope, inventory,
+  │     SKILL.md          │    rubric, dispatch — stays lean
+  └───┬────────┬──────┬───┘
+      │        │      │
+      ▼        │      │
+  ┌────────────┴──┐   │
+  │  sec-expert   │   │    sonnet · inventory + grep + raw findings
+  │  (sonnet)     │   │                (no triage, no CVE I/O)
+  └──────┬────────┘   │
+         │ JSONL      │
+         ▼            │
+  ┌───────────────┐   │
+  │ finding-      │   │    sonnet · context-aware FP annotation;
+  │ triager       │   │                never drops findings
+  │ (sonnet)      │   │
+  └──────┬────────┘   │
+         │ JSONL      │
+         │        ┌───▼──────────┐
+         │        │ cve-enricher │  haiku · OSV querybatch + NVD +
+         │        │ (haiku)      │          GHSA fallback, retry+cap
+         │        └──────┬───────┘
+         │               │ JSON
+         ▼               ▼
+       ┌───────────────────┐
+       │   report-writer   │   sonnet · composes final markdown
+       │   (sonnet)        │             from triaged + enriched
+       └───────┬───────────┘
+               ▼
+      sec-review-report-YYYYMMDD-HHMM.md
+```
+
+| Agent             | Model (pinned) | Role                                                 |
+|-------------------|----------------|------------------------------------------------------|
+| `sec-expert`      | `sonnet`       | Inventory + grep + raw JSONL findings. No triage.   |
+| `finding-triager` | `sonnet`       | Context-aware FP annotation; sets `confidence`.     |
+| `cve-enricher`    | `haiku`        | OSV querybatch + NVD/GHSA fallback; retry + 500 cap.|
+| `report-writer`   | `sonnet`       | Composes final markdown from all upstream outputs.  |
+
+Model pinning makes sub-agent cost independent of caller model — invoking
+`/sec-review` from an Opus session does not upgrade any sub-agent to Opus.
+
 ## Layout
 
 ```
@@ -111,7 +162,10 @@ To contribute a new reference pack:
   plugin.json
   marketplace.json
 agents/
-  sec-expert.md            — domain-expert subagent
+  sec-expert.md            — inventory + grep + raw findings (sonnet)
+  finding-triager.md       — context-aware FP annotation (sonnet)
+  cve-enricher.md          — OSV querybatch + NVD/GHSA fallback (haiku)
+  report-writer.md         — final markdown composition (sonnet)
 skills/
   sec-review/
     SKILL.md               — orchestrator
