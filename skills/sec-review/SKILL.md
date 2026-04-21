@@ -14,6 +14,10 @@ code analysis; this skill orchestrates and enriches.
 
 - `target_path` (required) — absolute path of the project to review.
   The slash command passes `$ARGUMENTS` here.
+- `target_url` (optional) — HTTP(S) URL of a running instance of the
+  same project, for the DAST lane (§3.7). When absent, DAST is
+  skipped; static code analysis and CVE enrichment still run. Read
+  from `$DAST_TARGET_URL` env var if unset.
 - `github_token` (optional) — used to raise the GHSA rate limit from 60/hr
   to 5000/hr. Read from `$GITHUB_TOKEN` env var if unset.
 - `nvd_api_key` (optional) — raises NVD rate limit from ~5/30s to 50/30s.
@@ -167,6 +171,46 @@ them):
 The dep-inventory and CVE-enrichment paths are NOT affected by this
 pass — SAST findings are code-pattern signal, not package-version
 signal.
+
+### 3.7 DAST pass — dispatch dast-runner
+
+When the caller supplies a `target_url` input (an HTTP or HTTPS URL
+of a running instance of the target), dispatch the `dast-runner`
+agent (`agents/dast-runner.md`, pinned to haiku, tools: Read + Bash).
+The agent shells out to OWASP ZAP baseline via docker
+(`zaproxy/zap-stable`) or the local `zap-baseline.py`, parses ZAP's
+native JSON output, and emits sec-expert-compatible JSONL on stdout —
+every line carrying `origin: "dast"` and `tool: "zap-baseline"`.
+
+DAST runs in parallel with sec-expert, sast-runner, and cve-enricher
+— its input is a URL, not a file path or a dep inventory, so it
+shares nothing with the other agents. Collect the DAST JSONL into a
+`dast_findings` list alongside the other streams.
+
+Skill-level invariants the orchestrator enforces on the DAST stream:
+
+- **No `target_url` supplied** — skip DAST entirely. Do NOT fabricate
+  a URL from the repo contents. Add a Review-metadata line
+  `DAST: skipped — no target_url supplied` so the absence is visible.
+- **`__dast_status__: "unavailable"`** — neither `docker` nor
+  `zap-baseline.py` was on PATH, the URL was non-HTTP, or the ZAP
+  run failed. Add the `⚠ DAST tools unavailable — install docker or
+  zap-baseline to enable dynamic-analysis pass` banner to the Review
+  metadata block. Do NOT fabricate findings.
+- **`__dast_status__: "ok"`** — ZAP ran successfully. Merge the DAST
+  findings into the triaged stream. DAST findings carry `file:
+  <site hostname or URI>` and `line: 0` because DAST has no source
+  line; the report-writer renders `Target: <method> <uri>` from the
+  `notes` field instead of the conventional `file:line` locus.
+- **DAST baseline is passive only.** The ZAP baseline profile never
+  performs active exploitation. Any finding with CRITICAL severity
+  must come from a different agent — DAST's maximum is HIGH
+  (`riskcode: "3"`).
+
+DAST findings are additive signal. They do NOT feed the dep-inventory
+or CVE-enrichment paths; a live scan surfaces runtime issues that
+static analysis cannot (reflected XSS, missing security headers on
+rendered pages, mixed-content, server banners).
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
