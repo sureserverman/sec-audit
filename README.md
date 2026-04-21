@@ -97,7 +97,7 @@ Three quality-of-review improvements landed in v0.3.0 without architectural chan
 - **Static analysis only.** This plugin does not execute your code, run SAST binaries, or fuzz endpoints. It greps for dangerous patterns and enriches with CVE feeds.
 - **Regex hints over-match.** Every reference file has a `## Common false positives` section. Findings the sec-expert flags as likely FP are emitted with `confidence: low` and a note; review with judgment.
 - **Transitive deps are covered by OSV** but only when the manifest exposes them (e.g. `poetry.lock`, `package-lock.json`, `go.sum`). Unlocked `requirements.txt` only lists direct deps.
-- **Platform coverage.** Deep CIS-benchmark coverage is strongest for Linux hosts; Windows/IIS targets are out of scope in v0.1.
+- **Platform coverage.** Deep CIS-benchmark coverage is strongest for Linux hosts. **IIS webserver configuration** (`web.config`, `applicationHost.config`) is covered as of v0.4.0 via `references/webservers/iis.md`. Windows OS hardening (registry, WinRM, SMB, Defender policy) remains out of scope — that territory needs live-host interaction rather than code/config review.
 - **Per-review lookup cap** of 500 CVE queries. Monorepos with many services should be scoped to one service at a time.
 - **Secrets detection** is pattern-based (it won't beat a dedicated scanner like gitleaks/trufflehog for history). Consider those as a complement.
 
