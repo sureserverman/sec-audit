@@ -92,12 +92,82 @@ Three quality-of-review improvements landed in v0.3.0 without architectural chan
 - **Per-agent token-cost accounting.** `tests/measure-pipeline.sh <tokens.json>` converts a per-agent tokens JSON into a blended-rate cost figure, using rates pinned in `tests/model-costs.json`. The v0.2.0 baseline (on the sample-stack fixture) landed at **$0.5575 / 112K tokens**; the v0.3.0 Stage 3 baseline with KEV added captured **$1.2644 / 244K tokens** — most of the spread is sub-agent dispatch variance across runs, not the KEV adapter (which is one extra HTTP fetch + index). Runtime only exposes `total_tokens`, so costing is blended at an assumed 3:1 input:output ratio; when per-token-type fields become visible, `model-costs.json` already carries `input_per_mtok` and `output_per_mtok` for a one-line upgrade.
 - **Offline-degradation drill.** `tests/offline-drill.sh` stands up a local 503 mock (`tests/offline-mock.py`), proves every override URL routes to it, and asserts the pipeline's offline path produces the ⚠ banner and zero fabricated CVE IDs. The `cve-enricher` agent now honors four env-var overrides (`OSV_BASE_URL`, `NVD_BASE_URL`, `GHSA_BASE_URL`, `KEV_URL`) with a stderr audit log on each active override — reviews run against an internal mirror or air-gapped cache are visibly distinguishable from live-feed runs.
 
+## Windows/IIS coverage (v0.4.0)
+
+A new reference pack `skills/sec-review/references/webservers/iis.md`
+extends sec-review to **Microsoft IIS 10** configuration audits. The
+pack covers eight hardening patterns grounded in primary sources:
+
+- **TLS policy** — TLS 1.0 / 1.1 enablement on `sslProtocols`; `ssl3`
+  surface.
+- **Directory browsing** — `<directoryBrowse enabled="true">` leaking
+  directory contents.
+- **Server / X-Powered-By headers** — missing `remove` rules in
+  `<customHeaders>` revealing IIS + ASP.NET version to attackers.
+- **Error disclosure** — `<customErrors mode="Off">` and
+  `<httpErrors errorMode="Detailed">` leaking stack traces.
+- **Anonymous IUSR authentication** — enabled in
+  `applicationHost.config` without explicit ACLs.
+- **machineKey AutoGenerate with IsolateApps** — breaks session state
+  and view-state validation across the farm.
+- **`maxAllowedContentLength` unset or huge** — enabling DoS via body
+  size.
+- **Missing security headers** — HSTS, X-Content-Type-Options,
+  X-Frame-Options absent from `<customHeaders>`.
+
+Primary sources cited in the pack: **CIS Microsoft IIS 10 Benchmark**,
+**NIST NCP / DISA STIG for IIS 10**, Microsoft Learn
+(`system.webServer` / `system.applicationHost` schema), OWASP Secure
+Headers, Mozilla SSL Configuration, **RFC 9325** (TLS BCP), and
+**RFC 6797** (HSTS). Fixture `tests/fixtures/iis-stack/` ships the full
+set of vulnerable patterns so regression tests fail loudly if the pack
+drifts.
+
+Windows OS hardening (registry policy, WinRM, SMB signing, Defender
+exclusions) remains out of scope — that territory needs live-host
+interaction rather than code/config review.
+
+## SAST adapter (v0.4.0)
+
+A fifth agent, **`sast-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline as an opt-in static-analysis pass dispatched
+in parallel with `sec-expert`. It shells out to two tools when they are
+on `PATH`:
+
+- **Semgrep** (`semgrep scan --config=p/owasp-top-ten --json
+  --metrics=off`) — OWASP Top Ten ruleset with telemetry suppressed so
+  the shape of the audited codebase never leaves the machine.
+- **Bandit** (`bandit -r <target> -f json --exit-zero`) — Python-only,
+  run recursively with structured JSON output.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "sast"` and `tool: "semgrep" | "bandit"`, mapped per the
+field-mapping recipes in `skills/sec-review/references/sast-tools.md`.
+The `finding-triager` agent is origin-aware — SAST findings consult
+the SAST pack's `## Common false positives` in addition to the matched
+domain pack and are never dropped.
+
+**Fixes still come from the regex packs, not from the SAST tools.**
+Semgrep and bandit surface a signal and a rule ID — they don't ship
+quoted, verbatim fix recipes in the sec-review sense, so every SAST
+finding lands with `fix_recipe: null`. The regex-based domain packs
+remain the single source of truth for the `> Recommended fix` block in
+the final report.
+
+**Degrade path.** When neither binary is on `PATH`, the agent emits a
+single sentinel line `{"__sast_status__": "unavailable", "tools": []}`
+and exits clean. The orchestrator adds a `⚠ SAST tools unavailable`
+banner to the Review metadata section — absence of SAST findings is
+visibly distinguishable from a clean SAST scan. `tests/sast-drill.sh`
+enforces this contract by scrubbing PATH and asserting the unavailable
+output shape. No SAST finding is ever fabricated.
+
 ## Known limits & false positives
 
 - **Static analysis only.** This plugin does not execute your code, run SAST binaries, or fuzz endpoints. It greps for dangerous patterns and enriches with CVE feeds.
 - **Regex hints over-match.** Every reference file has a `## Common false positives` section. Findings the sec-expert flags as likely FP are emitted with `confidence: low` and a note; review with judgment.
 - **Transitive deps are covered by OSV** but only when the manifest exposes them (e.g. `poetry.lock`, `package-lock.json`, `go.sum`). Unlocked `requirements.txt` only lists direct deps.
-- **Platform coverage.** Deep CIS-benchmark coverage is strongest for Linux hosts; Windows/IIS targets are out of scope in v0.1.
+- **Platform coverage.** Deep CIS-benchmark coverage is strongest for Linux hosts. **IIS webserver configuration** (`web.config`, `applicationHost.config`) is covered as of v0.4.0 via `references/webservers/iis.md`. Windows OS hardening (registry, WinRM, SMB, Defender policy) remains out of scope — that territory needs live-host interaction rather than code/config review.
 - **Per-review lookup cap** of 500 CVE queries. Monorepos with many services should be scoped to one service at a time.
 - **Secrets detection** is pattern-based (it won't beat a dedicated scanner like gitleaks/trufflehog for history). Consider those as a complement.
 

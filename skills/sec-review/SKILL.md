@@ -128,6 +128,46 @@ Input to finding-triager: the raw JSONL stream from sec-expert plus the
 plugin root path. Output: the same JSONL stream with the three extra
 fields appended to each finding line.
 
+### 3.6 SAST pass — dispatch sast-runner
+
+After triage, run a separate SAST pass on the same `target_path` by
+dispatching the `sast-runner` agent (`agents/sast-runner.md`, pinned
+to haiku, tools: Read + Bash). The agent shells out to `semgrep` and
+`bandit` using the canonical invocations in `references/sast-tools.md`,
+parses their native JSON, and emits sec-expert-compatible JSONL on
+stdout — every line carrying `origin: "sast"` and `tool: "semgrep"` or
+`tool: "bandit"`.
+
+The SAST stream runs in parallel with the sec-expert stream and is
+independent of it: SAST findings are additive signal, not replacements.
+Collect the SAST JSONL into a `sast_findings` list alongside the
+triaged regex findings.
+
+Skill-level invariants the orchestrator enforces on the SAST stream
+(the agent reports these states; the skill decides what to do with
+them):
+
+- **`__sast_status__: "unavailable"`** — neither `semgrep` nor `bandit`
+  was on PATH (or both failed). Add the `⚠ SAST tools unavailable —
+  install semgrep and/or bandit to enable static-analysis pass` banner
+  to the Review metadata block. Do NOT fabricate findings. Do NOT treat
+  the absence as a clean scan.
+- **`__sast_status__: "ok"`** — at least one tool ran successfully.
+  Merge the SAST findings into the triaged stream. The triager's
+  origin-aware rules (see `agents/finding-triager.md`) govern FP
+  annotation for any SAST-origin findings that flow back through
+  triage on a subsequent pass; by default the SAST findings carry the
+  `confidence` the tool or the mapping table sets and are not
+  downgraded.
+- **Partial availability** — if `tools` in the status line omits a
+  binary that was expected, note it in the Review metadata section
+  (`SAST tools run: semgrep; bandit skipped — not on PATH`) so the
+  absence is visible rather than silent.
+
+The dep-inventory and CVE-enrichment paths are NOT affected by this
+pass — SAST findings are code-pattern signal, not package-version
+signal.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

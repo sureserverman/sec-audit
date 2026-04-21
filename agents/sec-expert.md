@@ -69,7 +69,8 @@ Enumerate `target_path` to determine language, framework, and infrastructure:
   `composer.json`.
 - Config files: `Dockerfile`, `docker-compose.yml`, `kubernetes/*.yaml`,
   `nginx.conf`, `httpd.conf`, `.caddyfile`, `haproxy.cfg`, `traefik.yml`,
-  `envoy.yaml`, `.env*`, `settings.py`, `application.yml`, `next.config.js`.
+  `envoy.yaml`, `web.config`, `applicationHost.config`, `.env*`, `settings.py`,
+  `application.yml`, `next.config.js`.
 - Code layout: view/controller files, template engines, auth middleware,
   DB access patterns.
 

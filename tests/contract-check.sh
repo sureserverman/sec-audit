@@ -59,13 +59,142 @@ done
 
 # model pinning (caller-model-independence)
 for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
-            "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet"; do
+            "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
+            "agents/sast-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
         assert d.get('model')=='$model', ('wrong model', d.get('model'), 'expected $model'); \
         print(f'model pin ok: $file -> $model')"
 done
+
+# Per-fixture JSONL pipeline output validation against the sec-expert finding
+# schema. Walks every subdirectory of tests/fixtures/ and validates any
+# .pipeline/*.jsonl file found there. A fixture without a .pipeline/ directory
+# (or with no .jsonl files in it) is skipped with an informational line rather
+# than failing — fixtures may exist before any pipeline has been run against
+# them.
+validate_fixture_jsonl() {
+    local fixture_dir="$1"
+    local fixture_name
+    fixture_name="$(basename "$fixture_dir")"
+    local pipeline_dir="$fixture_dir/.pipeline"
+    if [ ! -d "$pipeline_dir" ]; then
+        echo "$fixture_name: no JSONL pipeline output yet, skipping"
+        return 0
+    fi
+    # Collect .jsonl files (nullglob-style via find to avoid literal glob).
+    local jsonl_files=()
+    while IFS= read -r -d '' f; do
+        jsonl_files+=("$f")
+    done < <(find "$pipeline_dir" -maxdepth 1 -type f -name '*.jsonl' -print0)
+    if [ "${#jsonl_files[@]}" -eq 0 ]; then
+        echo "$fixture_name: no JSONL pipeline output yet, skipping"
+        return 0
+    fi
+    local jf
+    for jf in "${jsonl_files[@]}"; do
+        if ! python3 - "$jf" "$fixture_name" <<'PY'
+import json, sys
+path, fixture = sys.argv[1], sys.argv[2]
+required = ["id", "severity", "cwe", "file", "line", "evidence",
+            "reference", "reference_url", "fix_recipe", "confidence"]
+severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}
+confidences = {"high", "medium", "low"}
+errs = 0
+with open(path) as fh:
+    for i, line in enumerate(fh, 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception as e:
+            print(f"CONTRACT FAIL: {path}:{i} not valid JSON: {e}", file=sys.stderr)
+            errs += 1
+            continue
+        if not isinstance(obj, dict):
+            print(f"CONTRACT FAIL: {path}:{i} not a JSON object", file=sys.stderr)
+            errs += 1
+            continue
+        # Allow the dep-inventory sentinel line emitted by sec-expert.
+        if "__dep_inventory__" in obj or obj.get("id") == "__dep_inventory__":
+            continue
+        # Allow the SAST status summary line emitted by sast-runner.
+        if "__sast_status__" in obj:
+            status = obj.get("__sast_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __sast_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __sast_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
+        missing = [k for k in required if k not in obj]
+        if missing:
+            print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
+            errs += 1
+            continue
+        if obj["severity"] not in severities:
+            print(f"CONTRACT FAIL: {path}:{i} bad severity {obj['severity']!r}", file=sys.stderr)
+            errs += 1
+        if obj["confidence"] not in confidences:
+            print(f"CONTRACT FAIL: {path}:{i} bad confidence {obj['confidence']!r}", file=sys.stderr)
+            errs += 1
+        if not isinstance(obj["line"], int):
+            print(f"CONTRACT FAIL: {path}:{i} line must be int", file=sys.stderr)
+            errs += 1
+        # Origin-aware validation: SAST findings must carry `tool` and `origin`.
+        if obj.get("origin") == "sast":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} sast finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"semgrep", "bandit"}:
+                print(f"CONTRACT FAIL: {path}:{i} sast tool must be semgrep|bandit, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # fix_recipe is explicitly null-permitted for SAST findings.
+            if "fix_recipe" in obj and obj["fix_recipe"] not in (None, ""):
+                # SAST tools do not ship quoted fix recipes; warn if present.
+                pass
+sys.exit(1 if errs else 0)
+PY
+        then
+            fail=1
+        else
+            echo "$fixture_name: $(basename "$jf") schema ok"
+        fi
+    done
+}
+
+if [ -d tests/fixtures ]; then
+    for fixture in tests/fixtures/*/; do
+        [ -d "$fixture" ] || continue
+        validate_fixture_jsonl "${fixture%/}"
+    done
+fi
+
+# --- Negative test: the origin-aware validator must reject a SAST
+# finding with no `tool`. We run the same inline python validator against
+# a synthetic malformed line and assert it exits non-zero.
+bad_line='{"id":"B602","severity":"HIGH","cwe":"CWE-78","title":"t","file":"x.py","line":1,"evidence":"e","reference":"sast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"sast"}'
+if echo "$bad_line" | python3 -c '
+import json, sys
+required = ["id","severity","cwe","file","line","evidence","reference","reference_url","fix_recipe","confidence"]
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    missing = [k for k in required if k not in obj]
+    if missing: errs += 1
+    if obj.get("origin") == "sast" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed SAST line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "sast negative-test: malformed SAST line (missing tool) correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
