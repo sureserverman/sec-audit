@@ -60,7 +60,7 @@ done
 # model pinning (caller-model-independence)
 for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
-            "agents/sast-runner.md:haiku"; do
+            "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -130,6 +130,16 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __sast_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the DAST status summary line emitted by dast-runner.
+        if "__dast_status__" in obj:
+            status = obj.get("__dast_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __dast_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __dast_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -156,6 +166,18 @@ with open(path) as fh:
             if "fix_recipe" in obj and obj["fix_recipe"] not in (None, ""):
                 # SAST tools do not ship quoted fix recipes; warn if present.
                 pass
+        # Origin-aware validation: DAST findings must carry `tool` and `origin`.
+        if obj.get("origin") == "dast":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} dast finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] != "zap-baseline":
+                print(f"CONTRACT FAIL: {path}:{i} dast tool must be zap-baseline, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # DAST has no source line; `line: 0` is the documented convention.
+            if obj.get("line") != 0:
+                print(f"CONTRACT FAIL: {path}:{i} dast line must be 0 (no source line), got {obj.get('line')!r}", file=sys.stderr)
+                errs += 1
 sys.exit(1 if errs else 0)
 PY
         then
@@ -195,6 +217,28 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "sast negative-test: malformed SAST line (missing tool) correctly rejected"
+
+# --- Negative test: the origin-aware validator must reject a DAST
+# finding with no `tool`. Same pattern as the SAST negative test above.
+bad_dast='{"id":"40018","severity":"HIGH","cwe":"CWE-89","title":"t","file":"http://x/","line":0,"evidence":"e","reference":"dast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"dast"}'
+if echo "$bad_dast" | python3 -c '
+import json, sys
+required = ["id","severity","cwe","file","line","evidence","reference","reference_url","fix_recipe","confidence"]
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    missing = [k for k in required if k not in obj]
+    if missing: errs += 1
+    if obj.get("origin") == "dast" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed DAST line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "dast negative-test: malformed DAST line (missing tool) correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
