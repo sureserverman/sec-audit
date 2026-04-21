@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "sec-review",
-      "description": "Analyze a project against top-tier security expertise (DB, framework, webserver, proxy, frontend, auth, TLS, container, secrets, supply-chain) and live CVE feeds (NVD, OSV, GHSA). Produces a prioritized report with cited, reliable fixes.",
+      "description": "Four-agent cybersecurity review pipeline (sec-expert + finding-triager + cve-enricher + report-writer, model-pinned for cost efficiency). Analyzes a project against top-tier security expertise (DB, framework, webserver, proxy, frontend, auth, TLS, container, secrets, supply-chain) and live CVE feeds (NVD, OSV, GHSA). Produces a prioritized markdown report with cited, reliable fixes.",
       "category": "security",
       "source": "./"
     }
