@@ -1,0 +1,30 @@
+[
+  {
+    "agent": "sec-expert",
+    "model": "sonnet",
+    "total_tokens": 34792,
+    "tool_uses": 11,
+    "duration_ms": 37424
+  },
+  {
+    "agent": "finding-triager",
+    "model": "sonnet",
+    "total_tokens": 22526,
+    "tool_uses": 11,
+    "duration_ms": 39109
+  },
+  {
+    "agent": "cve-enricher",
+    "model": "haiku",
+    "total_tokens": 29127,
+    "tool_uses": 4,
+    "duration_ms": 30605
+  },
+  {
+    "agent": "report-writer",
+    "model": "sonnet",
+    "total_tokens": 25889,
+    "tool_uses": 3,
+    "duration_ms": 36883
+  }
+]

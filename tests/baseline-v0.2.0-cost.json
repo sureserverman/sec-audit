@@ -1,0 +1,30 @@
+{
+  "per_agent": [
+    {
+      "agent": "sec-expert",
+      "model": "sonnet",
+      "tokens": 34792,
+      "cost_usd": 0.2088
+    },
+    {
+      "agent": "finding-triager",
+      "model": "sonnet",
+      "tokens": 22526,
+      "cost_usd": 0.1352
+    },
+    {
+      "agent": "cve-enricher",
+      "model": "haiku",
+      "tokens": 29127,
+      "cost_usd": 0.0583
+    },
+    {
+      "agent": "report-writer",
+      "model": "sonnet",
+      "tokens": 25889,
+      "cost_usd": 0.1553
+    }
+  ],
+  "total_usd": 0.5575,
+  "total_tokens": 112334
+}

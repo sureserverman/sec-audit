@@ -5,331 +5,1893 @@
     "version": "2.2.0",
     "cves": [
       {
-        "id": "CVE-2019-12781",
-        "osv_id": "PYSEC-2019-10",
-        "cve_aliases": [
-          "CVE-2019-12781"
-        ],
+        "id": "CVE-2022-28346",
         "cvss": null,
-        "summary": "An issue was discovered in Django 1.11 before 1.11.22, 2.1 before 2.1.10, and 2.2 before 2.2.3. An HTTP request is not redirected to HTTPS when the SECURE_PROXY_SSL_HEADER and SECURE_SSL_REDIRECT sett",
+        "summary": "SQL Injection in Django",
         "fixed_versions": [
-          "1.11.22",
-          "2.1.10",
-          "2.2.3"
-        ],
-        "references": [
-          "https://groups.google.com/forum/#!topic/django-announce/Is4kLY9ZcZQ",
-          "https://www.djangoproject.com/weblog/2019/jul/01/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "http://www.openwall.com/lists/oss-security/2019/07/01/3"
+          "2.2.28",
+          "3.2.13",
+          "4.0.4"
         ],
         "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-14232",
-        "osv_id": "PYSEC-2019-11",
-        "cve_aliases": [
-          "CVE-2019-14232"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. If django.utils.text.Truncator's chars() and words() methods were passed the html=True argument, t",
-        "fixed_versions": [
-          "1.11.23",
-          "2.1.11",
-          "2.2.4"
-        ],
         "references": [
-          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
-          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
+          "https://nvd.nist.gov/vuln/detail/CVE-2022-28346",
+          "https://github.com/django/django/commit/2044dac5c6968441be6f534c4139bcf48c5c7e48",
+          "https://github.com/django/django/commit/2c09e68ec911919360d5f8502cefc312f9e03c5d",
+          "https://github.com/django/django/commit/800828887a0509ad1162d6d407e94d8de7eafc60",
+          "https://github.com/django/django/commit/93cae5cb2f9a4ef1514cf1a41f714fef08005200",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-2gwj-7jmv-h26r",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-190.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.debian.org/debian-lts-announce/2022/04/msg00013.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HWY6DQWRVBALV73BPUVBXC3QIYUM24IK",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/LTZVAKU5ALQWOKFTPISE257VCVIYGFQI",
+          "https://security.netapp.com/advisory/ntap-20220609-0002",
+          "https://www.debian.org/security/2022/dsa-5254",
+          "https://www.djangoproject.com/weblog/2022/apr/11/security-releases",
+          "http://www.openwall.com/lists/oss-security/2022/04/11/1"
         ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-14233",
-        "osv_id": "PYSEC-2019-12",
-        "cve_aliases": [
-          "CVE-2019-14233"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. Due to the behaviour of the underlying HTMLParser, django.utils.html.strip_tags would be extremely",
-        "fixed_versions": [
-          "1.11.23",
-          "2.1.11",
-          "2.2.4"
-        ],
-        "references": [
-          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
-          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-14234",
-        "osv_id": "PYSEC-2019-13",
-        "cve_aliases": [
-          "CVE-2019-14234"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. Due to an error in shallow key transformation, key and index lookups for django.contrib.postgres.f",
-        "fixed_versions": [
-          "1.11.23",
-          "2.1.11",
-          "2.2.4"
-        ],
-        "references": [
-          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
-          "https://seclists.org/bugtraq/2019/Aug/15"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-14235",
-        "osv_id": "PYSEC-2019-14",
-        "cve_aliases": [
-          "CVE-2019-14235"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 1.11.x before 1.11.23, 2.1.x before 2.1.11, and 2.2.x before 2.2.4. If passed certain inputs, django.utils.encoding.uri_to_iri could lead to significant memory usage ",
-        "fixed_versions": [
-          "1.11.23",
-          "2.1.11",
-          "2.2.4"
-        ],
-        "references": [
-          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
-          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-19118",
-        "osv_id": "PYSEC-2019-15",
-        "cve_aliases": [
-          "CVE-2019-19118"
-        ],
-        "cvss": null,
-        "summary": "Django 2.1 before 2.1.15 and 2.2 before 2.2.8 allows unintended model editing. A Django model admin displaying inline related models, where the user has view-only permissions to a parent model but edi",
-        "fixed_versions": [
-          "2.1.15",
-          "2.2.8"
-        ],
-        "references": [
-          "http://www.openwall.com/lists/oss-security/2019/12/02/1",
-          "https://groups.google.com/forum/#!topic/django-announce/GjGqDvtNmWQ",
-          "https://www.djangoproject.com/weblog/2019/dec/02/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-19844",
-        "osv_id": "PYSEC-2019-16",
-        "cve_aliases": [
-          "CVE-2019-19844"
-        ],
-        "cvss": null,
-        "summary": "Django before 1.11.27, 2.x before 2.2.9, and 3.x before 3.0.1 allows account takeover. A suitably crafted email address (that is equal to an existing user's email address after case transformation of ",
-        "fixed_versions": [
-          "1.11.27",
-          "2.2.9"
-        ],
-        "references": [
-          "https://groups.google.com/forum/#!topic/django-announce/3oaB2rVH3a0",
-          "https://www.djangoproject.com/weblog/2019/dec/18/security-releases/",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://usn.ubuntu.com/4224-1/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2019-12308",
-        "osv_id": "PYSEC-2019-79",
-        "cve_aliases": [
-          "CVE-2019-12308"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 1.11 before 1.11.21, 2.1 before 2.1.9, and 2.2 before 2.2.2. The clickable Current URL value displayed by the AdminURLFieldWidget displays the provided value without ",
-        "fixed_versions": [
-          "1.11.21",
-          "2.1.9",
-          "2.2.2"
-        ],
-        "references": [
-          "https://www.djangoproject.com/weblog/2019/jun/03/security-releases/",
-          "https://groups.google.com/forum/#!topic/django-announce/GEbHU7YoVz8",
-          "https://docs.djangoproject.com/en/dev/releases/security/",
-          "https://docs.djangoproject.com/en/dev/releases/2.2.2/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-13254",
-        "osv_id": "PYSEC-2020-31",
-        "cve_aliases": [
-          "CVE-2020-13254"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 2.2 before 2.2.13 and 3.0 before 3.0.7. In cases where a memcached backend does not perform key validation, passing malformed cache keys could result in a key collisi",
-        "fixed_versions": [
-          "2.2.13",
-          "3.0.7"
-        ],
-        "references": [
-          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
-          "https://docs.djangoproject.com/en/3.0/releases/security/",
-          "https://groups.google.com/d/msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
-          "https://usn.ubuntu.com/4381-1/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       },
       {
         "id": "CVE-2020-13596",
-        "osv_id": "PYSEC-2020-32",
-        "cve_aliases": [
-          "CVE-2020-13596"
-        ],
         "cvss": null,
-        "summary": "An issue was discovered in Django 2.2 before 2.2.13 and 3.0 before 3.0.7. Query parameters generated by the Django admin ForeignKeyRawIdWidget were not properly URL encoded, leading to a possibility o",
+        "summary": "XSS in Django",
         "fixed_versions": [
           "2.2.13",
           "3.0.7"
         ],
+        "source": "OSV",
         "references": [
-          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-13596",
+          "https://github.com/django/django/commit/1f2dd37f6fcefdd10ed44cb233b2e62b520afb38",
+          "https://github.com/django/django/commit/6d61860b22875f358fac83d903dc629897934815",
+          "https://docs.djangoproject.com/en/3.0/releases/security",
+          "https://github.com/advisories/GHSA-2m34-jcjv-45xf",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-32.yaml",
           "https://groups.google.com/forum/#!msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
-          "https://docs.djangoproject.com/en/3.0/releases/security/",
-          "https://usn.ubuntu.com/4381-1/"
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ",
+          "https://security.netapp.com/advisory/ntap-20200611-0002",
+          "https://usn.ubuntu.com/4381-1",
+          "https://usn.ubuntu.com/4381-2",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases",
+          "https://www.oracle.com/security-alerts/cpujan2021.html"
         ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-24583",
-        "osv_id": "PYSEC-2020-33",
-        "cve_aliases": [
-          "CVE-2020-24583"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 2.2 before 2.2.16, 3.0 before 3.0.10, and 3.1 before 3.1.1 (when Python 3.7+ is used). FILE_UPLOAD_DIRECTORY_PERMISSIONS mode was not applied to intermediate-level di",
-        "fixed_versions": [
-          "2.2.16",
-          "3.0.10",
-          "3.1.1"
-        ],
-        "references": [
-          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
-          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
-          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
-          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-24584",
-        "osv_id": "PYSEC-2020-34",
-        "cve_aliases": [
-          "CVE-2020-24584"
-        ],
-        "cvss": null,
-        "summary": "An issue was discovered in Django 2.2 before 2.2.16, 3.0 before 3.0.10, and 3.1 before 3.1.1 (when Python 3.7+ is used). The intermediate-level directories of the filesystem cache had the system's sta",
-        "fixed_versions": [
-          "2.2.16",
-          "3.0.10",
-          "3.1.1"
-        ],
-        "references": [
-          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
-          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
-          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
-          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-7471",
-        "osv_id": "PYSEC-2020-35",
-        "cve_aliases": [
-          "CVE-2020-7471"
-        ],
-        "cvss": null,
-        "summary": "Django 1.11 before 1.11.28, 2.2 before 2.2.10, and 3.0 before 3.0.3 allows SQL Injection if untrusted data is used as a StringAgg delimiter (e.g., in Django applications that offer downloads of data a",
-        "fixed_versions": [
-          "1.11.28",
-          "2.2.10",
-          "3.0.3",
-          "eb31d845323618d688ad429479c6dda973056136"
-        ],
-        "references": [
-          "https://www.openwall.com/lists/oss-security/2020/02/03/1",
-          "https://docs.djangoproject.com/en/3.0/releases/security/",
-          "https://groups.google.com/forum/#!topic/django-announce/X45S86X5bZI",
-          "https://www.djangoproject.com/weblog/2020/feb/03/security-releases/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       },
       {
         "id": "CVE-2020-9402",
-        "osv_id": "PYSEC-2020-36",
-        "cve_aliases": [
-          "CVE-2020-9402"
-        ],
         "cvss": null,
-        "summary": "Django 1.11 before 1.11.29, 2.2 before 2.2.11, and 3.0 before 3.0.4 allows SQL Injection if untrusted data is used as a tolerance parameter in GIS functions and aggregates on Oracle. By passing a suit",
+        "summary": "SQL injection in Django",
         "fixed_versions": [
           "1.11.29",
           "2.2.11",
           "3.0.4"
         ],
+        "source": "OSV",
         "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-9402",
+          "https://github.com/django/django/commit/6695d29b1c1ce979725816295a26ecc64ae0e927",
+          "https://docs.djangoproject.com/en/3.0/releases/security",
+          "https://github.com/advisories/GHSA-3gh2-xw74-jmcw",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-36.yaml",
           "https://groups.google.com/forum/#!topic/django-announce/fLUh_pOaKrY",
-          "https://www.djangoproject.com/weblog/2020/mar/04/security-releases/",
-          "https://docs.djangoproject.com/en/3.0/releases/security/",
-          "https://usn.ubuntu.com/4296-1/"
+          "https://lists.debian.org/debian-lts-announce/2022/05/msg00035.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/UZMN2NKAGTFE3YKMNM2JVJG7R2W7LLHY",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://security.netapp.com/advisory/ntap-20200327-0004",
+          "https://usn.ubuntu.com/4296-1",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://www.djangoproject.com/weblog/2020/mar/04/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45115",
+        "cvss": null,
+        "summary": "Denial-of-service in Django",
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
         ],
         "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-45115",
+          "https://github.com/django/django/commit/2135637fdd5ce994de110affef9e67dffdf77277",
+          "https://github.com/django/django/commit/a8b32fe13bcaed1c0b772fdc53de84abc224fb20",
+          "https://github.com/django/django/commit/df79ef03ac867c93caaa6be56bc69e66abfeef8f",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-53qw-q765-4fww",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-1.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20220121-0005",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-33203",
+        "cvss": null,
+        "summary": "Path Traversal in Django",
+        "fixed_versions": [
+          "2.2.24",
+          "3.1.12",
+          "3.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-33203",
+          "https://github.com/django/django/commit/053cc9534d174dc89daba36724ed2dcb36755b90",
+          "https://github.com/django/django/commit/20c67a0693c4ede2b09af02574823485e82e4c8f",
+          "https://github.com/django/django/commit/dfaba12cda060b8b292ae1d271b44bf810b1c5b9",
+          "https://docs.djangoproject.com/en/3.2/releases/security",
+          "https://github.com/advisories/GHSA-68w8-qjq3-2gfm",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-98.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20210727-0004",
+          "https://www.djangoproject.com/weblog/2021/jun/02/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-11358",
+        "cvss": null,
+        "summary": "XSS in jQuery as used in Drupal, Backdrop CMS, and other products",
+        "fixed_versions": [
+          "3.4.0",
+          "4.3.4",
+          "2.1.9",
+          "2.2.2",
+          "1.19.0"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-11358",
+          "https://github.com/maximebf/php-debugbar/issues/447",
+          "https://github.com/jquery/jquery/pull/4333",
+          "https://github.com/maximebf/php-debugbar/commit/847216e60544258c881f2733d699bbcfeefac0fc",
+          "https://github.com/django/django/commit/34ec52269ade54af31a021b12969913129571a3f",
+          "https://github.com/django/django/commit/95649bc08547a878cebfa1d019edec8cb1b80829",
+          "https://github.com/django/django/commit/baaf187a4e354bf3976c51e2c83a0d2f8ee6e6ad",
+          "https://github.com/jquery/jquery/commit/753d591aea698e57d6db58c9f722cd0808619b1b",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/WZW27UCJ5CYFL4KFFFMYMIBNMIU2ALG5",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4UOAZIFCSZ3ENEFOR5IXX6NFAD3HV7FA",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/5IABSKTYZ5JUGL735UKGXL5YPRYOPUYI",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/KYH3OAGR2RTCHRA5NOKX2TES7SNQMWGO",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/QV3PKZC3PQCO3273HAT76PAQZFBEO4KP",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/RLXRX23725JL366CNZGJZ7AQQB7LHQ6F",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/WZW27UCJ5CYFL4KFFFMYMIBNMIU2ALG5",
+          "https://seclists.org/bugtraq/2019/Apr/32",
+          "https://seclists.org/bugtraq/2019/Jun/12",
+          "https://seclists.org/bugtraq/2019/May/18",
+          "https://www.tenable.com/security/tns-2020-02",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/RLXRX23725JL366CNZGJZ7AQQB7LHQ6F",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/QV3PKZC3PQCO3273HAT76PAQZFBEO4KP",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/KYH3OAGR2RTCHRA5NOKX2TES7SNQMWGO",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/5IABSKTYZ5JUGL735UKGXL5YPRYOPUYI",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/4UOAZIFCSZ3ENEFOR5IXX6NFAD3HV7FA",
+          "https://lists.debian.org/debian-lts-announce/2023/08/msg00040.html",
+          "https://lists.debian.org/debian-lts-announce/2020/02/msg00024.html",
+          "https://lists.debian.org/debian-lts-announce/2019/05/msg00029.html",
+          "https://lists.debian.org/debian-lts-announce/2019/05/msg00006.html",
+          "https://lists.apache.org/thread.html/rca37935d661f4689cb4119f1b3b224413b22be161b678e6e6ce0c69b@%3Ccommits.nifi.apache.org%3E",
+          "https://lists.apache.org/thread.html/rca37935d661f4689cb4119f1b3b224413b22be161b678e6e6ce0c69b%40%3Ccommits.nifi.apache.org%3E",
+          "https://lists.apache.org/thread.html/rac25da84ecdcd36f6de5ad0d255f4e967209bbbebddb285e231da37d@%3Cissues.flink.apache.org%3E",
+          "https://www.tenable.com/security/tns-2019-08",
+          "https://www.synology.com/security/advisory/Synology_SA_19_19",
+          "https://www.privacy-wise.com/mitigating-cve-2019-11358-in-old-versions-of-jquery",
+          "https://www.oracle.com/technetwork/security-advisory/cpuoct2019-5072832.html",
+          "https://www.oracle.com/technetwork/security-advisory/cpujul2019-5072835.html",
+          "https://www.oracle.com/security-alerts/cpuoct2021.html",
+          "https://www.oracle.com/security-alerts/cpuoct2020.html",
+          "https://www.oracle.com/security-alerts/cpujul2020.html",
+          "https://www.oracle.com/security-alerts/cpujan2022.html",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://www.oracle.com/security-alerts/cpujan2020.html",
+          "https://www.oracle.com/security-alerts/cpuapr2020.html",
+          "https://www.oracle.com/security-alerts/cpuApr2021.html",
+          "https://www.oracle.com//security-alerts/cpujul2021.html",
+          "https://www.drupal.org/sa-core-2019-006",
+          "https://www.djangoproject.com/weblog/2019/jun/03/security-releases",
+          "https://www.debian.org/security/2019/dsa-4460",
+          "https://www.debian.org/security/2019/dsa-4434",
+          "https://web.archive.org/web/20190824065237/http://www.securityfocus.com/bid/108023",
+          "https://supportportal.juniper.net/s/article/2021-07-Security-Bulletin-Junos-OS-Multiple-J-Web-vulnerabilities-resolved-in-Junos-OS-21-2R1",
+          "https://snyk.io/vuln/SNYK-JS-JQUERY-174006",
+          "https://security.snyk.io/vuln/SNYK-DOTNET-JQUERY-450226",
+          "https://security.netapp.com/advisory/ntap-20190919-0001",
+          "https://lists.apache.org/thread.html/b0656d359c7d40ec9f39c8cc61bca66802ef9a2a12ee199f5b0c1442@%3Cdev.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/b0656d359c7d40ec9f39c8cc61bca66802ef9a2a12ee199f5b0c1442%40%3Cdev.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/88fb0362fd40e5b605ea8149f63241537b8b6fb5bfa315391fc5cbb7@%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/88fb0362fd40e5b605ea8149f63241537b8b6fb5bfa315391fc5cbb7%40%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/6097cdbd6f0a337bedd9bb5cc441b2d525ff002a96531de367e4259f@%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/6097cdbd6f0a337bedd9bb5cc441b2d525ff002a96531de367e4259f%40%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/5928aa293e39d248266472210c50f176cac1535220f2486e6a7fa844@%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/5928aa293e39d248266472210c50f176cac1535220f2486e6a7fa844%40%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/519eb0fd45642dcecd9ff74cb3e71c20a4753f7d82e2f07864b5108f@%3Cdev.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/519eb0fd45642dcecd9ff74cb3e71c20a4753f7d82e2f07864b5108f%40%3Cdev.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/08720ef215ee7ab3386c05a1a90a7d1c852bf0706f176a7816bf65fc@%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/08720ef215ee7ab3386c05a1a90a7d1c852bf0706f176a7816bf65fc%40%3Ccommits.airflow.apache.org%3E",
+          "https://kb.pulsesecure.net/articles/Pulse_Security_Advisories/SA44601",
+          "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/jquery-rails/CVE-2019-11358.yml",
+          "https://github.com/rails/jquery-rails/blob/master/CHANGELOG.md#434",
+          "https://github.com/jquery/jquery",
+          "https://blog.jquery.com/2019/04/10/jquery-3-4-0-released",
+          "https://backdropcms.org/security/backdrop-sa-core-2019-009",
+          "https://access.redhat.com/errata/RHSA-2019:3024",
+          "https://access.redhat.com/errata/RHSA-2019:3023",
+          "https://access.redhat.com/errata/RHSA-2019:2587",
+          "https://access.redhat.com/errata/RHSA-2019:1456",
+          "https://access.redhat.com/errata/RHBA-2019:1570",
+          "https://lists.apache.org/thread.html/rac25da84ecdcd36f6de5ad0d255f4e967209bbbebddb285e231da37d%40%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7e8ebccb7c022e41295f6fdb7b971209b83702339f872ddd8cf8bf73@%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7e8ebccb7c022e41295f6fdb7b971209b83702339f872ddd8cf8bf73%40%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7d64895cc4dff84d0becfc572b20c0e4bf9bfa7b10c6f5f73e783734@%3Cdev.storm.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7d64895cc4dff84d0becfc572b20c0e4bf9bfa7b10c6f5f73e783734%40%3Cdev.storm.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7aac081cbddb6baa24b75e74abf0929bf309b176755a53e3ed810355@%3Cdev.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r7aac081cbddb6baa24b75e74abf0929bf309b176755a53e3ed810355%40%3Cdev.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r41b5bfe009c845f67d4f68948cc9419ac2d62e287804aafd72892b08@%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r41b5bfe009c845f67d4f68948cc9419ac2d62e287804aafd72892b08%40%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r38f0d1aa3c923c22977fe7376508f030f22e22c1379fbb155bf29766@%3Cdev.syncope.apache.org%3E",
+          "https://lists.apache.org/thread.html/r38f0d1aa3c923c22977fe7376508f030f22e22c1379fbb155bf29766%40%3Cdev.syncope.apache.org%3E",
+          "https://lists.apache.org/thread.html/r2baacab6e0acb5a2092eb46ae04fd6c3e8277b4fd79b1ffb7f3254fa@%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r2baacab6e0acb5a2092eb46ae04fd6c3e8277b4fd79b1ffb7f3254fa%40%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r2041a75d3fc09dec55adfd95d598b38d22715303f65c997c054844c9@%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/r2041a75d3fc09dec55adfd95d598b38d22715303f65c997c054844c9%40%3Cissues.flink.apache.org%3E",
+          "https://lists.apache.org/thread.html/f9bc3e55f4e28d1dcd1a69aae6d53e609a758e34d2869b4d798e13cc@%3Cissues.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/f9bc3e55f4e28d1dcd1a69aae6d53e609a758e34d2869b4d798e13cc%40%3Cissues.drill.apache.org%3E",
+          "https://lists.apache.org/thread.html/bcce5a9c532b386c68dab2f6b3ce8b0cc9b950ec551766e76391caa3@%3Ccommits.nifi.apache.org%3E",
+          "https://lists.apache.org/thread.html/bcce5a9c532b386c68dab2f6b3ce8b0cc9b950ec551766e76391caa3%40%3Ccommits.nifi.apache.org%3E",
+          "https://lists.apache.org/thread.html/ba79cf1658741e9f146e4c59b50aee56656ea95d841d358d006c18b6@%3Ccommits.roller.apache.org%3E",
+          "https://lists.apache.org/thread.html/ba79cf1658741e9f146e4c59b50aee56656ea95d841d358d006c18b6%40%3Ccommits.roller.apache.org%3E",
+          "https://lists.apache.org/thread.html/b736d0784cf02f5a30fbb4c5902762a15ad6d47e17e2c5a17b7d6205@%3Ccommits.airflow.apache.org%3E",
+          "https://lists.apache.org/thread.html/b736d0784cf02f5a30fbb4c5902762a15ad6d47e17e2c5a17b7d6205%40%3Ccommits.airflow.apache.org%3E",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "http://packetstormsecurity.com/files/152787/dotCMS-5.1.1-Vulnerable-Dependencies.html",
+          "http://packetstormsecurity.com/files/153237/RetireJS-CORS-Issue-Script-Execution.html",
+          "http://packetstormsecurity.com/files/156743/OctoberCMS-Insecure-Dependencies.html",
+          "http://seclists.org/fulldisclosure/2019/May/10",
+          "http://seclists.org/fulldisclosure/2019/May/11",
+          "http://seclists.org/fulldisclosure/2019/May/13",
+          "http://www.openwall.com/lists/oss-security/2019/06/03/2",
+          "http://www.securityfocus.com/bid/108023"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-12781",
+        "cvss": null,
+        "summary": "Django Incorrect HTTP detection with reverse-proxy connecting via HTTPS",
+        "fixed_versions": [
+          "2.1.10",
+          "2.2.3",
+          "1.11.22"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-12781",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-6c7v-2f49-8h26",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-10.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/Is4kLY9ZcZQ",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/5VXXWIOQGXOB7JCGJ3CVUW673LDHKEYL",
+          "https://seclists.org/bugtraq/2019/Jul/10",
+          "https://security.netapp.com/advisory/ntap-20190705-0002",
+          "https://usn.ubuntu.com/4043-1",
+          "https://www.debian.org/security/2019/dsa-4476",
+          "https://www.djangoproject.com/weblog/2019/jul/01/security-releases",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "http://www.openwall.com/lists/oss-security/2019/07/01/3"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-23833",
+        "cvss": null,
+        "summary": "Infinite Loop in Django",
+        "fixed_versions": [
+          "2.2.27",
+          "3.2.12",
+          "4.0.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2022-23833",
+          "https://github.com/django/django/commit/c477b761804984c932704554ad35f78a2e230c6a",
+          "https://github.com/django/django/commit/d16133568ef9c9b42cb7a08bdf9ff3feec2e5468",
+          "https://github.com/django/django/commit/f9c7d48fdd6f198a6494a9202f90242f176e4fc9",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-6cw3-g6wv-c2xv",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-20.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20220221-0003",
+          "https://www.debian.org/security/2022/dsa-5254",
+          "https://www.djangoproject.com/weblog/2022/feb/01/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14234",
+        "cvss": null,
+        "summary": "SQL Injection in Django",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-14234",
+          "https://github.com/django/django/commit/4f5b58f5cd3c57fee9972ab074f8dc6895d8f387",
+          "https://github.com/django/django/commit/ed682a24fca774818542757651bfba576c3fc3ef",
+          "https://github.com/django/django/commit/f74b3ae3628c26e1b4f8db3d13a91d52a833a975",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-6r97-cj55-9hrq",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-13.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://security.netapp.com/advisory/ntap-20190828-0002",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2025-57833",
+        "cvss": null,
+        "summary": "Django is subject to SQL injection through its column aliases",
+        "fixed_versions": [
+          "4.2.24",
+          "5.1.12",
+          "5.2.6"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-57833",
+          "https://github.com/django/django/commit/102965ea93072fe3c39a30be437c683ec1106ef5",
+          "https://github.com/django/django/commit/31334e6965ad136a5e369993b01721499c5d1a92",
+          "https://github.com/django/django/commit/4c044fcc866ec226f612c475950b690b0139d243",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/django/django",
+          "https://groups.google.com/g/django-announce",
+          "https://lists.debian.org/debian-lts-announce/2025/09/msg00017.html",
+          "https://medium.com/@EyalSec/django-unauthenticated-0-click-rce-and-sql-injection-using-default-configuration-059964f3f898",
+          "https://www.djangoproject.com/weblog/2025/sep/03/security-releases",
+          "http://www.openwall.com/lists/oss-security/2025/09/03/3"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-12308",
+        "cvss": null,
+        "summary": "Django Cross-site Scripting in AdminURLFieldWidget",
+        "fixed_versions": [
+          "1.11.21",
+          "2.1.9",
+          "2.2.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-12308",
+          "https://github.com/django/django/commit/09186a13d975de6d049f8b3e05484f66b01ece62",
+          "https://github.com/django/django/commit/afddabf8428ddc89a332f7a78d0d21eaf2b5a673",
+          "https://github.com/django/django/commit/c238701859a52d584f349cce15d56c8e8137c52b",
+          "https://www.djangoproject.com/weblog/2019/jun/03/security-releases",
+          "https://www.debian.org/security/2019/dsa-4476",
+          "https://usn.ubuntu.com/4043-1",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://seclists.org/bugtraq/2019/Jul/10",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/USYRARSYB7PE3S2ZQO7PZNWMH7RPGL5G",
+          "https://lists.debian.org/debian-lts-announce/2019/07/msg00001.html",
+          "https://lists.debian.org/debian-lts-announce/2019/06/msg00001.html",
+          "https://groups.google.com/forum/#!topic/django-announce/GEbHU7YoVz8",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-79.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-7rp2-fm2h-wchj",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://docs.djangoproject.com/en/dev/releases/2.2.2",
+          "https://docs.djangoproject.com/en/dev/releases/2.1.9",
+          "https://docs.djangoproject.com/en/dev/releases/1.11.21",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "http://www.openwall.com/lists/oss-security/2019/06/03/2"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2025-48432",
+        "cvss": null,
+        "summary": "Django Improper Output Neutralization for Logs vulnerability",
+        "fixed_versions": [
+          "5.2.2",
+          "5.1.10",
+          "4.2.22"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-48432",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2025-47.yaml",
+          "https://groups.google.com/g/django-announce",
+          "https://www.djangoproject.com/weblog/2025/jun/04/security-releases",
+          "https://www.djangoproject.com/weblog/2025/jun/10/bugfix-releases",
+          "http://www.openwall.com/lists/oss-security/2025/06/04/5",
+          "http://www.openwall.com/lists/oss-security/2025/06/10/2",
+          "http://www.openwall.com/lists/oss-security/2025/06/10/3",
+          "http://www.openwall.com/lists/oss-security/2025/06/10/4"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45116",
+        "cvss": null,
+        "summary": "Information disclosure in Django",
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-45116",
+          "https://github.com/django/django/commit/2a8ec7f546d6d5806e221ec948c5146b55bd7489",
+          "https://github.com/django/django/commit/c7fe895bca06daf12cc1670b56eaf72a1ef27a16",
+          "https://github.com/django/django/commit/c9f648ccfac5ab90fb2829a66da4f77e68c7f93a",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-8c5j-9r9f-c6w8",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-2.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20220121-0005",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-36359",
+        "cvss": null,
+        "summary": "Django vulnerable to Reflected File Download attack",
+        "fixed_versions": [
+          "3.2.15",
+          "4.0.7"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2022-36359",
+          "https://github.com/django/django/commit/b3e4494d759202a3b6bf247fd34455bf13be5b80",
+          "https://github.com/django/django/commit/b7d9529cbe0af4adabb6ea5d01ed8dcce3668fb3",
+          "https://github.com/django/django/commit/bd062445cffd3f6cc6dcd20d13e2abed818fa173",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-245.yaml",
+          "https://groups.google.com/g/django-announce/c/8cz--gvaJr4",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HWY6DQWRVBALV73BPUVBXC3QIYUM24IK",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/LTZVAKU5ALQWOKFTPISE257VCVIYGFQI",
+          "https://security.netapp.com/advisory/ntap-20220915-0008",
+          "https://www.debian.org/security/2022/dsa-5254",
+          "https://www.djangoproject.com/weblog/2022/aug/03/security-releases",
+          "http://www.openwall.com/lists/oss-security/2022/08/03/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-22818",
+        "cvss": null,
+        "summary": "Cross-site Scripting in Django",
+        "fixed_versions": [
+          "2.2.27",
+          "3.2.12",
+          "4.0.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2022-22818",
+          "https://github.com/django/django/commit/01422046065d2b51f8f613409cad2c81b39487e5",
+          "https://github.com/django/django/commit/1a1e8278c46418bde24c86a65443b0674bae65e2",
+          "https://github.com/django/django/commit/c27a7eb9f40b64990398978152e62b6ff839c2e6",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-95rw-fx8r-36v6",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-19.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20220221-0003",
+          "https://www.debian.org/security/2022/dsa-5254",
+          "https://www.djangoproject.com/weblog/2022/feb/01/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14232",
+        "cvss": null,
+        "summary": "Django Denial-of-service in django.utils.text.Truncator",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-14232",
+          "https://www.openwall.com/lists/oss-security/2023/10/04/6",
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "https://security.netapp.com/advisory/ntap-20190828-0002",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/message/5XTP44JEOSNXRVW4JDZXA5XGMBDZLWSW",
+          "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/message/3LGJSPCN3VEG2UJPYCUB6TU75JTIV2TQ",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK",
+          "https://groups.google.com/forum/#%21topic/django-announce/jIoju2-KLDs",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://github.com/pypa/advisory-db/tree/main/vulns/django/PYSEC-2019-11.yaml",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-11.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-c4qh-4vgv-qc6g",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "http://www.openwall.com/lists/oss-security/2023/10/04/6",
+          "http://www.openwall.com/lists/oss-security/2024/03/04/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-24584",
+        "cvss": null,
+        "summary": "Django Incorrect Default Permissions",
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-24584",
+          "https://github.com/django/django/commit/1853724acaf17ed7414d54c7d2b5563a25025a71",
+          "https://github.com/django/django/commit/2b099caa5923afa8cfb5f1e8c0d56b6e0e81915b",
+          "https://github.com/django/django/commit/a3aebfdc8153dc230686b6d2454ccd32ed4c9e6f",
+          "https://github.com/django/django/commit/cdb367c92a0ba72ddc0cbd13ff42b0e6df709554",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases",
+          "https://usn.ubuntu.com/4479-1",
+          "https://security.netapp.com/advisory/ntap-20200918-0004",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZCRPQCBTV3RZHKVZ6K6QOAANPRZQD3GI",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/OLGFFLMF3X6USMJD7V5F5P4K2WVUTO3T",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/F2ZHO3GZCJMP3DDTXCNVFV6ED3W64NAU",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-34.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-fr28-569j-53c4",
+          "https://docs.djangoproject.com/en/dev/releases/security"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2025-64459",
+        "cvss": null,
+        "summary": "Django vulnerable to SQL injection via _connector keyword argument in QuerySet and Q objects.",
+        "fixed_versions": [
+          "5.2.8",
+          "5.1.14",
+          "4.2.26"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-64459",
+          "https://github.com/django/django/commit/06dd38324ac3d60d83d9f3adabf0dcdf423d2a85",
+          "https://github.com/django/django/commit/59ae82e67053d281ff4562a24bbba21299f0a7d4",
+          "https://github.com/django/django/commit/6703f364d767e949c5b0e4016433ef75063b4f9b",
+          "https://github.com/django/django/commit/72d2c87431f2ae0431d65d0ec792047f078c8241",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/django/django",
+          "https://github.com/omarkurt/django-connector-CVE-2025-64459-testbed",
+          "https://groups.google.com/g/django-announce",
+          "https://shivasurya.me/security/django/2025/11/07/django-sql-injection-CVE-2025-64459.html",
+          "https://www.djangoproject.com/weblog/2025/nov/05/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-3281",
+        "cvss": null,
+        "summary": "Django Directory Traversal via archive.extract",
+        "fixed_versions": [
+          "2.2.18",
+          "3.1.6",
+          "3.0.12"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-3281",
+          "https://github.com/django/django/commit/02e6592835b4559909aa3aaaf67988fef435f624",
+          "https://github.com/django/django/commit/05413afa8c18cdb978fcdf470e09f7a12b234a23",
+          "https://github.com/django/django/commit/21e7622dec1f8612c85c2fc37fe8efbfd3311e37",
+          "https://github.com/django/django/commit/52e409ed17287e9aabda847b6afe58be2fa9f86a",
+          "https://docs.djangoproject.com/en/3.1/releases/3.0.12",
+          "https://docs.djangoproject.com/en/3.1/releases/security",
+          "https://github.com/advisories/GHSA-fvgf-6h6h-3322",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-9.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/YF52FKEH5S2P5CM4X7IXSYG67YY2CDOO",
+          "https://security.netapp.com/advisory/ntap-20210226-0004",
+          "https://www.djangoproject.com/weblog/2021/feb/01/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14233",
+        "cvss": null,
+        "summary": "Django Denial-of-service in strip_tags()",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-14233",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-h5jv-4p7w-64jg",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-12.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://security.netapp.com/advisory/ntap-20190828-0002",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-7471",
+        "cvss": null,
+        "summary": "SQL injection in Django",
+        "fixed_versions": [
+          "1.11.28",
+          "2.2.10",
+          "3.0.3"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-7471",
+          "https://github.com/django/django/commit/001b0634cd309e372edb6d7d95d083d02b8e37bd",
+          "https://github.com/django/django/commit/505826b469b16ab36693360da9e11fd13213421b",
+          "https://github.com/django/django/commit/c67a368c16e4680b324b4f385398d638db4d8147",
+          "https://github.com/django/django/commit/eb31d845323618d688ad429479c6dda973056136",
+          "https://www.openwall.com/lists/oss-security/2020/02/03/1",
+          "https://www.djangoproject.com/weblog/2020/feb/03/security-releases",
+          "https://www.debian.org/security/2020/dsa-4629",
+          "https://usn.ubuntu.com/4264-1",
+          "https://security.netapp.com/advisory/ntap-20200221-0006",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://seclists.org/bugtraq/2020/Feb/30",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ",
+          "https://groups.google.com/forum/#!topic/django-announce/X45S86X5bZI",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-35.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-hmr4-m2h5-33qx",
+          "https://docs.djangoproject.com/en/3.0/releases/security",
+          "http://www.openwall.com/lists/oss-security/2020/02/03/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-19118",
+        "cvss": null,
+        "summary": "Django allows unintended model editing",
+        "fixed_versions": [
+          "2.1.15",
+          "2.2.8"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-19118",
+          "https://github.com/django/django/commit/103ebe2b5ff1b2614b85a52c239f471904d26244",
+          "https://github.com/django/django/commit/36f580a17f0b3cb087deadf3b65eea024f479c21",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-hvmf-r92r-27hr",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-15.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/GjGqDvtNmWQ",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/6R4HD22PVEVQ45H2JA2NXH443AYJOPL5",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://security.netapp.com/advisory/ntap-20191217-0003",
+          "https://www.djangoproject.com/weblog/2019/dec/02/security-releases",
+          "http://www.openwall.com/lists/oss-security/2019/12/02/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45452",
+        "cvss": null,
+        "summary": "Directory-traversal in Django",
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-45452",
+          "https://github.com/django/django/commit/4cb35b384ceef52123fc66411a73c36a706825e1",
+          "https://github.com/django/django/commit/8d2f7cff76200cbd2337b2cf1707e383eb1fb54b",
+          "https://github.com/django/django/commit/e1592e0f26302e79856cc7f2218ae848ae19b0f6",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-jrh2-hc4r-7jwx",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-3.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20220121-0005",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-24583",
+        "cvss": null,
+        "summary": "Django Incorrect Default Permissions",
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-24583",
+          "https://github.com/django/django/commit/8d7271578d7b153435b40fe40236ebec43cbf1b9",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-m6gj-h9gm-gw44",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-33.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/F2ZHO3GZCJMP3DDTXCNVFV6ED3W64NAU",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/OLGFFLMF3X6USMJD7V5F5P4K2WVUTO3T",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZCRPQCBTV3RZHKVZ6K6QOAANPRZQD3GI",
+          "https://security.netapp.com/advisory/ntap-20200918-0004",
+          "https://usn.ubuntu.com/4479-1",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://www.oracle.com/security-alerts/cpujan2021.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-33571",
+        "cvss": null,
+        "summary": "Django Access Control Bypass possibly leading to SSRF, RFI, and LFI attacks ",
+        "fixed_versions": [
+          "2.2.24",
+          "3.1.12",
+          "3.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-33571",
+          "https://github.com/django/django/commit/203d4ab9ebcd72fc4d6eb7398e66ed9e474e118e",
+          "https://github.com/django/django/commit/9f75e2e562fa0c0482f3dde6fc7399a9070b4a3d",
+          "https://github.com/django/django/commit/f27c38ab5d90f68c9dd60cabef248a570c0be8fc",
+          "https://docs.djangoproject.com/en/3.2/releases/security",
+          "https://github.com/advisories/GHSA-p99v-5w3c-jqq9",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-99.yaml",
+          "https://groups.google.com/g/django-announce/c/sPyjSKMi8Eo",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20210727-0004",
+          "https://www.djangoproject.com/weblog/2021/jun/02/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-32052",
+        "cvss": null,
+        "summary": "Header injection possible in Django",
+        "fixed_versions": [
+          "2.2.22",
+          "3.1.10",
+          "3.2.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-32052",
+          "https://github.com/django/django/commit/e1e81aa1c4427411e3c68facdd761229ffea6f6f",
+          "https://bugzilla.redhat.com/show_bug.cgi?id=1944801",
+          "https://docs.djangoproject.com/en/3.2/releases/security",
+          "https://github.com/advisories/GHSA-qm57-vhq3-3fwf",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-8.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE",
+          "https://security.netapp.com/advisory/ntap-20210611-0002",
+          "https://www.djangoproject.com/weblog/2021/may/06/security-releases",
+          "http://www.openwall.com/lists/oss-security/2021/05/06/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2025-64458",
+        "cvss": null,
+        "summary": "Django has a denial-of-service vulnerability in HttpResponseRedirect and HttpResponsePermanentRedirect on Windows",
+        "fixed_versions": [
+          "5.2.8",
+          "5.1.14",
+          "4.2.26"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2025-64458",
+          "https://github.com/django/django/commit/3790593781d26168e7306b5b2f8ea0309de16242",
+          "https://github.com/django/django/commit/4f5d904b63751dea9ffc3b0e046404a7fa5881ac",
+          "https://github.com/django/django/commit/6e13348436fccf8f22982921d6a3a3e65c956a9f",
+          "https://github.com/django/django/commit/770eea38d7a0e9ba9455140b5a9a9e33618226a7",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/django/django",
+          "https://groups.google.com/g/django-announce",
+          "https://www.djangoproject.com/weblog/2025/nov/05/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2024-45231",
+        "cvss": null,
+        "summary": "Django allows enumeration of user e-mail addresses",
+        "fixed_versions": [
+          "5.1.1",
+          "5.0.9",
+          "4.2.16"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-45231",
+          "https://github.com/django/django/commit/3c733c78d6f8e50296d6e248968b6516c92a53ca",
+          "https://github.com/django/django/commit/96d84047715ea1715b4bd1594e46122b8a77b9e2",
+          "https://github.com/django/django/commit/bf4888d317ba4506d091eeac6e8b4f1fcc731199",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/django/django",
+          "https://groups.google.com/forum/#%21forum/django-announce",
+          "https://www.djangoproject.com/weblog/2024/sep/03/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-31542",
+        "cvss": null,
+        "summary": "Path Traversal in Django",
+        "fixed_versions": [
+          "2.2.21",
+          "3.1.9",
+          "3.2.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-31542",
+          "https://github.com/django/django/commit/04ac1624bdc2fa737188401757cf95ced122d26d",
+          "https://github.com/django/django/commit/25d84d64122c15050a0ee739e859f22ddab5ac48",
+          "https://github.com/django/django/commit/c98f446c188596d4ba6de71d1b77b4a6c5c2a007",
+          "https://www.djangoproject.com/weblog/2021/may/04/security-releases",
+          "https://security.netapp.com/advisory/ntap-20210618-0001",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE",
+          "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://lists.debian.org/debian-lts-announce/2021/05/msg00005.html",
+          "https://groups.google.com/forum/#%21forum/django-announce",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-7.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-rxjp-mfm9-w4wr",
+          "https://docs.djangoproject.com/en/3.2/releases/security",
+          "http://www.openwall.com/lists/oss-security/2021/05/04/3"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       },
       {
         "id": "CVE-2021-44420",
-        "osv_id": "PYSEC-2021-439",
-        "cve_aliases": [
-          "CVE-2021-44420"
-        ],
         "cvss": null,
-        "summary": "In Django 2.2 before 2.2.25, 3.1 before 3.1.14, and 3.2 before 3.2.10, HTTP requests for URLs with trailing newlines could bypass upstream access control based on URL paths.",
+        "summary": "Potential bypass of an upstream access control based on URL paths in Django",
         "fixed_versions": [
           "2.2.25",
           "3.1.14",
           "3.2.10"
         ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-44420",
+          "https://github.com/django/django/commit/d4dcd5b9dd9e462fec8220e33e3e6c822b7e88a6",
+          "https://docs.djangoproject.com/en/3.2/releases/security",
+          "https://github.com/advisories/GHSA-v6rh-hp5x-86rv",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-439.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/B4SQG2EAF4WCI2SLRL6XRDJ3RPK3ZRDV",
+          "https://security.netapp.com/advisory/ntap-20211229-0006",
+          "https://www.djangoproject.com/weblog/2021/dec/07/security-releases",
+          "https://www.openwall.com/lists/oss-security/2021/12/07/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14235",
+        "cvss": null,
+        "summary": "Uncontrolled Recursion in Django",
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-14235",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "https://github.com/advisories/GHSA-v9qg-3j8p-r63v",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-14.yaml",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://security.netapp.com/advisory/ntap-20190828-0002",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-19844",
+        "cvss": null,
+        "summary": "Django Potential account hijack via password reset form",
+        "fixed_versions": [
+          "1.11.27",
+          "2.2.9",
+          "3.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2019-19844",
+          "https://github.com/django/django/commit/302a4ff1e8b1c798aab97673909c7a3dfda42c26",
+          "https://github.com/django/django/commit/4d334bea06cac63dc1272abcec545b85136cca0e",
+          "https://github.com/django/django/commit/5b1fbcef7a8bec991ebe7b2a18b5d5a95d72cb70",
+          "https://github.com/django/django/commit/f4cff43bf921fcea6a29b726eb66767f67753fa2",
+          "https://www.djangoproject.com/weblog/2019/dec/18/security-releases",
+          "https://www.debian.org/security/2020/dsa-4598",
+          "https://usn.ubuntu.com/4224-1",
+          "https://security.netapp.com/advisory/ntap-20200110-0003",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://seclists.org/bugtraq/2020/Jan/9",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HCM2DPUI7TOZWN4A6JFQFUVQ2XGE7GUD",
+          "https://groups.google.com/forum/#!topic/django-announce/3oaB2rVH3a0",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2019-16.yaml",
+          "https://github.com/django/django",
+          "https://github.com/advisories/GHSA-vfq6-hq5r-27r6",
+          "https://docs.djangoproject.com/en/dev/releases/security",
+          "http://packetstormsecurity.com/files/155872/Django-Account-Hijack.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-28347",
+        "cvss": null,
+        "summary": "SQL Injection in Django",
+        "fixed_versions": [
+          "2.2.28",
+          "3.2.13",
+          "4.0.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2022-28347",
+          "https://github.com/django/django/commit/00b0fc50e1738c7174c495464a5ef069408a4402",
+          "https://github.com/django/django/commit/29a6c98b4c13af82064f993f0acc6e8fafa4d3f5",
+          "https://github.com/django/django/commit/6723a26e59b0b5429a0c5873941e01a2e1bdbb81",
+          "https://github.com/django/django/commit/9e19accb6e0a00ba77d5a95a91675bf18877c72d",
+          "https://docs.djangoproject.com/en/4.0/releases/security",
+          "https://github.com/advisories/GHSA-w24h-v9qh-8gxj",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2022-191.yaml",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HWY6DQWRVBALV73BPUVBXC3QIYUM24IK",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/LTZVAKU5ALQWOKFTPISE257VCVIYGFQI",
+          "https://www.debian.org/security/2022/dsa-5254",
+          "https://www.djangoproject.com/weblog/2022/apr/11/security-releases",
+          "http://www.openwall.com/lists/oss-security/2022/04/11/1"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-13254",
+        "cvss": null,
+        "summary": "Data leakage via cache key collision in Django",
+        "fixed_versions": [
+          "2.2.13",
+          "3.0.7"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-13254",
+          "https://github.com/django/django/commit/07e59caa02831c4569bbebb9eb773bdd9cb4b206",
+          "https://github.com/django/django/commit/84b2da5552e100ae3294f564f6c862fef8d0e693",
+          "https://docs.djangoproject.com/en/3.0/releases/security",
+          "https://github.com/advisories/GHSA-wpjr-j57x-wxfw",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2020-31.yaml",
+          "https://groups.google.com/d/msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
+          "https://lists.debian.org/debian-lts-announce/2020/06/msg00016.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ",
+          "https://security.netapp.com/advisory/ntap-20200611-0002",
+          "https://usn.ubuntu.com/4381-1",
+          "https://usn.ubuntu.com/4381-2",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases",
+          "https://www.oracle.com/security-alerts/cpujan2021.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-28658",
+        "cvss": null,
+        "summary": "Directory Traversal in Django",
+        "fixed_versions": [
+          "2.2.20",
+          "3.0.14",
+          "3.1.8"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2021-28658",
+          "https://docs.djangoproject.com/en/3.1/releases/security",
+          "https://github.com/advisories/GHSA-xgxc-v2qg-chmh",
+          "https://github.com/django/django",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/django/PYSEC-2021-6.yaml",
+          "https://groups.google.com/g/django-announce/c/ePr5j-ngdPU",
+          "https://lists.debian.org/debian-lts-announce/2021/04/msg00008.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE",
+          "https://pypi.org/project/Django",
+          "https://security.netapp.com/advisory/ntap-20210528-0001",
+          "https://www.djangoproject.com/weblog/2021/apr/06/security-releases"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-12781",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.1.10",
+          "2.2.3",
+          "1.11.22"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Is4kLY9ZcZQ",
+          "https://www.djangoproject.com/weblog/2019/jul/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "http://www.openwall.com/lists/oss-security/2019/07/01/3",
+          "https://usn.ubuntu.com/4043-1/",
+          "http://www.securityfocus.com/bid/109018",
+          "https://security.netapp.com/advisory/ntap-20190705-0002/",
+          "https://www.debian.org/security/2019/dsa-4476",
+          "https://seclists.org/bugtraq/2019/Jul/10",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/5VXXWIOQGXOB7JCGJ3CVUW673LDHKEYL/",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://github.com/advisories/GHSA-6c7v-2f49-8h26"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14232",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "1.11.23",
+          "2.1.11",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK/",
+          "https://security.netapp.com/advisory/ntap-20190828-0002/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-c4qh-4vgv-qc6g"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14233",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.1.11",
+          "2.2.4",
+          "1.11.23"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK/",
+          "https://security.netapp.com/advisory/ntap-20190828-0002/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-h5jv-4p7w-64jg"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14234",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.1.11",
+          "1.11.23",
+          "2.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK/",
+          "https://security.netapp.com/advisory/ntap-20190828-0002/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-6r97-cj55-9hrq"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-14235",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.4",
+          "1.11.23",
+          "2.1.11"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/aug/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/jIoju2-KLDs",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "https://seclists.org/bugtraq/2019/Aug/15",
+          "https://www.debian.org/security/2019/dsa-4498",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/STVX7X7IDWAH5SKE6MBMY3TEI6ZODBTK/",
+          "https://security.netapp.com/advisory/ntap-20190828-0002/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-v9qg-3j8p-r63v"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-19118",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.1.15",
+          "2.2.8"
+        ],
+        "source": "OSV",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2019/12/02/1",
+          "https://groups.google.com/forum/#!topic/django-announce/GjGqDvtNmWQ",
+          "https://www.djangoproject.com/weblog/2019/dec/02/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://security.netapp.com/advisory/ntap-20191217-0003/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/6R4HD22PVEVQ45H2JA2NXH443AYJOPL5/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-hvmf-r92r-27hr"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-19844",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "1.11.27",
+          "2.2.9"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/3oaB2rVH3a0",
+          "https://www.djangoproject.com/weblog/2019/dec/18/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://usn.ubuntu.com/4224-1/",
+          "https://www.debian.org/security/2020/dsa-4598",
+          "https://seclists.org/bugtraq/2020/Jan/9",
+          "http://packetstormsecurity.com/files/155872/Django-Account-Hijack.html",
+          "https://security.netapp.com/advisory/ntap-20200110-0003/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HCM2DPUI7TOZWN4A6JFQFUVQ2XGE7GUD/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-vfq6-hq5r-27r6"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2019-12308",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.1.9",
+          "1.11.21",
+          "2.2.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2019/jun/03/security-releases/",
+          "https://groups.google.com/forum/#!topic/django-announce/GEbHU7YoVz8",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://docs.djangoproject.com/en/dev/releases/2.2.2/",
+          "https://docs.djangoproject.com/en/dev/releases/2.1.9/",
+          "https://docs.djangoproject.com/en/dev/releases/1.11.21/",
+          "http://www.openwall.com/lists/oss-security/2019/06/03/2",
+          "http://www.securityfocus.com/bid/108559",
+          "https://lists.debian.org/debian-lts-announce/2019/06/msg00001.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/USYRARSYB7PE3S2ZQO7PZNWMH7RPGL5G/",
+          "https://usn.ubuntu.com/4043-1/",
+          "https://lists.debian.org/debian-lts-announce/2019/07/msg00001.html",
+          "https://www.debian.org/security/2019/dsa-4476",
+          "https://seclists.org/bugtraq/2019/Jul/10",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00006.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-08/msg00025.html",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://github.com/advisories/GHSA-7rp2-fm2h-wchj"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-13254",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.13",
+          "3.0.7"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://groups.google.com/d/msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
+          "https://usn.ubuntu.com/4381-1/",
+          "https://usn.ubuntu.com/4381-2/",
+          "https://security.netapp.com/advisory/ntap-20200611-0002/",
+          "https://lists.debian.org/debian-lts-announce/2020/06/msg00016.html",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ/",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://github.com/advisories/GHSA-wpjr-j57x-wxfw"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-13596",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.13",
+          "3.0.7"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2020/jun/03/security-releases/",
+          "https://groups.google.com/forum/#!msg/django-announce/pPEmb2ot4Fo/X-SMalYSBAAJ",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://usn.ubuntu.com/4381-1/",
+          "https://usn.ubuntu.com/4381-2/",
+          "https://security.netapp.com/advisory/ntap-20200611-0002/",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ/",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://github.com/advisories/GHSA-2m34-jcjv-45xf"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-24583",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://usn.ubuntu.com/4479-1/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/F2ZHO3GZCJMP3DDTXCNVFV6ED3W64NAU/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZCRPQCBTV3RZHKVZ6K6QOAANPRZQD3GI/",
+          "https://security.netapp.com/advisory/ntap-20200918-0004/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/OLGFFLMF3X6USMJD7V5F5P4K2WVUTO3T/",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://github.com/advisories/GHSA-m6gj-h9gm-gw44"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-24584",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.16",
+          "3.0.10",
+          "3.1.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/Gdqn58RqIDM",
+          "https://www.openwall.com/lists/oss-security/2020/09/01/2",
+          "https://groups.google.com/forum/#!topic/django-announce/zFCMdgUnutU",
+          "https://www.djangoproject.com/weblog/2020/sep/01/security-releases/",
+          "https://docs.djangoproject.com/en/dev/releases/security/",
+          "https://usn.ubuntu.com/4479-1/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/F2ZHO3GZCJMP3DDTXCNVFV6ED3W64NAU/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZCRPQCBTV3RZHKVZ6K6QOAANPRZQD3GI/",
+          "https://security.netapp.com/advisory/ntap-20200918-0004/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/OLGFFLMF3X6USMJD7V5F5P4K2WVUTO3T/",
+          "https://www.oracle.com/security-alerts/cpujan2021.html",
+          "https://github.com/advisories/GHSA-fr28-569j-53c4"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-7471",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "eb31d845323618d688ad429479c6dda973056136",
+          "1.11.28",
+          "2.2.10",
+          "3.0.3"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.openwall.com/lists/oss-security/2020/02/03/1",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://groups.google.com/forum/#!topic/django-announce/X45S86X5bZI",
+          "https://www.djangoproject.com/weblog/2020/feb/03/security-releases/",
+          "http://www.openwall.com/lists/oss-security/2020/02/03/1",
+          "https://github.com/django/django/commit/eb31d845323618d688ad429479c6dda973056136",
+          "https://usn.ubuntu.com/4264-1/",
+          "https://seclists.org/bugtraq/2020/Feb/30",
+          "https://www.debian.org/security/2020/dsa-4629",
+          "https://security.netapp.com/advisory/ntap-20200221-0006/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ/",
+          "https://github.com/advisories/GHSA-hmr4-m2h5-33qx"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-9402",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "1.11.29",
+          "2.2.11",
+          "3.0.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/forum/#!topic/django-announce/fLUh_pOaKrY",
+          "https://www.djangoproject.com/weblog/2020/mar/04/security-releases/",
+          "https://docs.djangoproject.com/en/3.0/releases/security/",
+          "https://usn.ubuntu.com/4296-1/",
+          "https://security.netapp.com/advisory/ntap-20200327-0004/",
+          "https://security.gentoo.org/glsa/202004-17",
+          "https://www.debian.org/security/2020/dsa-4705",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4A2AP4T7RKPBCLTI2NNQG3T6MINDUUMZ/",
+          "https://github.com/advisories/GHSA-3gh2-xw74-jmcw"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-44420",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.25",
+          "3.1.14",
+          "3.2.10"
+        ],
+        "source": "OSV",
         "references": [
           "https://docs.djangoproject.com/en/3.2/releases/security/",
           "https://www.openwall.com/lists/oss-security/2021/12/07/1",
           "https://www.djangoproject.com/weblog/2021/dec/07/security-releases/",
-          "https://groups.google.com/forum/#!forum/django-announce"
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/advisories/GHSA-v6rh-hp5x-86rv"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-28658",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.20",
+          "3.0.14",
+          "3.1.8"
         ],
         "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "references": [
+          "https://groups.google.com/g/django-announce/c/ePr5j-ngdPU",
+          "https://www.djangoproject.com/weblog/2021/apr/06/security-releases/",
+          "https://docs.djangoproject.com/en/3.1/releases/security/",
+          "https://lists.debian.org/debian-lts-announce/2021/04/msg00008.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE/",
+          "https://github.com/advisories/GHSA-xgxc-v2qg-chmh"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-31542",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.21",
+          "3.1.9",
+          "3.2.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://www.djangoproject.com/weblog/2021/may/04/security-releases/",
+          "https://docs.djangoproject.com/en/3.2/releases/security/",
+          "http://www.openwall.com/lists/oss-security/2021/05/04/3",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.debian.org/debian-lts-announce/2021/05/msg00005.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE/",
+          "https://github.com/advisories/GHSA-rxjp-mfm9-w4wr"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-32052",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.22",
+          "3.1.10",
+          "3.2.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/3.2/releases/security/",
+          "http://www.openwall.com/lists/oss-security/2021/05/06/1",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://www.djangoproject.com/weblog/2021/may/06/security-releases/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZVKYPHR3TKR2ESWXBPOJEKRO2OSJRZUE/",
+          "https://github.com/advisories/GHSA-qm57-vhq3-3fwf"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-3281",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.18",
+          "3.0.12",
+          "3.1.6"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/3.1/releases/security/",
+          "https://www.djangoproject.com/weblog/2021/feb/01/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/YF52FKEH5S2P5CM4X7IXSYG67YY2CDOO/",
+          "https://security.netapp.com/advisory/ntap-20210226-0004/",
+          "https://github.com/advisories/GHSA-fvgf-6h6h-3322"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-33203",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.24",
+          "3.1.12",
+          "3.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/3.2/releases/security/",
+          "https://www.djangoproject.com/weblog/2021/jun/02/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/advisories/GHSA-68w8-qjq3-2gfm"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-33571",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.24",
+          "3.1.12",
+          "3.2.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://groups.google.com/g/django-announce/c/sPyjSKMi8Eo",
+          "https://docs.djangoproject.com/en/3.2/releases/security/",
+          "https://www.djangoproject.com/weblog/2021/jun/02/security-releases/",
+          "https://github.com/advisories/GHSA-p99v-5w3c-jqq9"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45115",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases/",
+          "https://github.com/advisories/GHSA-53qw-q765-4fww"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-22818",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.27",
+          "3.2.12",
+          "4.0.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://www.djangoproject.com/weblog/2022/feb/01/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/advisories/GHSA-95rw-fx8r-36v6"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-28346",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "4.0.4",
+          "3.2.13",
+          "2.2.28"
+        ],
+        "source": "OSV",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2022/04/11/1",
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://www.djangoproject.com/weblog/2022/apr/11/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://lists.debian.org/debian-lts-announce/2022/04/msg00013.html",
+          "https://github.com/advisories/GHSA-2gwj-7jmv-h26r"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-28347",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "4.0.4",
+          "3.2.13",
+          "2.2.28"
+        ],
+        "source": "OSV",
+        "references": [
+          "http://www.openwall.com/lists/oss-security/2022/04/11/1",
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://www.djangoproject.com/weblog/2022/apr/11/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/advisories/GHSA-w24h-v9qh-8gxj"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45116",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases/",
+          "https://github.com/advisories/GHSA-8c5j-9r9f-c6w8"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2022-23833",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.27",
+          "3.2.12",
+          "4.0.2"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://www.djangoproject.com/weblog/2022/feb/01/security-releases/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://github.com/advisories/GHSA-6cw3-g6wv-c2xv"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2021-45452",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "2.2.26",
+          "3.2.11",
+          "4.0.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://docs.djangoproject.com/en/4.0/releases/security/",
+          "https://groups.google.com/forum/#!forum/django-announce",
+          "https://www.djangoproject.com/weblog/2022/jan/04/security-releases/",
+          "https://github.com/advisories/GHSA-jrh2-hc4r-7jwx"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       }
     ],
     "status": "ok"
@@ -340,86 +1902,172 @@
     "version": "2.19.0",
     "cves": [
       {
-        "id": "CVE-2018-18074",
-        "osv_id": "PYSEC-2018-28",
-        "cve_aliases": [
-          "CVE-2018-18074"
-        ],
+        "id": "CVE-2024-47081",
         "cvss": null,
-        "summary": "The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to dis",
+        "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs",
         "fixed_versions": [
-          "2.20.0",
-          "c45d7c49ea75133e52ab22a8e9e13173938e36ff"
+          "2.32.4"
         ],
+        "source": "OSV",
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-47081",
+          "https://github.com/psf/requests/pull/6965",
+          "https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef",
+          "https://github.com/psf/requests",
+          "https://requests.readthedocs.io/en/latest/api/#requests.Session.trust_env",
+          "https://seclists.org/fulldisclosure/2025/Jun/2",
+          "http://seclists.org/fulldisclosure/2025/Jun/2",
+          "http://www.openwall.com/lists/oss-security/2025/06/03/11",
+          "http://www.openwall.com/lists/oss-security/2025/06/03/9",
+          "http://www.openwall.com/lists/oss-security/2025/06/04/1",
+          "http://www.openwall.com/lists/oss-security/2025/06/04/6"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2024-35195",
+        "cvss": null,
+        "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
+        "fixed_versions": [
+          "2.32.0"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56",
+          "https://nvd.nist.gov/vuln/detail/CVE-2024-35195",
+          "https://github.com/psf/requests/pull/6655",
+          "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac",
+          "https://github.com/psf/requests",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/IYLSNK5TL46Q6XPRVMHVWS63MVJQOK4Q",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/N7WP6EYDSUOCOJYHDK5NX43PYZ4SNHGZ"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2026-25645",
+        "cvss": null,
+        "summary": "Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility function",
+        "fixed_versions": [
+          "2.33.0"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-gc5v-m9x4-r6x2",
+          "https://nvd.nist.gov/vuln/detail/CVE-2026-25645",
+          "https://github.com/psf/requests/commit/66d21cb07bd6255b1280291c4fafb71803cdb3b7",
+          "https://github.com/psf/requests",
+          "https://github.com/psf/requests/releases/tag/v2.33.0"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2023-32681",
+        "cvss": null,
+        "summary": "Unintended leak of Proxy-Authorization header in requests",
+        "fixed_versions": [
+          "2.31.0"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q",
+          "https://nvd.nist.gov/vuln/detail/CVE-2023-32681",
+          "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+          "https://github.com/psf/requests",
+          "https://github.com/psf/requests/releases/tag/v2.31.0",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/requests/PYSEC-2023-74.yaml",
+          "https://lists.debian.org/debian-lts-announce/2023/06/msg00018.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/AW7HNFGYP44RT3DUDQXG2QT3OEV2PJ7Y",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/KOYASTZDGQG2BWLSNBPL3TQRL2G7QYNZ",
+          "https://security.gentoo.org/glsa/202309-08"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2018-18074",
+        "cvss": null,
+        "summary": "Insufficiently Protected Credentials in Requests",
+        "fixed_versions": [
+          "2.20.0"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2018-18074",
+          "https://github.com/requests/requests/issues/4716",
+          "https://github.com/requests/requests/pull/4718",
+          "https://github.com/requests/requests/commit/c45d7c49ea75133e52ab22a8e9e13173938e36ff",
+          "https://access.redhat.com/errata/RHSA-2019:2035",
+          "https://bugs.debian.org/910766",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/requests/PYSEC-2018-28.yaml",
+          "https://github.com/requests/requests",
+          "https://usn.ubuntu.com/3790-1",
+          "https://usn.ubuntu.com/3790-2",
+          "https://www.oracle.com/security-alerts/cpujul2022.html",
+          "http://docs.python-requests.org/en/master/community/updates/#release-and-version-history",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-07/msg00024.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2018-18074",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "c45d7c49ea75133e52ab22a8e9e13173938e36ff",
+          "2.20.0"
+        ],
+        "source": "OSV",
         "references": [
           "https://github.com/requests/requests/pull/4718",
           "https://github.com/requests/requests/issues/4716",
           "https://github.com/requests/requests/commit/c45d7c49ea75133e52ab22a8e9e13173938e36ff",
-          "https://bugs.debian.org/910766"
+          "https://bugs.debian.org/910766",
+          "https://usn.ubuntu.com/3790-1/",
+          "http://docs.python-requests.org/en/master/community/updates/#release-and-version-history",
+          "https://usn.ubuntu.com/3790-2/",
+          "http://lists.opensuse.org/opensuse-security-announce/2019-07/msg00024.html",
+          "https://access.redhat.com/errata/RHSA-2019:2035",
+          "https://github.com/advisories/GHSA-x84v-xcm2-53pg"
         ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       },
       {
         "id": "CVE-2023-32681",
-        "osv_id": "PYSEC-2023-74",
-        "cve_aliases": [
-          "CVE-2023-32681"
-        ],
         "cvss": null,
-        "summary": "Requests is a HTTP library. Since Requests 2.3.0, Requests has been leaking Proxy-Authorization headers to destination servers when redirected to an HTTPS endpoint. This is a product of how we use `re",
+        "summary": null,
         "fixed_versions": [
-          "2.31.0",
-          "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5"
+          "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+          "2.31.0"
         ],
+        "source": "OSV",
         "references": [
           "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q",
           "https://github.com/psf/requests/releases/tag/v2.31.0",
           "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
           "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/AW7HNFGYP44RT3DUDQXG2QT3OEV2PJ7Y/"
         ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2024-35195",
-        "osv_id": "GHSA-9wx4-h78v-vm56",
-        "cve_aliases": [
-          "CVE-2024-35195"
-        ],
-        "cvss": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
-        "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
-        "fixed_versions": [
-          "2.32.0"
-        ],
-        "references": [
-          "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56",
-          "https://nvd.nist.gov/vuln/detail/CVE-2024-35195",
-          "https://github.com/psf/requests/pull/6655",
-          "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2023-32681",
-        "osv_id": "GHSA-j8r2-6x86-q33q",
-        "cve_aliases": [
-          "CVE-2023-32681"
-        ],
-        "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
-        "summary": "Unintended leak of Proxy-Authorization header in requests",
-        "fixed_versions": [
-          "2.31.0"
-        ],
-        "references": [
-          "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q",
-          "https://nvd.nist.gov/vuln/detail/CVE-2023-32681",
-          "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
-          "https://github.com/psf/requests"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       }
     ],
     "status": "ok"
@@ -431,83 +2079,104 @@
     "cves": [
       {
         "id": "CVE-2020-1747",
-        "osv_id": "PYSEC-2020-96",
-        "cve_aliases": [
-          "CVE-2020-1747",
-          "CVE-2025-50460"
-        ],
         "cvss": null,
-        "summary": "A vulnerability was discovered in the PyYAML library in versions before 5.3.1, where it is susceptible to arbitrary code execution when it processes untrusted YAML files through the full_load method o",
-        "fixed_versions": [
-          "5.3.1"
-        ],
-        "references": [
-          "https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2020-1747",
-          "https://github.com/yaml/pyyaml/pull/386",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/WORRFHPQVAFKKXXWLSSW6XKUYLWM6CSH/",
-          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZBJA3SGNJKCAYPSHOHWY3KBCWNM5NYK2/"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-14343",
-        "osv_id": "PYSEC-2021-142",
-        "cve_aliases": [
-          "CVE-2020-14343"
-        ],
-        "cvss": null,
-        "summary": "A vulnerability was discovered in the PyYAML library in versions before 5.4, where it is susceptible to arbitrary code execution when it processes untrusted YAML files through the full_load method or ",
-        "fixed_versions": [
-          "5.4"
-        ],
-        "references": [
-          "https://bugzilla.redhat.com/show_bug.cgi?id=1860466",
-          "https://github.com/advisories/GHSA-8q59-q68h-6hv4"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-14343",
-        "osv_id": "GHSA-8q59-q68h-6hv4",
-        "cve_aliases": [
-          "CVE-2020-14343"
-        ],
-        "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-        "summary": "Improper Input Validation in PyYAML",
-        "fixed_versions": [
-          "5.4"
-        ],
-        "references": [
-          "https://nvd.nist.gov/vuln/detail/CVE-2020-14343",
-          "https://github.com/SeldonIO/seldon-core/issues/2252",
-          "https://github.com/yaml/pyyaml/issues/420",
-          "https://github.com/yaml/pyyaml/issues/420#issuecomment-663673966"
-        ],
-        "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
-      },
-      {
-        "id": "CVE-2020-1747",
-        "osv_id": "GHSA-6757-jp84-gxfx",
-        "cve_aliases": [
-          "CVE-2020-1747",
-          "CVE-2025-50460"
-        ],
-        "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "summary": "Improper Input Validation in PyYAML",
         "fixed_versions": [
           "5.3.1"
         ],
+        "source": "OSV",
         "references": [
           "https://nvd.nist.gov/vuln/detail/CVE-2020-1747",
           "https://github.com/github/advisory-database/pull/4942",
           "https://github.com/yaml/pyyaml/pull/386",
-          "https://github.com/yaml/pyyaml/commit/0cedb2a0697b2bc49e4f3841b8d4590b6b15657e"
+          "https://github.com/yaml/pyyaml/commit/0cedb2a0697b2bc49e4f3841b8d4590b6b15657e",
+          "https://github.com/yaml/pyyaml/commit/5080ba513377b6355a0502104846ee804656f1e0",
+          "https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2020-1747",
+          "https://github.com/advisories/GHSA-6757-jp84-gxfx",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/pyyaml/PYSEC-2020-96.yaml",
+          "https://github.com/yaml/pyyaml",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/7PPAS6C4SZRDQLR7C22A5U3QOLXY33JX",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/K5HEPD7LEVDPCITY5IMDYWXUMX37VFMY",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/MMQXSZXNJT6ERABJZAAICI3DQSQLCP3D",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/WORRFHPQVAFKKXXWLSSW6XKUYLWM6CSH",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZBJA3SGNJKCAYPSHOHWY3KBCWNM5NYK2",
+          "https://www.oracle.com/security-alerts/cpujul2022.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2020-04/msg00017.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2020-05/msg00017.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-14343",
+        "cvss": null,
+        "summary": "Improper Input Validation in PyYAML",
+        "fixed_versions": [
+          "5.4"
         ],
         "source": "OSV",
-        "fetched_at": "2026-04-21T11:35Z"
+        "references": [
+          "https://nvd.nist.gov/vuln/detail/CVE-2020-14343",
+          "https://github.com/SeldonIO/seldon-core/issues/2252",
+          "https://github.com/yaml/pyyaml/issues/420",
+          "https://github.com/yaml/pyyaml/issues/420#issuecomment-663673966",
+          "https://github.com/yaml/pyyaml/commit/a001f2782501ad2d24986959f0239a354675f9dc",
+          "https://bugzilla.redhat.com/show_bug.cgi?id=1860466",
+          "https://github.com/advisories/GHSA-8q59-q68h-6hv4",
+          "https://github.com/pypa/advisory-database/tree/main/vulns/pyyaml/PYSEC-2021-142.yaml",
+          "https://github.com/yaml/pyyaml",
+          "https://pypi.org/project/PyYAML",
+          "https://www.oracle.com/security-alerts/cpuapr2022.html",
+          "https://www.oracle.com/security-alerts/cpujul2022.html"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-1747",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "5.3.1"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2020-1747",
+          "https://github.com/yaml/pyyaml/pull/386",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/WORRFHPQVAFKKXXWLSSW6XKUYLWM6CSH/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZBJA3SGNJKCAYPSHOHWY3KBCWNM5NYK2/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/K5HEPD7LEVDPCITY5IMDYWXUMX37VFMY/",
+          "http://lists.opensuse.org/opensuse-security-announce/2020-04/msg00017.html",
+          "http://lists.opensuse.org/opensuse-security-announce/2020-05/msg00017.html",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/MMQXSZXNJT6ERABJZAAICI3DQSQLCP3D/",
+          "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/7PPAS6C4SZRDQLR7C22A5U3QOLXY33JX/",
+          "https://github.com/advisories/GHSA-6757-jp84-gxfx"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
+      },
+      {
+        "id": "CVE-2020-14343",
+        "cvss": null,
+        "summary": null,
+        "fixed_versions": [
+          "5.4"
+        ],
+        "source": "OSV",
+        "references": [
+          "https://bugzilla.redhat.com/show_bug.cgi?id=1860466",
+          "https://github.com/advisories/GHSA-8q59-q68h-6hv4"
+        ],
+        "fetched_at": "2026-04-21T12:23:25Z",
+        "kev": false,
+        "kev_date_added": null,
+        "kev_due_date": null
       }
     ],
     "status": "ok"
