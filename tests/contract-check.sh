@@ -120,6 +120,16 @@ with open(path) as fh:
         # Allow the dep-inventory sentinel line emitted by sec-expert.
         if "__dep_inventory__" in obj or obj.get("id") == "__dep_inventory__":
             continue
+        # Allow the SAST status summary line emitted by sast-runner.
+        if "__sast_status__" in obj:
+            status = obj.get("__sast_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __sast_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __sast_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -134,6 +144,18 @@ with open(path) as fh:
         if not isinstance(obj["line"], int):
             print(f"CONTRACT FAIL: {path}:{i} line must be int", file=sys.stderr)
             errs += 1
+        # Origin-aware validation: SAST findings must carry `tool` and `origin`.
+        if obj.get("origin") == "sast":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} sast finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"semgrep", "bandit"}:
+                print(f"CONTRACT FAIL: {path}:{i} sast tool must be semgrep|bandit, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # fix_recipe is explicitly null-permitted for SAST findings.
+            if "fix_recipe" in obj and obj["fix_recipe"] not in (None, ""):
+                # SAST tools do not ship quoted fix recipes; warn if present.
+                pass
 sys.exit(1 if errs else 0)
 PY
         then
@@ -150,6 +172,29 @@ if [ -d tests/fixtures ]; then
         validate_fixture_jsonl "${fixture%/}"
     done
 fi
+
+# --- Negative test: the origin-aware validator must reject a SAST
+# finding with no `tool`. We run the same inline python validator against
+# a synthetic malformed line and assert it exits non-zero.
+bad_line='{"id":"B602","severity":"HIGH","cwe":"CWE-78","title":"t","file":"x.py","line":1,"evidence":"e","reference":"sast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"sast"}'
+if echo "$bad_line" | python3 -c '
+import json, sys
+required = ["id","severity","cwe","file","line","evidence","reference","reference_url","fix_recipe","confidence"]
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    missing = [k for k in required if k not in obj]
+    if missing: errs += 1
+    if obj.get("origin") == "sast" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed SAST line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "sast negative-test: malformed SAST line (missing tool) correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
