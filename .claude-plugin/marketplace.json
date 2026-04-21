@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sec-review-marketplace",
+  "description": "Single-plugin marketplace distributing sec-review: a cybersecurity audit plugin with a top-tier domain-expert subagent and live-CVE-enriched review skill for web services and servers.",
+  "owner": {
+    "name": "holyfiremin",
+    "email": "holyfiremin@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "sec-review",
+      "description": "Analyze a project against top-tier security expertise (DB, framework, webserver, proxy, frontend, auth, TLS, container, secrets, supply-chain) and live CVE feeds (NVD, OSV, GHSA). Produces a prioritized report with cited, reliable fixes.",
+      "category": "security",
+      "source": "./"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "sec-review",
+  "version": "0.1.0",
+  "description": "Cybersecurity review plugin for web services and servers: orchestrates a sec-expert subagent armed with top-tier, citation-grounded expertise (databases, frameworks, webservers, proxies, frontend, auth, TLS, containers, secrets, supply-chain) to analyze project code and cross-reference live CVE feeds (NVD, OSV.dev, GHSA), then produce a prioritized report with reliable fixes.",
+  "author": {
+    "name": "holyfiremin",
+    "email": "holyfiremin@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "cybersecurity",
+    "audit",
+    "cve",
+    "owasp",
+    "sast",
+    "vulnerability",
+    "hardening",
+    "web-security",
+    "server-security",
+    "nvd",
+    "osv",
+    "ghsa",
+    "tls",
+    "oauth",
+    "jwt",
+    "xss",
+    "sqli",
+    "csp",
+    "supply-chain"
+  ]
+}
