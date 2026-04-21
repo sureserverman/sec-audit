@@ -1,0 +1,21 @@
+{
+  "_comment": "Anthropic list prices in USD per million tokens. Since the runtime exposes only total_tokens (no input/output split), we use a blended rate that assumes a ~3:1 input:output ratio typical for agentic work. Re-check quarterly at https://www.anthropic.com/pricing.",
+  "_checked_at": "2026-04-21",
+  "_source": "https://www.anthropic.com/pricing",
+
+  "sonnet": {
+    "input_per_mtok":  3.00,
+    "output_per_mtok": 15.00,
+    "blended_per_mtok": 6.00
+  },
+  "haiku": {
+    "input_per_mtok":  1.00,
+    "output_per_mtok":  5.00,
+    "blended_per_mtok": 2.00
+  },
+  "opus": {
+    "input_per_mtok": 15.00,
+    "output_per_mtok": 75.00,
+    "blended_per_mtok": 30.00
+  }
+}
