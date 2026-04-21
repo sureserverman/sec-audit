@@ -162,9 +162,51 @@ visibly distinguishable from a clean SAST scan. `tests/sast-drill.sh`
 enforces this contract by scrubbing PATH and asserting the unavailable
 output shape. No SAST finding is ever fabricated.
 
+## DAST lane (v0.5.0)
+
+A sixth agent, **`dast-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline as an opt-in dynamic-analysis pass
+dispatched in parallel with `sec-expert` and `sast-runner`. Unlike
+SAST, DAST needs a running target — the agent is a no-op unless the
+orchestrator is passed a `target_url` (or the agent is invoked with
+`$DAST_TARGET_URL` set). It shells out to OWASP ZAP baseline when
+available:
+
+- **Docker** (preferred): `docker run --rm -v <tmp>:/zap/wrk/:rw
+  --user $(id -u):$(id -g) zaproxy/zap-stable zap-baseline.py -t
+  <URL> -J report.json -I -m <max-minutes>` — passive-only scan,
+  exits cleanly on warnings/failures via `-I`.
+- **Local** `zap-baseline.py` when docker is absent: same flags,
+  writing the JSON report to a tempdir.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "dast"`, `tool: "zap-baseline"`, `file: <URI>`, and
+`line: 0` (there is no source line for a live scan — the URI and
+request method live in `notes`). ZAP's `riskcode` ("0"–"3") maps to
+INFO/LOW/MEDIUM/HIGH. Baseline never emits CRITICAL — it is a
+passive scan, not exploitation. `cweid` maps to `CWE-<n>` when
+present. Field-mapping recipes live in
+`skills/sec-review/references/dast-tools.md`.
+
+**Fixes still come from the regex packs and reference files, not
+from ZAP.** DAST findings land with `fix_recipe: null`; the
+triager's domain-pack lookup is what supplies the quoted fix in the
+final report.
+
+**Degrade path.** When the orchestrator runs without a
+`target_url`, the DAST pass is skipped entirely and a
+`dast skipped (no target_url)` metadata line appears in the report.
+When a URL is supplied but neither docker nor `zap-baseline.py` is
+on `PATH`, the agent emits a single sentinel line
+`{"__dast_status__": "unavailable", "tools": []}` and exits clean.
+The orchestrator adds a `⚠ DAST tools unavailable` banner.
+`tests/dast-drill.sh` enforces this contract by scrubbing PATH and
+asserting the unavailable output shape. No DAST finding is ever
+fabricated.
+
 ## Known limits & false positives
 
-- **Static analysis only.** This plugin does not execute your code, run SAST binaries, or fuzz endpoints. It greps for dangerous patterns and enriches with CVE feeds.
+- **No exploitation, no fuzzing.** The plugin does not fuzz endpoints, brute-force credentials, or exploit findings. SAST invokes semgrep/bandit when available; DAST invokes ZAP baseline (passive-only) against a supplied `target_url`. Everything else is grep + CVE-feed enrichment.
 - **Regex hints over-match.** Every reference file has a `## Common false positives` section. Findings the sec-expert flags as likely FP are emitted with `confidence: low` and a note; review with judgment.
 - **Transitive deps are covered by OSV** but only when the manifest exposes them (e.g. `poetry.lock`, `package-lock.json`, `go.sum`). Unlocked `requirements.txt` only lists direct deps.
 - **Platform coverage.** Deep CIS-benchmark coverage is strongest for Linux hosts. **IIS webserver configuration** (`web.config`, `applicationHost.config`) is covered as of v0.4.0 via `references/webservers/iis.md`. Windows OS hardening (registry, WinRM, SMB, Defender policy) remains out of scope — that territory needs live-host interaction rather than code/config review.
