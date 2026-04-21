@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head><title>Results for {{ q }}</title></head>
+<body>
+  <h1>Results</h1>
+  <!-- DANGEROUS: |safe on user-controlled input — CWE-79 -->
+  <div class="query">{{ q|safe }}</div>
+  <ul>
+    {% for row in rows %}
+      <li>{{ row.1|safe }}</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
