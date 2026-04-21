@@ -178,9 +178,10 @@ Compute a numeric score 0–100 per finding and bucket it.
 - **Exposure** (0–25 pts): `+25` if the affected file is reachable from an
   unauthenticated HTTP path, `+15` if authenticated, `+5` if internal-only
   (admin, cron, worker), `0` if test/fixture code.
-- **Exploit-in-wild** (0–20 pts): `+20` if CVE references include "CISA
-  KEV", "exploit-db", or "metasploit"; `+10` if there's a public PoC;
-  `0` otherwise.
+- **Exploit-in-wild** (0–20 pts): `+20` if `cve.kev == true` (CISA KEV
+  catalog, cross-referenced by `cve-enricher`); `+10` if there's a public
+  PoC reference; `0` otherwise. Note: `cve.kev == null` means the KEV feed
+  was offline — unknown is unknown, no points awarded.
 - **Auth-required** (0–15 pts): `+15` if exploit requires no auth; `+8`
   if auth but no elevated privileges; `+2` if admin-only; `0` if attacker
   must already control the host.

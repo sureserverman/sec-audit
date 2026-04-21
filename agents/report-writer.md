@@ -146,6 +146,20 @@ matched CVE, emit one line:
 CVE-YYYY-NNNNN (CVSS <x>, source: OSV|NVD|GHSA, fetched <ISO timestamp>)
 ```
 
+Then append a KEV suffix based on the CVE entry's `kev` field:
+
+- `kev == true` → append ` — CISA KEV (added <kev_date_added>, due <kev_due_date>)`
+- `kev == null` → append ` — KEV check offline`
+- `kev == false` → append nothing
+
+Example rendered lines:
+
+```
+CVE-2022-28346 (CVSS 9.8, source: OSV, fetched 2026-04-21T14:30Z) — CISA KEV (added 2022-05-23, due 2022-06-13)
+CVE-2023-12345 (CVSS 7.5, source: NVD, fetched 2026-04-21T14:30Z) — KEV check offline
+CVE-2024-00001 (CVSS 5.3, source: GHSA, fetched 2026-04-21T14:30Z)
+```
+
 If there are multiple CVEs, emit one bullet per CVE under the `**CVE(s):**`
 label. If no CVEs matched this finding, write:
 
