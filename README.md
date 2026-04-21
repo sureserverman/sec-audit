@@ -84,6 +84,14 @@ No source code from the target project is ever sent to external services. Only p
 
 If all three feeds fail (rate limit, network, outage), the review still completes with a `⚠ CVE enrichment offline` banner. The plugin will **never** fabricate CVE IDs from training data — when offline, the dep inventory is surfaced without enrichment, and the user can re-run with network later.
 
+## Rigor (v0.3.0)
+
+Three quality-of-review improvements landed in v0.3.0 without architectural change:
+
+- **CISA KEV cross-reference.** The `cve-enricher` agent fetches the CISA Known Exploited Vulnerabilities catalog once per run, indexes it by CVE ID, and attaches `kev: true|false|null` plus `kev_date_added` / `kev_due_date` to every CVE. The scoring rubric's Exploit-in-wild sub-score is now a direct `kev == true` check instead of fuzzy substring matching on reference text. `kev: null` (KEV feed offline) awards zero points — unknown is unknown; the agent never fabricates a KEV hit.
+- **Per-agent token-cost accounting.** `tests/measure-pipeline.sh <tokens.json>` converts a per-agent tokens JSON into a blended-rate cost figure, using rates pinned in `tests/model-costs.json`. The v0.2.0 baseline (on the sample-stack fixture) landed at **$0.5575 / 112K tokens**; the v0.3.0 Stage 3 baseline with KEV added captured **$1.2644 / 244K tokens** — most of the spread is sub-agent dispatch variance across runs, not the KEV adapter (which is one extra HTTP fetch + index). Runtime only exposes `total_tokens`, so costing is blended at an assumed 3:1 input:output ratio; when per-token-type fields become visible, `model-costs.json` already carries `input_per_mtok` and `output_per_mtok` for a one-line upgrade.
+- **Offline-degradation drill.** `tests/offline-drill.sh` stands up a local 503 mock (`tests/offline-mock.py`), proves every override URL routes to it, and asserts the pipeline's offline path produces the ⚠ banner and zero fabricated CVE IDs. The `cve-enricher` agent now honors four env-var overrides (`OSV_BASE_URL`, `NVD_BASE_URL`, `GHSA_BASE_URL`, `KEV_URL`) with a stderr audit log on each active override — reviews run against an internal mirror or air-gapped cache are visibly distinguishable from live-feed runs.
+
 ## Known limits & false positives
 
 - **Static analysis only.** This plugin does not execute your code, run SAST binaries, or fuzz endpoints. It greps for dangerous patterns and enriches with CVE feeds.

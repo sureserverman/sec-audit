@@ -1,7 +1,7 @@
 {
   "name": "sec-review",
-  "version": "0.2.0",
-  "description": "Cybersecurity review plugin for web services and servers: a pipelined four-agent architecture (sec-expert, finding-triager, cve-enricher, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O. Citation-grounded expertise across databases, frameworks, webservers, proxies, frontend, auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev, and GHSA; prioritized markdown report with reliable, primary-source-cited fixes.",
+  "version": "0.3.0",
+  "description": "Cybersecurity review plugin for web services and servers: a pipelined four-agent architecture (sec-expert, finding-triager, cve-enricher, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O. Citation-grounded expertise across databases, frameworks, webservers, proxies, frontend, auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev, and GHSA with CISA KEV cross-reference for exploit-in-wild prioritization; per-run token-cost accounting; offline-degradation drill ensures graceful behavior when feeds are unreachable; prioritized markdown report with reliable, primary-source-cited fixes.",
   "author": {
     "name": "holyfiremin",
     "email": "holyfiremin@gmail.com"
@@ -21,6 +21,7 @@
     "nvd",
     "osv",
     "ghsa",
+    "kev",
     "tls",
     "oauth",
     "jwt",
