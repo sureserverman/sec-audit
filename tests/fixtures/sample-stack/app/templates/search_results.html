@@ -1,0 +1,9 @@
+<!doctype html>
+<html>
+<head><title>Results for {{ q }}</title></head>
+<body>
+  <!-- XSS sink via |safe on user input — CWE-79 -->
+  <div>{{ q|safe }}</div>
+  <ul>{% for r in rows %}<li>{{ r.1|safe }}</li>{% endfor %}</ul>
+</body>
+</html>
