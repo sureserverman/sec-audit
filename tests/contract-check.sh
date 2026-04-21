@@ -67,6 +67,89 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
         print(f'model pin ok: $file -> $model')"
 done
 
+# Per-fixture JSONL pipeline output validation against the sec-expert finding
+# schema. Walks every subdirectory of tests/fixtures/ and validates any
+# .pipeline/*.jsonl file found there. A fixture without a .pipeline/ directory
+# (or with no .jsonl files in it) is skipped with an informational line rather
+# than failing — fixtures may exist before any pipeline has been run against
+# them.
+validate_fixture_jsonl() {
+    local fixture_dir="$1"
+    local fixture_name
+    fixture_name="$(basename "$fixture_dir")"
+    local pipeline_dir="$fixture_dir/.pipeline"
+    if [ ! -d "$pipeline_dir" ]; then
+        echo "$fixture_name: no JSONL pipeline output yet, skipping"
+        return 0
+    fi
+    # Collect .jsonl files (nullglob-style via find to avoid literal glob).
+    local jsonl_files=()
+    while IFS= read -r -d '' f; do
+        jsonl_files+=("$f")
+    done < <(find "$pipeline_dir" -maxdepth 1 -type f -name '*.jsonl' -print0)
+    if [ "${#jsonl_files[@]}" -eq 0 ]; then
+        echo "$fixture_name: no JSONL pipeline output yet, skipping"
+        return 0
+    fi
+    local jf
+    for jf in "${jsonl_files[@]}"; do
+        if ! python3 - "$jf" "$fixture_name" <<'PY'
+import json, sys
+path, fixture = sys.argv[1], sys.argv[2]
+required = ["id", "severity", "cwe", "file", "line", "evidence",
+            "reference", "reference_url", "fix_recipe", "confidence"]
+severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}
+confidences = {"high", "medium", "low"}
+errs = 0
+with open(path) as fh:
+    for i, line in enumerate(fh, 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception as e:
+            print(f"CONTRACT FAIL: {path}:{i} not valid JSON: {e}", file=sys.stderr)
+            errs += 1
+            continue
+        if not isinstance(obj, dict):
+            print(f"CONTRACT FAIL: {path}:{i} not a JSON object", file=sys.stderr)
+            errs += 1
+            continue
+        # Allow the dep-inventory sentinel line emitted by sec-expert.
+        if "__dep_inventory__" in obj or obj.get("id") == "__dep_inventory__":
+            continue
+        missing = [k for k in required if k not in obj]
+        if missing:
+            print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
+            errs += 1
+            continue
+        if obj["severity"] not in severities:
+            print(f"CONTRACT FAIL: {path}:{i} bad severity {obj['severity']!r}", file=sys.stderr)
+            errs += 1
+        if obj["confidence"] not in confidences:
+            print(f"CONTRACT FAIL: {path}:{i} bad confidence {obj['confidence']!r}", file=sys.stderr)
+            errs += 1
+        if not isinstance(obj["line"], int):
+            print(f"CONTRACT FAIL: {path}:{i} line must be int", file=sys.stderr)
+            errs += 1
+sys.exit(1 if errs else 0)
+PY
+        then
+            fail=1
+        else
+            echo "$fixture_name: $(basename "$jf") schema ok"
+        fi
+    done
+}
+
+if [ -d tests/fixtures ]; then
+    for fixture in tests/fixtures/*/; do
+        [ -d "$fixture" ] || continue
+        validate_fixture_jsonl "${fixture%/}"
+    done
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1

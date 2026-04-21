@@ -1,0 +1,23 @@
+<!--
+  Fragment of applicationHost.config illustrating the authentication and
+  machineKey state for the ContosoPortal site. Not a standalone config.
+-->
+<location path="ContosoPortal">
+  <system.webServer>
+    <security>
+      <authentication>
+        <!-- INTENTIONAL: anonymous auth runs as the shared built-in IUSR account
+             rather than a per-app-pool identity. Breaks CIS "unique identity
+             per app pool" guidance and enables lateral access between sites. -->
+        <anonymousAuthentication enabled="true" userName="IUSR" />
+        <windowsAuthentication enabled="false" />
+        <basicAuthentication enabled="false" />
+      </authentication>
+    </security>
+  </system.webServer>
+  <system.web>
+    <!-- INTENTIONAL: AutoGenerate machineKey breaks ViewState / forms-auth
+         validation across a web farm (each node picks its own key). -->
+    <machineKey validationKey="AutoGenerate,IsolateApps" decryptionKey="AutoGenerate,IsolateApps" />
+  </system.web>
+</location>
