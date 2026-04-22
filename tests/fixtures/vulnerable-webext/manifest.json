@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Vulnerable WebExt Fixture",
+  "version": "0.0.1",
+  "description": "Intentionally-vulnerable MV3 extension for sec-review webext lane E2E testing. NOT for distribution.",
+  "host_permissions": ["*://*/*"],
+  "permissions": ["tabs", "cookies", "webRequest", "webRequestBlocking"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'unsafe-eval'; object-src 'self'"
+  },
+  "externally_connectable": {
+    "matches": ["*://*/*"]
+  },
+  "background": {
+    "service_worker": "background/sw.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/inject.js", "lib/jquery-1.12.4.min.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

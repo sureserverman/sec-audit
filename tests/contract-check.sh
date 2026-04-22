@@ -141,6 +141,16 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __dast_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the webext status summary line emitted by webext-runner.
+        if "__webext_status__" in obj:
+            status = obj.get("__webext_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __webext_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __webext_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -178,6 +188,18 @@ with open(path) as fh:
             # DAST has no source line; `line: 0` is the documented convention.
             if obj.get("line") != 0:
                 print(f"CONTRACT FAIL: {path}:{i} dast line must be 0 (no source line), got {obj.get('line')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: webext findings must carry `tool` and `origin`.
+        if obj.get("origin") == "webext":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} webext finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"addons-linter", "web-ext", "retire"}:
+                print(f"CONTRACT FAIL: {path}:{i} webext tool must be addons-linter|web-ext|retire, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: webext findings must NOT carry SAST/DAST tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+                print(f"CONTRACT FAIL: {path}:{i} webext finding carries non-webext tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -218,6 +240,45 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "sast negative-test: malformed SAST line (missing tool) correctly rejected"
+
+# --- Negative test: the origin-aware validator must reject a webext
+# finding with no `tool` and a webext finding tagged with a non-webext tool.
+bad_webext_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"manifest.json","line":1,"evidence":"e","reference":"webext-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"webext"}'
+if echo "$bad_webext_notool" | python3 -c '
+import json, sys
+required = ["id","severity","cwe","file","line","evidence","reference","reference_url","fix_recipe","confidence"]
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    missing = [k for k in required if k not in obj]
+    if missing: errs += 1
+    if obj.get("origin") == "webext" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed webext line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "webext negative-test: malformed webext line (missing tool) correctly rejected"
+
+bad_webext_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"manifest.json","line":1,"evidence":"e","reference":"webext-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"webext","tool":"semgrep"}'
+if echo "$bad_webext_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "webext" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: webext finding with SAST/DAST tool was accepted" >&2
+    exit 1
+fi
+echo "webext negative-test: origin-tag isolation enforced (webext cannot carry semgrep/bandit/zap-baseline)"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
