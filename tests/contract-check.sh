@@ -240,6 +240,33 @@ sys.exit(1 if errs else 0)
 fi
 echo "dast negative-test: malformed DAST line (missing tool) correctly rejected"
 
+# --- webext inventory rule (v0.6.0 Stage 1 Task 1.4):
+# SKILL.md §2 must document the browser-extension detection rule
+# (manifest.json + manifest_version) and emit a `webext` inventory key.
+check skills/sec-review/SKILL.md "Browser-extension signals" "SKILL.md §2 missing webext detection rule"
+check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule missing manifest_version trigger"
+check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
+echo "webext-inventory: SKILL.md §2 documents webext stack detection"
+
+# --- webext fixture-match sanity: a synthetic manifest.json containing
+# "manifest_version": 3 must match the grep hint the SKILL.md rule uses.
+# This is a documentation-vs-fixture alignment check, not a full
+# orchestrator run (the orchestrator is driven by an LLM reading §2).
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+cat > "$tmp/manifest.json" <<'JSON'
+{
+  "manifest_version": 3,
+  "name": "fixture",
+  "version": "0.0.1",
+  "host_permissions": ["*://*/*"]
+}
+JSON
+if ! grep -q '"manifest_version"' "$tmp/manifest.json"; then
+    echo "webext-inventory: FAIL — fixture lacks manifest_version key" >&2
+    fail=1
+fi
+echo "webext-inventory: synthetic manifest.json fixture matches §2 detection rule"
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1

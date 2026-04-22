@@ -67,6 +67,13 @@ Detect the technology stack. Read only — do not install or execute.
   (Rails), `pom.xml` with `spring-boot-starter-*` (Spring).
 - **Frontend signals**: `src/**/*.{tsx,jsx,vue,svelte}`, templates
   (`templates/**/*.html`, `app/views/**/*.erb`, `resources/views/**/*.blade.php`).
+- **Browser-extension signals**: `manifest.json` at project root AND the
+  file contains a `"manifest_version"` key (2 or 3). Distinguish platform
+  by `browser_specific_settings.gecko` (Firefox / AMO) vs absence
+  (Chrome / Edge / Chromium). When detected, add `"webext"` to the
+  inventory and load `references/frontend/webext-chrome-mv3.md`,
+  `references/frontend/webext-firefox-amo.md`, and
+  `references/frontend/webext-shared-patterns.md` as appropriate.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -79,11 +86,18 @@ Emit an `inventory.json` record (in-memory only) like:
   "webservers":  ["nginx"],
   "proxies":     [],
   "frontend":    ["django-templates"],
+  "webext":      [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
   "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}]
 }
 ```
+
+For a browser-extension target the `webext` key carries the detected
+platform(s), e.g. `"webext": ["chrome-mv3"]`, `"webext": ["firefox-amo"]`,
+or `"webext": ["chrome-mv3", "firefox-amo"]` for a cross-browser
+extension (one whose manifest has both a top-level MV3 shape and a
+`browser_specific_settings.gecko.id`).
 
 ## 3. Code analysis — dispatch sec-expert subagent(s)
 
