@@ -67,6 +67,13 @@ Detect the technology stack. Read only — do not install or execute.
   (Rails), `pom.xml` with `spring-boot-starter-*` (Spring).
 - **Frontend signals**: `src/**/*.{tsx,jsx,vue,svelte}`, templates
   (`templates/**/*.html`, `app/views/**/*.erb`, `resources/views/**/*.blade.php`).
+- **Browser-extension signals**: `manifest.json` at project root AND the
+  file contains a `"manifest_version"` key (2 or 3). Distinguish platform
+  by `browser_specific_settings.gecko` (Firefox / AMO) vs absence
+  (Chrome / Edge / Chromium). When detected, add `"webext"` to the
+  inventory and load `references/frontend/webext-chrome-mv3.md`,
+  `references/frontend/webext-firefox-amo.md`, and
+  `references/frontend/webext-shared-patterns.md` as appropriate.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -79,11 +86,18 @@ Emit an `inventory.json` record (in-memory only) like:
   "webservers":  ["nginx"],
   "proxies":     [],
   "frontend":    ["django-templates"],
+  "webext":      [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
   "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}]
 }
 ```
+
+For a browser-extension target the `webext` key carries the detected
+platform(s), e.g. `"webext": ["chrome-mv3"]`, `"webext": ["firefox-amo"]`,
+or `"webext": ["chrome-mv3", "firefox-amo"]` for a cross-browser
+extension (one whose manifest has both a top-level MV3 shape and a
+`browser_specific_settings.gecko.id`).
 
 ## 3. Code analysis — dispatch sec-expert subagent(s)
 
@@ -211,6 +225,56 @@ DAST findings are additive signal. They do NOT feed the dep-inventory
 or CVE-enrichment paths; a live scan surfaces runtime issues that
 static analysis cannot (reflected XSS, missing security headers on
 rendered pages, mixed-content, server banners).
+
+### 3.8 Browser-extension pass — dispatch webext-runner
+
+When the inventory emitted by §2 contains `webext` (the `manifest.json`
++ `manifest_version` detection rule fired), dispatch the `webext-runner`
+agent (`agents/webext-runner.md`, pinned to haiku, tools: Read + Bash).
+The agent shells out to three Node-based CLIs — `addons-linter`,
+`web-ext lint`, and `retire.js` — against the extension source
+directory, parses each tool's native JSON output, and emits
+sec-expert-compatible JSONL on stdout — every line carrying
+`origin: "webext"` and `tool: "addons-linter" | "web-ext" | "retire"`.
+
+webext-runner runs in parallel with sec-expert, sast-runner,
+dast-runner, and cve-enricher — its input is the extension source
+tree, which other agents may also read but do not mutate, so they
+share nothing observable. Collect the webext JSONL into a
+`webext_findings` list alongside the other streams.
+
+Skill-level invariants the orchestrator enforces on the webext stream:
+
+- **No `webext` in inventory** — skip this pass entirely. Do NOT probe
+  for browser-extension tools on an unrelated project; the tools are
+  node-based and noisy on server/backend trees.
+- **`__webext_status__: "unavailable"`** — none of `addons-linter`,
+  `web-ext`, or `retire` was on PATH, the target directory had no
+  `manifest.json`, or every tool crashed. Add the `⚠ Browser-extension
+  tools unavailable — install addons-linter, web-ext, or retire to
+  enable WebExtension analysis pass` banner to the Review metadata
+  block. Do NOT fabricate findings.
+- **`__webext_status__: "partial"`** — some tools ran successfully
+  and others were missing or crashed. Merge the findings from the
+  tools that ran; note the missing/failed tools in the Review-metadata
+  section (`WebExt tools run: addons-linter, retire; web-ext skipped —
+  not on PATH`).
+- **`__webext_status__: "ok"`** — every available tool ran. Merge the
+  webext findings into the triaged stream. Webext findings carry
+  `file: <relative path>` (e.g. `manifest.json`, `background/sw.js`)
+  and `line: <integer>` when the tool supplied one; retire findings
+  carry `line: 0` because the upstream advisory has no line.
+- **Retire findings with a CVE** — when a retire finding's `id` is a
+  `CVE-YYYY-NNNN` string, the cve-enricher MUST pick it up and attach
+  CVSS / KEV / fix-version metadata just as it does for manifest-
+  derived CVEs. The dep-inventory path in §4 is extended to include
+  retire's `{component, version}` pairs.
+
+Webext findings combine code-pattern signal (addons-linter rules) with
+package-version signal (retire.js). The dep-inventory path IS affected:
+retire's `{component, version}` pairs feed the cve-enricher as an
+additional ecosystem entry with `ecosystem: "retire"` so OSV/NVD/GHSA
+lookups run against them.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

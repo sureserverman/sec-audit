@@ -1,0 +1,44 @@
+{
+  "summary": {"errors": 2, "warnings": 2, "notices": 0},
+  "errors": [
+    {
+      "code": "MANIFEST_CSP_UNSAFE_DIRECTIVE",
+      "message": "'unsafe-eval' is not allowed in manifest CSP.",
+      "description": "Remove 'unsafe-eval' from content_security_policy.extension_pages.",
+      "file": "manifest.json",
+      "line": 10,
+      "column": 5,
+      "type": "error"
+    },
+    {
+      "code": "DANGEROUS_EVAL",
+      "message": "eval() called with user-influenced argument.",
+      "description": "Replace eval() with a static parser or postMessage handler.",
+      "file": "background/sw.js",
+      "line": 14,
+      "column": 3,
+      "type": "error"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "MANIFEST_PERMISSIONS",
+      "message": "Broad host_permissions pattern '*://*/*' requested.",
+      "description": "Narrow host_permissions to the origins the extension actually needs, or move to optional_permissions.",
+      "file": "manifest.json",
+      "line": 6,
+      "column": 5,
+      "type": "warning"
+    },
+    {
+      "code": "MANIFEST_WEB_ACCESSIBLE_RESOURCES_ALL_URLS",
+      "message": "web_accessible_resources matches <all_urls>.",
+      "description": "Restrict web_accessible_resources.matches to trusted origins.",
+      "file": "manifest.json",
+      "line": 19,
+      "column": 5,
+      "type": "warning"
+    }
+  ],
+  "notices": []
+}

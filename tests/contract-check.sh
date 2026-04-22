@@ -60,7 +60,8 @@ done
 # model pinning (caller-model-independence)
 for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
-            "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku"; do
+            "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku" \
+            "agents/webext-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -140,6 +141,16 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __dast_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the webext status summary line emitted by webext-runner.
+        if "__webext_status__" in obj:
+            status = obj.get("__webext_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __webext_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __webext_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -177,6 +188,18 @@ with open(path) as fh:
             # DAST has no source line; `line: 0` is the documented convention.
             if obj.get("line") != 0:
                 print(f"CONTRACT FAIL: {path}:{i} dast line must be 0 (no source line), got {obj.get('line')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: webext findings must carry `tool` and `origin`.
+        if obj.get("origin") == "webext":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} webext finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"addons-linter", "web-ext", "retire"}:
+                print(f"CONTRACT FAIL: {path}:{i} webext tool must be addons-linter|web-ext|retire, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: webext findings must NOT carry SAST/DAST tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+                print(f"CONTRACT FAIL: {path}:{i} webext finding carries non-webext tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -218,6 +241,45 @@ sys.exit(1 if errs else 0)
 fi
 echo "sast negative-test: malformed SAST line (missing tool) correctly rejected"
 
+# --- Negative test: the origin-aware validator must reject a webext
+# finding with no `tool` and a webext finding tagged with a non-webext tool.
+bad_webext_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"manifest.json","line":1,"evidence":"e","reference":"webext-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"webext"}'
+if echo "$bad_webext_notool" | python3 -c '
+import json, sys
+required = ["id","severity","cwe","file","line","evidence","reference","reference_url","fix_recipe","confidence"]
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    missing = [k for k in required if k not in obj]
+    if missing: errs += 1
+    if obj.get("origin") == "webext" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed webext line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "webext negative-test: malformed webext line (missing tool) correctly rejected"
+
+bad_webext_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"manifest.json","line":1,"evidence":"e","reference":"webext-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"webext","tool":"semgrep"}'
+if echo "$bad_webext_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "webext" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: webext finding with SAST/DAST tool was accepted" >&2
+    exit 1
+fi
+echo "webext negative-test: origin-tag isolation enforced (webext cannot carry semgrep/bandit/zap-baseline)"
+
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
 bad_dast='{"id":"40018","severity":"HIGH","cwe":"CWE-89","title":"t","file":"http://x/","line":0,"evidence":"e","reference":"dast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"dast"}'
@@ -239,6 +301,44 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "dast negative-test: malformed DAST line (missing tool) correctly rejected"
+
+# --- webext inventory rule (v0.6.0 Stage 1 Task 1.4):
+# SKILL.md §2 must document the browser-extension detection rule
+# (manifest.json + manifest_version) and emit a `webext` inventory key.
+check skills/sec-review/SKILL.md "Browser-extension signals" "SKILL.md §2 missing webext detection rule"
+check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule missing manifest_version trigger"
+check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
+echo "webext-inventory: SKILL.md §2 documents webext stack detection"
+
+# --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
+# SKILL.md must declare §3.8, reference webext-runner, and document all
+# three sentinel states (ok / partial / unavailable). Shape mirrors
+# §3.6 SAST and §3.7 DAST.
+check skills/sec-review/SKILL.md "### 3.8 Browser-extension pass" "SKILL.md missing §3.8"
+check skills/sec-review/SKILL.md "webext-runner" "SKILL.md §3.8 missing webext-runner reference"
+check skills/sec-review/SKILL.md "__webext_status__" "SKILL.md §3.8 missing webext sentinel"
+check skills/sec-review/SKILL.md '__webext_status__.*"unavailable"\|"unavailable".*__webext_status__\|`__webext_status__: "unavailable"`' "SKILL.md §3.8 missing unavailable state (documented)"
+check skills/sec-review/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
+echo "webext-orchestrator: SKILL.md §3.8 documents webext-runner wire-up"
+
+# --- webext fixture-match sanity: a synthetic manifest.json containing
+# "manifest_version": 3 must match the grep hint the SKILL.md rule uses.
+# This is a documentation-vs-fixture alignment check, not a full
+# orchestrator run (the orchestrator is driven by an LLM reading §2).
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+cat > "$tmp/manifest.json" <<'JSON'
+{
+  "manifest_version": 3,
+  "name": "fixture",
+  "version": "0.0.1",
+  "host_permissions": ["*://*/*"]
+}
+JSON
+if ! grep -q '"manifest_version"' "$tmp/manifest.json"; then
+    echo "webext-inventory: FAIL — fixture lacks manifest_version key" >&2
+    fail=1
+fi
+echo "webext-inventory: synthetic manifest.json fixture matches §2 detection rule"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

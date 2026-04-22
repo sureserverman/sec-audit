@@ -204,6 +204,76 @@ The orchestrator adds a `⚠ DAST tools unavailable` banner.
 asserting the unavailable output shape. No DAST finding is ever
 fabricated.
 
+## Browser-extension lane (v0.6.0)
+
+A seventh agent, **`webext-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects a
+browser extension — a `manifest.json` at project root containing a
+`"manifest_version"` key (2 or 3). The runner is dispatched in
+parallel with `sec-expert`, `sast-runner`, `dast-runner`, and
+`cve-enricher`. It shells out to three Node-based CLIs when available:
+
+- **`addons-linter`** (Mozilla's official AMO validator) — emits
+  rule-coded errors / warnings / notices, with security-rule codes
+  (e.g. `MANIFEST_CSP_UNSAFE_DIRECTIVE`, `DANGEROUS_EVAL`) mapped to
+  CWE via the table in `references/webext-tools.md`.
+- **`web-ext lint`** — Mozilla's developer-tool linter; same JSON
+  schema as addons-linter (it wraps it), separate `tool` tag so the
+  origin-tag isolation check can distinguish which runner flagged
+  each finding.
+- **`retire.js`** — flags bundled vulnerable JavaScript libraries in
+  the extension source tree. CVE-carrying findings flow into the
+  `cve-enricher` step via the `retire` ecosystem and appear as rows in
+  the final report's Dependency CVE summary table alongside manifest-
+  declared dependencies.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "webext"` and one of
+`tool: "addons-linter" | "web-ext" | "retire"`. `file` is the
+relative path inside the extension (e.g. `manifest.json`,
+`background/sw.js`, `lib/jquery-1.12.4.min.js`); `line` is the integer
+line number the tool supplied, or `0` when it did not (retire.js has
+no line; addons-linter `notice` type often omits it). Field-mapping
+recipes live in `skills/sec-review/references/webext-tools.md`; the
+code-pattern reference packs (MV3, AMO, shared) live in
+`skills/sec-review/references/frontend/webext-*.md`.
+
+**Fixes for code-pattern findings come from the `frontend/webext-*`
+packs**, not from addons-linter's one-liner messages; the triager's
+domain-pack lookup supplies the quoted before/after recipe in the
+final report. **Retire.js findings are upgrade-only**: the
+recommended fix is synthesised from the advisory's `below` field
+("Upgrade `jquery` beyond 3.0.0"), never invented.
+
+**Three-state sentinel.** Unlike SAST and DAST, which have two states
+(ok / unavailable), the webext lane adds `partial` for the common case
+where some of the three tools are installed and others are not.
+`__webext_status__` ∈ {`"ok"`, `"partial"`, `"unavailable"`}. The
+orchestrator adds `⚠ Browser-extension tools unavailable` or a
+`WebExt tools run: addons-linter, retire; web-ext skipped — not on
+PATH` metadata line so the absence is always visible.
+
+**Degrade path.** When the inventory does NOT contain `webext`, the
+pass is skipped entirely — the tools are not probed. When webext is
+detected but no tool is on PATH, the agent emits a single sentinel
+line `{"__webext_status__": "unavailable", "tools": []}` and exits
+clean. `tests/webext-drill.sh` enforces this contract by scrubbing
+PATH and asserting the unavailable output shape. `tests/webext-e2e.sh`
+validates the `vulnerable-webext` fixture produces addons-linter
+findings, retire findings, origin-tag isolation, and the trailing
+status line. No webext finding is ever fabricated.
+
+## Coverage matrix
+
+| Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
+|---------------------------|--------------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------|------------|
+| Code reasoning            | Source tree (any supported framework)            | `sec-expert` (LLM, grep + context)         | `databases/`, `frameworks/`, `webservers/`, `proxies/`, `frontend/`, `auth/`, `tls/`, `containers/`, `secrets/`, `supply-chain/` | v0.2.0     |
+| Windows / IIS             | `web.config`, `applicationHost.config`           | `sec-expert` (code reasoning)              | `references/webservers/iis.md`                                                         | v0.4.0     |
+| SAST                      | Source tree                                      | `semgrep` (OWASP Top Ten), `bandit`        | `references/sast-tools.md`                                                             | v0.4.0     |
+| DAST                      | Running `http(s)://…` instance                   | `zap-baseline.py` (docker or local)        | `references/dast-tools.md`                                                             | v0.5.0     |
+| Browser extensions        | MV3 / AMO extension source tree                  | `addons-linter`, `web-ext lint`, `retire`  | `references/frontend/webext-{chrome-mv3,firefox-amo,shared-patterns}.md`, `references/webext-tools.md` | v0.6.0     |
+| CVE enrichment            | Manifests + retire components                    | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+
 ## Known limits & false positives
 
 - **No exploitation, no fuzzing.** The plugin does not fuzz endpoints, brute-force credentials, or exploit findings. SAST invokes semgrep/bandit when available; DAST invokes ZAP baseline (passive-only) against a supplied `target_url`. Everything else is grep + CVE-feed enrichment.
