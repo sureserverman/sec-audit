@@ -126,6 +126,7 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
 ### <title>
 - **File:** `<file>:<line>`
 - **CWE:** <cwe>
+- **Origin:** <origin-line — see below>
 - **CVE(s):** <CVE lines — see below>
 - **Score:** <score> / 100 (<breakdown>, confidence: <confidence>)
 - **Evidence:**
@@ -138,6 +139,23 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
   - <reference_url>
   - <CVE advisory URLs>
 ```
+
+Origin line: built from the finding's `origin` and `tool` fields when
+present. Render exactly one of:
+
+| Finding shape                                    | Origin line                               |
+|--------------------------------------------------|-------------------------------------------|
+| `origin` absent (sec-expert code-reasoning)      | `sec-expert (code reasoning)`             |
+| `origin: "sast"`, `tool: "semgrep" \| "bandit"`  | `sast (<tool>)`                           |
+| `origin: "dast"`, `tool: "zap-baseline"`         | `dast (zap-baseline) — target: <notes>`   |
+| `origin: "webext"`, `tool: "addons-linter"`      | `webext (addons-linter)`                  |
+| `origin: "webext"`, `tool: "web-ext"`            | `webext (web-ext lint)`                   |
+| `origin: "webext"`, `tool: "retire"`             | `webext (retire.js) — bundled library`    |
+
+The `notes` substitution for DAST findings is the finding's `notes`
+field verbatim (e.g. `GET /admin`). For retire.js findings, the
+`bundled library` suffix flags to the reader that the fix lives in the
+project's bundled-dependency tree, not in first-party code.
 
 CVE lines: look up the finding's `id` in the cve-enricher output. For each
 matched CVE, emit one line:
@@ -222,17 +240,38 @@ single row:
 | (no CVE data — feed offline or no dependencies found) | — | — | — | — |
 ```
 
+**Retire.js bundled libraries:** webext-origin findings with
+`tool: "retire"` contribute rows to this table via the `retire`
+ecosystem that the orchestrator adds to the dep-inventory in §3.8. Each
+row renders as:
+
+```
+| <component> | <version> | <CVE-YYYY-NNNNN> (+ N more if multiple) | <max CVSS> | <advisory "below" field> |
+```
+
+The `<component>` cell uses the retire-reported component name (e.g.
+`jquery`); the `<version>` cell is the detected bundled version; `CVEs`
+lists every CVE from the advisory; `Fixed in` quotes the advisory's
+`below` field ("Upgrade beyond X.Y.Z"). This makes bundled-library
+risk comparable to manifest-declared-dependency risk in a single table.
+
 ### Step 6 — Emit review metadata
 
 ```markdown
 ## Review metadata
 
-- Plugin version: sec-review 0.2.0
+- Plugin version: sec-review <version>
 - Reference packs loaded: <comma-separated list from inventory or orchestrator>
 - sec-expert runs: <n>
+- SAST tools run: <list or "skipped — not on PATH">
+- DAST tools run: <list or "skipped — no target_url supplied">
+- WebExt tools run: <list or "skipped — no webext detected" or "skipped — not on PATH">
 - Total CVE lookups: <n>
 - Limits hit: <list or "none">
 ```
+
+`<version>` is the current value of `.claude-plugin/plugin.json`'s
+`version` field; read it from the plugin manifest (do not hardcode).
 
 All values must come from the inputs. If a value is not supplied, write
 `unknown` rather than inventing a number.
