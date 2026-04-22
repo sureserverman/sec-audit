@@ -249,6 +249,17 @@ check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule mi
 check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
 echo "webext-inventory: SKILL.md §2 documents webext stack detection"
 
+# --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
+# SKILL.md must declare §3.8, reference webext-runner, and document all
+# three sentinel states (ok / partial / unavailable). Shape mirrors
+# §3.6 SAST and §3.7 DAST.
+check skills/sec-review/SKILL.md "### 3.8 Browser-extension pass" "SKILL.md missing §3.8"
+check skills/sec-review/SKILL.md "webext-runner" "SKILL.md §3.8 missing webext-runner reference"
+check skills/sec-review/SKILL.md "__webext_status__" "SKILL.md §3.8 missing webext sentinel"
+check skills/sec-review/SKILL.md '__webext_status__.*"unavailable"\|"unavailable".*__webext_status__\|`__webext_status__: "unavailable"`' "SKILL.md §3.8 missing unavailable state (documented)"
+check skills/sec-review/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
+echo "webext-orchestrator: SKILL.md §3.8 documents webext-runner wire-up"
+
 # --- webext fixture-match sanity: a synthetic manifest.json containing
 # "manifest_version": 3 must match the grep hint the SKILL.md rule uses.
 # This is a documentation-vs-fixture alignment check, not a full
