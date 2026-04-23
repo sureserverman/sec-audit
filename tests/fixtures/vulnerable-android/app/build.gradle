@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.fixture'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.example.fixture'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '0.0.1'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Intentionally missing proguard config for fixture purposes.
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.4.0'
+}

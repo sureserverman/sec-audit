@@ -1,0 +1,43 @@
+{
+  "results": {
+    "android_hardcoded": {
+      "metadata": {
+        "description": "Hardcoded sensitive string detected",
+        "severity": "ERROR",
+        "cwe": "CWE-312: Cleartext Storage of Sensitive Information",
+        "owasp-mobile": "M9: Reverse Engineering",
+        "masvs": "MSTG-STORAGE-1",
+        "reference": "https://mobsf.github.io/docs/"
+      },
+      "files": [
+        {
+          "file_path": "app/src/main/java/com/example/MainActivity.java",
+          "match_lines": [25, 25],
+          "match_position": [20, 70],
+          "match_string": "\"api_key\", \"sk_live_DEADBEEFCAFEBABE1234567890ABCDEF\""
+        }
+      ]
+    },
+    "android_webview_js_bridge": {
+      "metadata": {
+        "description": "WebView addJavascriptInterface exposes Java methods to JavaScript; untrusted content can call them",
+        "severity": "WARNING",
+        "cwe": "CWE-749: Exposed Dangerous Method or Function",
+        "owasp-mobile": "M7: Client Code Quality",
+        "masvs": "MSTG-PLATFORM-7",
+        "reference": "https://developer.android.com/develop/ui/views/layout/webapps/webview"
+      },
+      "files": [
+        {
+          "file_path": "app/src/main/java/com/example/MainActivity.java",
+          "match_lines": [20],
+          "match_position": [9, 45],
+          "match_string": "webView.addJavascriptInterface(new JsBridge(), \"AndroidBridge\");"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "total_findings": 2,
+  "version": "0.4.2"
+}

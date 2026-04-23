@@ -162,6 +162,27 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __rust_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the android status summary line emitted by android-runner.
+        # Unique to this lane: may carry a `skipped` list alongside tools/failed.
+        if "__android_status__" in obj:
+            status = obj.get("__android_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __android_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __android_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            # Optional skipped list — if present, must be a list of {tool, reason}.
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __android_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __android_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -220,13 +241,25 @@ with open(path) as fh:
             elif obj["tool"] not in {"cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
                 print(f"CONTRACT FAIL: {path}:{i} rust tool must be cargo-audit|cargo-deny|cargo-geiger|cargo-vet, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: rust findings must NOT carry SAST/DAST/webext tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire"}:
+            # Origin-tag isolation: rust findings must NOT carry SAST/DAST/webext/android tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "mobsfscan", "apkleaks", "android-lint"}:
                 print(f"CONTRACT FAIL: {path}:{i} rust finding carries non-rust tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
             # cargo-geiger findings MUST be INFO — never elevated.
             if obj.get("tool") == "cargo-geiger" and obj.get("severity") != "INFO":
                 print(f"CONTRACT FAIL: {path}:{i} cargo-geiger finding must be INFO severity, got {obj.get('severity')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: android findings must carry `tool` and `origin`.
+        if obj.get("origin") == "android":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} android finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"mobsfscan", "apkleaks", "android-lint"}:
+                print(f"CONTRACT FAIL: {path}:{i} android tool must be mobsfscan|apkleaks|android-lint, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: android findings must NOT carry SAST/DAST/webext/rust tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+                print(f"CONTRACT FAIL: {path}:{i} android finding carries non-android tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -358,6 +391,60 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "rust negative-test: cargo-geiger INFO ceiling enforced"
+
+# --- Negative tests for android origin: missing tool + cross-tag + malformed skipped entry
+bad_android_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"AndroidManifest.xml","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"android"}'
+if echo "$bad_android_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "android" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed android line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "android negative-test: malformed android line (missing tool) correctly rejected"
+
+bad_android_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"AndroidManifest.xml","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"android","tool":"cargo-audit"}'
+if echo "$bad_android_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "android" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: android finding with non-android tool was accepted" >&2
+    exit 1
+fi
+echo "android negative-test: origin-tag isolation enforced (android cannot carry 7 other lanes' tool names)"
+
+bad_android_skipped='{"__android_status__":"partial","tools":["mobsfscan"],"runs":1,"findings":3,"skipped":[{"wrong":"shape"}]}'
+if echo "$bad_android_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__android_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed skipped entry was accepted" >&2
+    exit 1
+fi
+echo "android negative-test: malformed skipped-list entry correctly rejected"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
