@@ -263,6 +263,73 @@ for issue in root.findall('.//issue'):
 
 Source: https://developer.android.com/studio/write/lint
 
+### codesign  — iOS lane (v0.9.0+)
+
+- Install: ships with Xcode / macOS Command Line Tools. macOS-only
+  binary; not available on Linux or Windows hosts.
+- Invocation (entitlements dump for review):
+  ```bash
+  codesign -dv --entitlements :- --xml "$path_to_app_or_binary" \
+    > "$TMPDIR/ios-runner-codesign-entitlements.xml" \
+    2> "$TMPDIR/ios-runner-codesign.stderr"
+  ```
+  Use `--verbose=4` to also surface `Notarization=accepted` / Team-ID.
+- Target: `.app` / `.framework` / `.xcarchive` / binary. When no such
+  bundle exists under the caller's `target_path`, the tool is CLEANLY
+  SKIPPED with `reason: "no-bundle"` (same skip-category as apkleaks-
+  no-apk; see `## Degrade rules`).
+- Output: `--entitlements :- --xml` emits an Entitlements plist to
+  stdout; `-dv --verbose=4` emits key:value lines to stderr. The
+  ios-runner parses the XML plist for entitlement keys and the
+  stderr for `Notarization=`, `Authority=`, `TeamIdentifier=`.
+- Primary source:
+  https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
+  (notarization); `man codesign(1)` as the binary reference.
+
+Source: https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
+
+### spctl  — iOS lane (v0.9.0+)
+
+- Install: ships with macOS. macOS-only.
+- Invocation:
+  ```bash
+  spctl --assess --verbose=2 "$path_to_app_bundle" \
+    2> "$TMPDIR/ios-runner-spctl.stderr"
+  rc_sp=$?
+  ```
+- Target: `.app` bundle; macOS/iOS-simulator artifact. No bundle →
+  clean-skip with `reason: "no-bundle"`.
+- Output: a short stderr string like `<path>: accepted source=Notarized Developer ID`
+  or `<path>: rejected`. Parse as a Pass/Fail signal; emit one finding
+  per rejection.
+- Primary source: `man spctl(8)` (macOS system manual).
+
+Source: https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
+
+### xcrun notarytool  — iOS lane (v0.9.0+)
+
+- Install: Xcode 13+; requires a valid `AuthKey_<keyId>.p8` or
+  app-specific-password. macOS-only.
+- Invocation (history / info; never submit from the runner):
+  ```bash
+  xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" \
+    --output-format json > "$TMPDIR/ios-runner-notarytool.json" \
+    2> "$TMPDIR/ios-runner-notarytool.stderr"
+  rc_nt=$?
+  ```
+  The runner MUST NOT invoke `notarytool submit` — submitting is a
+  developer-side release action, not a review action. When no
+  `NOTARY_PROFILE` is configured, the tool is cleanly skipped with
+  `reason: "no-notary-profile"`.
+- Target: last N notarization submissions for the caller's Apple
+  Developer team; use for release-artifact review.
+- Output: `--output-format json` produces
+  `{"history": [{"id": "...", "createdDate": "...", "status": "Accepted|Invalid|In Progress", "name": "..."}]}`.
+- Primary source:
+  https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
+
+Source: https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
+
 ## Output-field mapping
 
 Every finding produced by the `android-runner` sub-agent carries:
@@ -406,11 +473,70 @@ security_issues = [i for i in root.findall(".//issue")
 
 Source: https://developer.android.com/studio/write/lint, https://cwe.mitre.org/
 
+### codesign → sec-review finding (iOS lane)
+
+One finding per entitlement drift / hardened-runtime missing / notarization-
+absent signal the tool surfaces for a `.app` / `.framework` / `.xcarchive`.
+Parse both the `--entitlements :- --xml` plist (stdout) and `-dv --verbose=4`
+stderr. Emit:
+
+| upstream field                          | sec-review field              |
+|-----------------------------------------|-------------------------------|
+| (synthetic) `"codesign:" + check-name`  | `id`                          |
+| rule severity: entitlement-drift HIGH, hardened-runtime missing HIGH, notarization absent HIGH | `severity` |
+| per-rule CWE lookup                     | `cwe`                         |
+| check description                       | `title`                       |
+| bundle basename                         | `file` (e.g. `VulnerableiOS.app`) |
+| 0                                       | `line`                        |
+| the offending entitlement key / stderr line | `evidence`                |
+| `mobile-tools.md`                       | `reference`                   |
+| Apple docs URL                          | `reference_url`               |
+| synthesised from the corresponding `references/mobile/ios-codesign.md` fix recipe | `fix_recipe` |
+| `"high"`                                | `confidence`                  |
+| `"ios"` (constant)                      | `origin`                      |
+| `"codesign"` (constant)                 | `tool`                        |
+
+### spctl → sec-review finding (iOS lane)
+
+One finding emitted only when the assessment rejects (accepted
+assessments produce no finding). Severity HIGH; CWE-693 Protection
+Mechanism Failure. `evidence` is the rejection reason string from
+spctl's stderr. `tool: "spctl"`.
+
+### xcrun notarytool → sec-review finding (iOS lane)
+
+One finding per release artifact with status `Invalid` or `Rejected`
+in the returned history. Severity MEDIUM (legacy releases may be
+acceptable to leave unstapled if never distributed); CWE-693.
+`evidence` is the verbatim rejection reason. `tool: "notarytool"`.
+
 ## Degrade rules
 
 The `android-runner` agent follows a three-state sentinel contract consistent
 with `sast-runner` (`__sast_status__`), `webext-runner` (`__webext_status__`),
 `dast-runner` (`__dast_status__`), and `rust-runner` (`__rust_status__`).
+
+The `ios-runner` agent (v0.9.0+) follows an identical three-state
+sentinel `__ios_status__` with the same schema. iOS-specific
+clean-skip reasons extend the v0.8 skipped-list primitive:
+
+- `{"tool": "<name>", "reason": "requires-macos-host"}` — codesign /
+  spctl / notarytool are macOS-only binaries. A Linux or Windows host
+  running the runner cannot execute them, even when they would
+  conceptually apply. This is a clean skip, NOT a failure.
+- `{"tool": "<name>", "reason": "no-bundle"}` — codesign / spctl
+  require a `.app` / `.framework` / `.xcarchive` artifact under the
+  target. Source-only reviews (the common CI case) lack this
+  artifact; tools are cleanly skipped.
+- `{"tool": "notarytool", "reason": "no-notary-profile"}` — notarytool
+  needs `NOTARY_PROFILE` / `$APPLE_ID` + app-specific password. When
+  unconfigured, clean-skip.
+
+Downstream consumers (finding-triager, report-writer) MUST treat
+`reason: "requires-macos-host"` entries as informational metadata
+rather than as reviewer-fixable gaps. The sec-review report surfaces
+them in a separate "Host-OS-unavailable" metadata line so readers
+know the review was partial-by-design rather than partial-by-failure.
 
 > **APK-absence sub-case — unique to this lane:** apkleaks requires a
 > compiled APK/AAB. When no `*.apk` or `*.aab` file is found under the

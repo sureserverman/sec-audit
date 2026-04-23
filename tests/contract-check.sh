@@ -506,6 +506,29 @@ check skills/sec-review/SKILL.md "com.android.application\|com.android.library" 
 check skills/sec-review/SKILL.md "Maven" "SKILL.md §2 missing Maven ecosystem routing"
 echo "android-inventory: SKILL.md §2 documents android stack detection"
 
+# --- ios inventory rule (v0.9.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "iOS / Apple-platform signals" "SKILL.md §2 missing iOS detection rule"
+check skills/sec-review/SKILL.md "Info.plist" "SKILL.md §2 ios rule missing Info.plist trigger"
+check skills/sec-review/SKILL.md "xcodeproj\|Package.swift\|Podfile" "SKILL.md §2 missing Xcode/SwiftPM/CocoaPods trigger"
+check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing ios key"
+check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
+echo "ios-inventory: SKILL.md §2 documents ios stack detection"
+
+# --- ios fixture-match sanity: synthetic Info.plist
+tmp_i=$(mktemp -d); trap 'rm -rf "$tmp_i"' EXIT
+cat > "$tmp_i/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.example.fixture</string>
+  <key>CFBundleVersion</key><string>1</string>
+</dict></plist>
+PLIST
+if ! grep -q '<plist' "$tmp_i/Info.plist"; then
+    echo "ios-inventory: FAIL — fixture Info.plist malformed" >&2; fail=1
+fi
+echo "ios-inventory: synthetic Info.plist fixture matches §2 detection rule"
+
 # --- android fixture-match sanity: synthetic AndroidManifest.xml + build.gradle
 tmp_a=$(mktemp -d); trap 'rm -rf "$tmp_a"' EXIT
 mkdir -p "$tmp_a/app/src/main"

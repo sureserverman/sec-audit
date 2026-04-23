@@ -90,6 +90,23 @@ Detect the technology stack. Read only — do not install or execute.
   no enricher change). Transitive deps are covered when the project
   commits a resolved lockfile (`gradle.lockfile`); direct
   `build.gradle` parsing gives top-level deps only.
+- **iOS / Apple-platform signals**: any of
+  `Info.plist` (anywhere in the tree — typically at
+  `<App>/Info.plist` or `<App>/Resources/Info.plist`), a `*.xcodeproj`
+  directory, `Package.swift` (SwiftPM manifest), or `Podfile`
+  (CocoaPods). When detected, add `"ios"` to the inventory with values
+  reflecting project shape — `"ios": ["app"]` for application
+  targets, `"ios": ["library"]` for SwiftPM/CocoaPod-producing
+  libraries, or `"ios": ["app", "library"]` for multi-target
+  projects. Load `references/mobile/ios-plist.md`,
+  `references/mobile/ios-data.md`,
+  `references/mobile/ios-codesign.md`, and the tool-lane reference
+  `references/mobile-tools.md`. `ecosystems` gains one or both of
+  `{"ecosystem": "CocoaPods", "manifest": "Podfile.lock"}` and
+  `{"ecosystem": "SwiftPM", "manifest": "Package.resolved"}`. Note
+  both ecosystems have partial OSV coverage (CocoaPods: via GHSA
+  fallback; SwiftPM: best-effort) — document as a known limit rather
+  than a blocker; cve-enricher's multi-feed routing handles the gap.
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -118,6 +135,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "frontend":    ["django-templates"],
   "webext":      [],
   "android":     [],
+  "ios":         [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
