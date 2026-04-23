@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.2.0">
+    <issue
+        id="HardcodedDebugMode"
+        severity="Error"
+        message="Avoid hardcoding the debug mode; leaving it out allows debug and release builds to automatically assign one"
+        category="Security"
+        priority="5"
+        summary="Hardcoded value of android:debuggable in the manifest"
+        explanation="Hardcoding android:debuggable can cause security problems (debuggable apps allow full access via adb). Remove the attribute and let the build system set it.">
+        <location
+            file="app/src/main/AndroidManifest.xml"
+            line="9"
+            column="9" />
+    </issue>
+    <issue
+        id="AllowBackup"
+        severity="Warning"
+        message="On SDK version 23 and below, your app data will be automatically backed up to Google Drive; consider android:allowBackup=&quot;false&quot; to opt out"
+        category="Security"
+        priority="3"
+        summary="AllowBackup/FullBackupContent Problems"
+        explanation="The android:allowBackup attribute determines if an application's data can be backed up and restored, as documented here.">
+        <location
+            file="app/src/main/AndroidManifest.xml"
+            line="8"
+            column="9" />
+    </issue>
+    <issue
+        id="ExportedReceiver"
+        severity="Warning"
+        message="Exported receiver does not require permission"
+        category="Security"
+        priority="5"
+        summary="Exported receiver does not require permission"
+        explanation="Exported services, receivers, providers, or activities should either be protected with a permission or explicitly marked as not exported.">
+        <location
+            file="app/src/main/AndroidManifest.xml"
+            line="26"
+            column="9" />
+    </issue>
+    <issue
+        id="SetJavaScriptEnabled"
+        severity="Warning"
+        message="Using setJavaScriptEnabled can introduce XSS vulnerabilities into your application"
+        category="Security"
+        priority="6"
+        summary="Using setJavaScriptEnabled"
+        explanation="Your code should not invoke setJavaScriptEnabled if you are loading content from any source that is not fully trusted.">
+        <location
+            file="app/src/main/java/com/example/MainActivity.java"
+            line="18"
+            column="9" />
+    </issue>
+</issues>
