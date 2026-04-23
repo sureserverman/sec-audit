@@ -695,6 +695,16 @@ check skills/sec-review/SKILL.md "codesign" "SKILL.md §3.11 missing codesign"
 check skills/sec-review/SKILL.md "notarytool" "SKILL.md §3.11 missing notarytool"
 echo "ios-orchestrator: SKILL.md §3.11 documents ios-runner wire-up"
 
+# --- orchestrator §3.12 wire-up (v0.10.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.12 Desktop Linux pass" "SKILL.md missing §3.12"
+check skills/sec-review/SKILL.md "linux-runner" "SKILL.md §3.12 missing linux-runner reference"
+check skills/sec-review/SKILL.md "__linux_status__" "SKILL.md §3.12 missing linux sentinel"
+check skills/sec-review/SKILL.md "requires-systemd-host" "SKILL.md §3.12 missing systemd-host clean-skip reason"
+check skills/sec-review/SKILL.md "systemd-analyze" "SKILL.md §3.12 missing systemd-analyze"
+check skills/sec-review/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
+check skills/sec-review/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
+echo "linux-orchestrator: SKILL.md §3.12 documents linux-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
