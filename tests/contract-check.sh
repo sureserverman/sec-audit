@@ -601,6 +601,34 @@ check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing 
 check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
 echo "ios-inventory: SKILL.md §2 documents ios stack detection"
 
+# --- linux inventory rule (v0.10.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
+check skills/sec-review/SKILL.md "\.service\|\.socket\|\.timer" "SKILL.md §2 linux rule missing systemd unit trigger"
+check skills/sec-review/SKILL.md "debian/control\|debian/rules" "SKILL.md §2 missing Debian packaging trigger"
+check skills/sec-review/SKILL.md "snapcraft.yaml\|flatpak" "SKILL.md §2 missing Snap/Flatpak trigger"
+check skills/sec-review/SKILL.md "\"linux\"" "SKILL.md §2 inventory JSON missing linux key"
+check skills/sec-review/SKILL.md "\"Debian\"\|ecosystem.*Debian" "SKILL.md §2 missing Debian ecosystem routing"
+echo "linux-inventory: SKILL.md §2 documents linux stack detection"
+
+# --- linux fixture-match sanity: synthetic .service
+tmp_l=$(mktemp -d); trap 'rm -rf "$tmp_l"' EXIT
+mkdir -p "$tmp_l/systemd"
+cat > "$tmp_l/systemd/fixture.service" <<'SVC'
+[Unit]
+Description=fixture
+
+[Service]
+ExecStart=/usr/bin/fixture
+User=root
+
+[Install]
+WantedBy=multi-user.target
+SVC
+if ! grep -q '^\[Service\]' "$tmp_l/systemd/fixture.service"; then
+    echo "linux-inventory: FAIL — fixture .service malformed" >&2; fail=1
+fi
+echo "linux-inventory: synthetic .service fixture matches §2 detection rule"
+
 # --- ios fixture-match sanity: synthetic Info.plist
 tmp_i=$(mktemp -d); trap 'rm -rf "$tmp_i"' EXIT
 cat > "$tmp_i/Info.plist" <<'PLIST'

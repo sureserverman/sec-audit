@@ -107,6 +107,29 @@ Detect the technology stack. Read only — do not install or execute.
   both ecosystems have partial OSV coverage (CocoaPods: via GHSA
   fallback; SwiftPM: best-effort) — document as a known limit rather
   than a blocker; cve-enricher's multi-feed routing handles the gap.
+- **Linux-desktop signals**: any of the following triggers the
+  `linux` inventory key:
+  - Systemd units anywhere in the tree — `*.service`, `*.socket`,
+    `*.timer` under `systemd/`, `debian/`, `etc/systemd/system/`, or
+    `usr/lib/systemd/system/`.
+  - Debian packaging — `debian/control` + `debian/rules`.
+  - RPM packaging — `*.spec` at project root or under a `rpm/` or
+    `packaging/rpm/` subdir.
+  - Flatpak manifest — `*.flatpak` manifest file OR `*.y(a)ml` /
+    `*.json` file under a `flatpak/` subdir whose contents declare
+    an `id:` + `sdk:` pair (flatpak-builder manifest shape).
+  - Snap manifest — `snapcraft.yaml` at project root or under
+    `snap/`.
+  When detected, add `"linux"` with values indicating the mechanism(s):
+  `"linux": ["systemd"]`, `["deb"]`, `["rpm"]`, `["flatpak"]`,
+  `["snap"]`, or combinations (`["systemd", "deb"]` is common).
+  Load `references/desktop/linux-systemd.md`,
+  `references/desktop/linux-sandboxing.md`,
+  `references/desktop/linux-packaging.md`, and the tool-lane
+  reference `references/linux-tools.md`. `ecosystems` gains a
+  `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
+  Debian packaging is detected (OSV partial via the Debian Security
+  Tracker — best-effort coverage; document as a known limit).
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -136,6 +159,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "webext":      [],
   "android":     [],
   "ios":         [],
+  "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
