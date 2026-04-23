@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>VulnerableMac</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.example.vulnerable</string>
+  <key>CFBundleName</key>
+  <string>VulnerableMac</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+
+  <!-- macOS inventory trigger — distinguishes from iOS. -->
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+
+  <!-- CWE-319 / CVE-2014-9390 class: Sparkle update feed over cleartext HTTP. -->
+  <key>SUFeedURL</key>
+  <string>http://example.com/appcast.xml</string>
+
+  <!-- CWE-494: Sparkle configured without SUPublicEDKey — no EdDSA signature check on updates. -->
+  <key>SUAllowsAutomaticUpdates</key>
+  <true/>
+  <key>SUAutomaticallyUpdate</key>
+  <true/>
+
+  <!-- Missing NSCameraUsageDescription paired with camera entitlement. -->
+</dict>
+</plist>

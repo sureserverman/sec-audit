@@ -1,0 +1,9 @@
+#!/bin/bash
+# CWE-390: no `set -e`. Silent failures on error.
+# CWE-494/829/319: remote code executed over HTTP at install time.
+curl -sSf http://example.com/post-install.sh | bash
+
+# CWE-250: unnecessary chown root:wheel of user-owned files.
+chown -R root:wheel /Applications/VulnerableMac.app
+
+exit 0
