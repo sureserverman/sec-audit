@@ -124,6 +124,30 @@ Detect the technology stack. Read only — do not install or execute.
   `references/desktop/macos-tcc.md`,
   `references/desktop/macos-packaging.md`, and the shared
   `references/mobile-tools.md` (iOS/macOS subsections).
+- **Windows-desktop signals**: any of the following triggers the
+  `windows` inventory key:
+  - .NET project files (`*.csproj`, `*.vbproj`), C++ project files
+    (`*.vcxproj`), Visual Studio solutions (`*.sln`), or NuGet
+    package specs (`*.nuspec`).
+  - WiX installer sources (`*.wxs`, `*.wxi`).
+  - MSIX / Appx manifests (`AppxManifest.xml`,
+    `Package.appxmanifest`).
+  - Compiled PE artifacts under target — `*.exe`, `*.dll`, `*.msi`,
+    `*.msix`, `*.sys`.
+  - AppLocker / WDAC policy XML files — path or filename matching
+    `AppLocker*.xml` or `WDAC*.xml`, or XML content containing
+    `<AppLockerPolicy>` / `<SiPolicy>` root elements.
+  When detected, add `"windows"` with values reflecting the
+  artifact/source shape — `"windows": ["exe"]` / `["msi"]` /
+  `["msix"]` / `["applocker"]` / `["wdac"]` / `["source"]` or
+  combinations. Load
+  `references/desktop/windows-authenticode.md`,
+  `references/desktop/windows-applocker.md`,
+  `references/desktop/windows-packaging.md`, and the tool-lane
+  reference `references/windows-tools.md`. `ecosystems` gains a
+  `{"ecosystem": "NuGet", "manifest": "packages.lock.json"}` entry
+  when `.csproj` with `<PackageReference>` is present; NuGet is
+  OSV-native so cve-enricher handles it without adapter change.
 - **Linux-desktop signals**: any of the following triggers the
   `linux` inventory key:
   - Systemd units anywhere in the tree — `*.service`, `*.socket`,
@@ -177,6 +201,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "android":     [],
   "ios":         [],
   "macos":       [],
+  "windows":     [],
   "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],

@@ -798,6 +798,32 @@ if ! grep -q 'LSMinimumSystemVersion' "$tmp_m/Info.plist"; then
 fi
 echo "macos-inventory: synthetic macOS Info.plist fixture matches §2 detection rule"
 
+# --- windows inventory rule (v0.12.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "Windows-desktop signals" "SKILL.md §2 missing Windows detection rule"
+check skills/sec-review/SKILL.md "\.csproj\|\.vcxproj\|\.sln" "SKILL.md §2 windows rule missing .NET/C++ project trigger"
+check skills/sec-review/SKILL.md "\.wxs\|AppxManifest\|Package.appxmanifest" "SKILL.md §2 missing WiX/MSIX trigger"
+check skills/sec-review/SKILL.md "\"windows\"" "SKILL.md §2 inventory JSON missing windows key"
+check skills/sec-review/SKILL.md "NuGet" "SKILL.md §2 missing NuGet ecosystem routing"
+echo "windows-inventory: SKILL.md §2 documents windows stack detection"
+
+# --- windows fixture-match sanity: synthetic .csproj with PackageReference
+tmp_w=$(mktemp -d); trap 'rm -rf "$tmp_w"' EXIT
+cat > "$tmp_w/VulnerableWin.csproj" <<'CSPROJ'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
+CSPROJ
+if ! grep -q '<PackageReference' "$tmp_w/VulnerableWin.csproj"; then
+    echo "windows-inventory: FAIL — fixture .csproj malformed" >&2; fail=1
+fi
+echo "windows-inventory: synthetic .csproj fixture matches §2 detection rule"
+
 # --- linux inventory rule (v0.10.0 Stage 1 Task 1.5):
 check skills/sec-review/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
 check skills/sec-review/SKILL.md "\.service\|\.socket\|\.timer" "SKILL.md §2 linux rule missing systemd unit trigger"
