@@ -124,6 +124,30 @@ Detect the technology stack. Read only — do not install or execute.
   `references/desktop/macos-tcc.md`,
   `references/desktop/macos-packaging.md`, and the shared
   `references/mobile-tools.md` (iOS/macOS subsections).
+- **Windows-desktop signals**: any of the following triggers the
+  `windows` inventory key:
+  - .NET project files (`*.csproj`, `*.vbproj`), C++ project files
+    (`*.vcxproj`), Visual Studio solutions (`*.sln`), or NuGet
+    package specs (`*.nuspec`).
+  - WiX installer sources (`*.wxs`, `*.wxi`).
+  - MSIX / Appx manifests (`AppxManifest.xml`,
+    `Package.appxmanifest`).
+  - Compiled PE artifacts under target — `*.exe`, `*.dll`, `*.msi`,
+    `*.msix`, `*.sys`.
+  - AppLocker / WDAC policy XML files — path or filename matching
+    `AppLocker*.xml` or `WDAC*.xml`, or XML content containing
+    `<AppLockerPolicy>` / `<SiPolicy>` root elements.
+  When detected, add `"windows"` with values reflecting the
+  artifact/source shape — `"windows": ["exe"]` / `["msi"]` /
+  `["msix"]` / `["applocker"]` / `["wdac"]` / `["source"]` or
+  combinations. Load
+  `references/desktop/windows-authenticode.md`,
+  `references/desktop/windows-applocker.md`,
+  `references/desktop/windows-packaging.md`, and the tool-lane
+  reference `references/windows-tools.md`. `ecosystems` gains a
+  `{"ecosystem": "NuGet", "manifest": "packages.lock.json"}` entry
+  when `.csproj` with `<PackageReference>` is present; NuGet is
+  OSV-native so cve-enricher handles it without adapter change.
 - **Linux-desktop signals**: any of the following triggers the
   `linux` inventory key:
   - Systemd units anywhere in the tree — `*.service`, `*.socket`,
@@ -177,6 +201,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "android":     [],
   "ios":         [],
   "macos":       [],
+  "windows":     [],
   "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
@@ -631,6 +656,50 @@ macOS uses the same CocoaPods/SwiftPM ecosystems as iOS, routed in
 §3.11. When both `ios` and `macos` are in the inventory, the
 ecosystems entry is emitted once per unique `manifest`, not
 duplicated per lane.
+
+### 3.14 Desktop Windows pass — dispatch windows-runner
+
+When the inventory emitted by §2 contains `windows` (any of: .NET
+project files, WiX sources, MSIX manifests, PE artifacts, or
+AppLocker/WDAC policy XML), dispatch the `windows-runner` agent
+(`agents/windows-runner.md`, pinned to haiku, tools: Read + Bash).
+The agent runs up to three tools: `binskim` (Microsoft PE hardening
+scanner — cross-platform via dotnet), `osslsigncode` (cross-platform
+Authenticode verifier), and `sigcheck` (Sysinternals — Windows host
+only). **Unlike the iOS/macOS lanes where most Apple binaries are
+host-gated, only ONE of the Windows lane's three tools needs a
+Windows host** — the other two produce useful output on Linux/macOS
+CI.
+
+windows-runner runs in parallel with every other pass agent. Collect
+the Windows JSONL into a `windows_findings` list.
+
+Skill-level invariants:
+
+- **No `windows` in inventory** — skip entirely.
+- **`__windows_status__: "unavailable"`** — no tool could run.
+- **`__windows_status__: "partial"`** — mix of successful + failed
+  tools.
+- **`__windows_status__: "ok"`** — every available tool ran;
+  `skipped` list may be populated for cleanly-inapplicable tools.
+- **Three clean-skip reasons specific to this lane:**
+  - `requires-windows-host` (sigcheck only) — NEW in v0.12, and the
+    THIRD host-OS-gated reason after `requires-macos-host` (v0.9)
+    and `requires-systemd-host` (v0.10). The three together cover
+    every major desktop-OS runner gate.
+  - `no-pe` (all three tools) — NEW in v0.12; source-only targets
+    (`.csproj` + `.wxs` + manifests without compiled `.exe`/`.dll`/
+    `.msi`) cleanly-skip. Target-shape parallel to `no-apk`/
+    `no-bundle`/`no-pkg`/`no-elf`.
+  - `tool-missing` — the binary is absent when its host+target
+    preconditions held.
+
+Windows findings combine PE-hardening signal (binskim), Authenticode
+signature signal (osslsigncode), and deep-metadata signal (sigcheck).
+The dep-inventory path IS affected when `.csproj` with
+`<PackageReference>` is present — NuGet dependencies feed cve-
+enricher as `{"ecosystem": "NuGet", "manifest": "packages.lock.json"}`.
+OSV's `querybatch` handles NuGet natively, so no adapter change.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

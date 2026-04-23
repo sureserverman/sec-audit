@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>VulnerableWin</AssemblyName>
+    <!-- CWE-693: missing hardening flags in release PropertyGroup. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pinned to an old Newtonsoft.Json (just for NuGet ecosystem detection). -->
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+  </ItemGroup>
+</Project>

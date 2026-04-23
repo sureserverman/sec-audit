@@ -547,6 +547,63 @@ fixture (Sparkle HTTP feed + UserDefaults secret + JIT entitlement)
 produces mobsfscan findings with all four Apple binaries cleanly-
 skipped on Linux.
 
+## Desktop Windows lane (v0.12.0)
+
+A thirteenth agent, **`windows-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory detects
+a Windows desktop target — .NET projects (`.csproj`), C++ projects
+(`.vcxproj`), Visual Studio solutions (`.sln`), WiX installer
+sources (`.wxs`), MSIX manifests (`AppxManifest.xml` /
+`Package.appxmanifest`), compiled PE artifacts (`.exe`/`.dll`/
+`.msi`/`.msix`/`.sys`), or AppLocker/WDAC policy XML.
+
+The runner dispatches up to three tools. **Unlike the iOS/macOS
+lanes where most Apple binaries are host-OS-gated, only ONE of the
+Windows lane's three tools is host-gated** — the other two run
+cross-platform:
+
+- **`binskim`** (Microsoft PE hardening scanner) — cross-platform
+  via dotnet. SARIF v2.1.0 output. Per-rule CWE mapping for BA2001-
+  BA2025 rules (ASLR, DEP, SafeSEH, CFG, stack canaries, Spectre,
+  shadow-stack).
+- **`osslsigncode`** — cross-platform Authenticode verifier. Emits
+  findings for unsigned binaries, missing timestamps, SHA-1 digests,
+  and invalid signatures.
+- **`sigcheck`** (Sysinternals) — Windows-host-only. Deep
+  Authenticode metadata + catalog-signed detection.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "windows"` and one of
+`tool: "binskim" | "osslsigncode" | "sigcheck"`. Field-mapping
+recipes live in `skills/sec-review/references/windows-tools.md`;
+code-pattern reference packs live in
+`skills/sec-review/references/desktop/windows-*.md` and cover
+Authenticode signing hygiene, AppLocker/WDAC policy hygiene, and
+MSI/MSIX/WiX packaging concerns (MSI `CustomAction Type=3426`
+SDL violations, MSIX `rescap:Capability` runFullTrust/allowElevation,
+SmartScreen reputation).
+
+**Dependencies feed cve-enricher** via the NuGet ecosystem
+(`<PackageReference>` entries). NuGet is OSV-native.
+
+**NEW in v0.12: the THIRD host-OS-gated clean-skip reason.** The
+plugin now recognises three host-environment gates —
+`requires-macos-host` (v0.9), `requires-systemd-host` (v0.10), and
+`requires-windows-host` (v0.12). Together they cover every major
+desktop-OS runner gate. v0.12 also adds `no-pe` as a target-shape
+skip (source-only targets without compiled artifacts cleanly-skip
+all three Windows tools).
+
+**Degrade path.** No `windows` in inventory → skip entirely. Linux
+CI with `.csproj`+`.wxs`+MSIX sources but no compiled `.exe` → `ok`
+with `sigcheck: requires-windows-host` plus `binskim/osslsigncode:
+no-pe` skipped entries. `tests/windows-drill.sh` enforces the four-
+tool probe + Windows-host-gate + three-skip-reason contracts.
+`tests/windows-e2e.sh` validates the `vulnerable-windows` fixture
+produces binskim + osslsigncode findings with 16-lane origin-tag
+isolation (the largest cross-lane check — rejects 21 exclusive tool
+names from the other 12 lanes).
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -561,7 +618,8 @@ skipped on Linux.
 | iOS                       | Source tree (`Info.plist` / `*.xcodeproj` / `Package.swift` / `Podfile`) | `mobsfscan`, `codesign` / `spctl` / `xcrun notarytool` (macOS-host + bundle-present) | `references/mobile/{ios-plist,ios-data,ios-codesign}.md`, `references/mobile-tools.md` | v0.9.0     |
 | Desktop Linux             | Source tree (`*.service` / `debian/control` / `*.spec` / flatpak-manifest / `snapcraft.yaml`) | `systemd-analyze security` (systemd-host), `lintian` (debian/ source), `checksec` (ELF present) | `references/desktop/{linux-systemd,linux-sandboxing,linux-packaging}.md`, `references/linux-tools.md` | v0.10.0    |
 | Desktop macOS             | Source tree (`Info.plist` with `LSMinimumSystemVersion` / `*.pkg` / `*.dmg` / Sparkle) | `mobsfscan`, `codesign` / `spctl` / `pkgutil` / `stapler` (macOS-host + artifact-present) | `references/desktop/{macos-hardened-runtime,macos-tcc,macos-packaging}.md`, `references/mobile-tools.md` | v0.11.0    |
-| CVE enrichment            | Manifests + retire + crates.io + Maven + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| Desktop Windows           | Source + PE artifacts (`.csproj` / `.vcxproj` / `.wxs` / `AppxManifest.xml` / `.exe` / `.msi` / AppLocker/WDAC XML) | `binskim` + `osslsigncode` (cross-platform), `sigcheck` (Windows-host) | `references/desktop/{windows-authenticode,windows-applocker,windows-packaging}.md`, `references/windows-tools.md` | v0.12.0    |
+| CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 

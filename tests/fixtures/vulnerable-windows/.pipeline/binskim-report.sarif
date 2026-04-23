@@ -1,0 +1,64 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "BinSkim",
+          "version": "4.3.1"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "BA2009",
+          "level": "error",
+          "message": {
+            "text": "Image 'VulnerableWin.exe' does not have the ASLR flag set in the PE header — CWE-693 Protection Mechanism Failure."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "VulnerableWin.exe"},
+                "region": {"startLine": 0}
+              }
+            }
+          ],
+          "help": {"text": "Rebuild with /DYNAMICBASE (MSVC) or -Wl,--dynamicbase (MinGW)."}
+        },
+        {
+          "ruleId": "BA2008",
+          "level": "error",
+          "message": {
+            "text": "Image 'VulnerableWin.exe' does not have Control Flow Guard enabled."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "VulnerableWin.exe"},
+                "region": {"startLine": 0}
+              }
+            }
+          ],
+          "help": {"text": "Rebuild with /guard:cf (MSVC)."}
+        },
+        {
+          "ruleId": "BA2011",
+          "level": "warning",
+          "message": {
+            "text": "Image 'VulnerableWin.exe' has stack protection but some functions are marked /GS-."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "VulnerableWin.exe"},
+                "region": {"startLine": 0}
+              }
+            }
+          ],
+          "help": {"text": "Remove /GS- from any function not explicitly requiring it."}
+        }
+      ]
+    }
+  ]
+}
