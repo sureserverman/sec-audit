@@ -847,6 +847,13 @@ check agents/report-writer.md "Lanes dispatched" "report-writer missing Lanes-di
 check agents/report-writer.md "Lane filter applied" "report-writer missing Lane-filter-applied line"
 echo "per-lane-summary: report-writer renders per-lane summary table + filter metadata"
 
+# --- CLI --only/--skip flags (v1.0.0 Stage 2 Task 2.1):
+check commands/sec-review.md "\-\-only=" "commands/sec-review.md missing --only flag"
+check commands/sec-review.md "\-\-skip=" "commands/sec-review.md missing --skip flag"
+check commands/sec-review.md "mutually exclusive" "commands/sec-review.md missing --only/--skip mutual-exclusion rule"
+check commands/sec-review.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-review.md missing canonical lane list"
+echo "cli-flags: commands/sec-review.md documents --only/--skip with mutual-exclusion"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors

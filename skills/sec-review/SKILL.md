@@ -18,6 +18,16 @@ code analysis; this skill orchestrates and enriches.
   same project, for the DAST lane (§3.7). When absent, DAST is
   skipped; static code analysis and CVE enrichment still run. Read
   from `$DAST_TARGET_URL` env var if unset.
+- `only_lanes` (optional, v1.0.0+) — list of canonical lane names
+  the caller wants to run exclusively. Valid values: `sec-expert`,
+  `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
+  `macos`, `windows`. When set, the orchestrator dispatches ONLY
+  the named lanes and records the filter in the Review-metadata
+  block. Mutually exclusive with `skip_lanes`.
+- `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
+  the caller wants to exclude. Same vocabulary as `only_lanes`.
+  When set, the orchestrator dispatches every applicable lane
+  EXCEPT the named ones. Mutually exclusive with `only_lanes`.
 - `github_token` (optional) — used to raise the GHSA rate limit from 60/hr
   to 5000/hr. Read from `$GITHUB_TOKEN` env var if unset.
 - `nvd_api_key` (optional) — raises NVD rate limit from ~5/30s to 50/30s.
