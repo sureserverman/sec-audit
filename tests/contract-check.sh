@@ -61,7 +61,7 @@ done
 for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
             "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku" \
-            "agents/webext-runner.md:haiku"; do
+            "agents/webext-runner.md:haiku" "agents/rust-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -151,6 +151,16 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __webext_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the rust status summary line emitted by rust-runner.
+        if "__rust_status__" in obj:
+            status = obj.get("__rust_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __rust_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __rust_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -197,9 +207,25 @@ with open(path) as fh:
             elif obj["tool"] not in {"addons-linter", "web-ext", "retire"}:
                 print(f"CONTRACT FAIL: {path}:{i} webext tool must be addons-linter|web-ext|retire, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: webext findings must NOT carry SAST/DAST tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+            # Origin-tag isolation: webext findings must NOT carry SAST/DAST/rust tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
                 print(f"CONTRACT FAIL: {path}:{i} webext finding carries non-webext tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: rust findings must carry `tool` and `origin`.
+        if obj.get("origin") == "rust":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} rust finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+                print(f"CONTRACT FAIL: {path}:{i} rust tool must be cargo-audit|cargo-deny|cargo-geiger|cargo-vet, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: rust findings must NOT carry SAST/DAST/webext tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire"}:
+                print(f"CONTRACT FAIL: {path}:{i} rust finding carries non-rust tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+            # cargo-geiger findings MUST be INFO — never elevated.
+            if obj.get("tool") == "cargo-geiger" and obj.get("severity") != "INFO":
+                print(f"CONTRACT FAIL: {path}:{i} cargo-geiger finding must be INFO severity, got {obj.get('severity')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -280,6 +306,58 @@ sys.exit(1 if errs else 0)
 fi
 echo "webext negative-test: origin-tag isolation enforced (webext cannot carry semgrep/bandit/zap-baseline)"
 
+# --- Negative tests for rust origin: missing tool + cross-tag + INFO ceiling
+bad_rust_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Cargo.toml","line":1,"evidence":"e","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"rust"}'
+if echo "$bad_rust_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "rust" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed rust line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: malformed rust line (missing tool) correctly rejected"
+
+bad_rust_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Cargo.toml","line":1,"evidence":"e","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"rust","tool":"semgrep"}'
+if echo "$bad_rust_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "rust" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: rust finding with non-rust tool was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: origin-tag isolation enforced (rust cannot carry semgrep/bandit/zap-baseline/addons-linter/web-ext/retire)"
+
+bad_geiger_severity='{"id":"serde@1.0.0","severity":"HIGH","cwe":null,"title":"Unsafe code in serde","file":"serde","line":0,"evidence":"unsafe fns: 5","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"low","origin":"rust","tool":"cargo-geiger"}'
+if echo "$bad_geiger_severity" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("tool") == "cargo-geiger" and obj.get("severity") != "INFO":
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: cargo-geiger finding with non-INFO severity was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: cargo-geiger INFO ceiling enforced"
+
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
 bad_dast='{"id":"40018","severity":"HIGH","cwe":"CWE-89","title":"t","file":"http://x/","line":0,"evidence":"e","reference":"dast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"dast"}'
@@ -320,6 +398,40 @@ check skills/sec-review/SKILL.md "__webext_status__" "SKILL.md §3.8 missing web
 check skills/sec-review/SKILL.md '__webext_status__.*"unavailable"\|"unavailable".*__webext_status__\|`__webext_status__: "unavailable"`' "SKILL.md §3.8 missing unavailable state (documented)"
 check skills/sec-review/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
 echo "webext-orchestrator: SKILL.md §3.8 documents webext-runner wire-up"
+
+# --- rust inventory rule (v0.7.0 Stage 1 Task 1.4):
+# SKILL.md §2 must document the Rust detection rule (Cargo.toml +
+# [package] or [workspace]) and emit a `rust` inventory key.
+check skills/sec-review/SKILL.md "Rust / Cargo signals" "SKILL.md §2 missing Rust detection rule"
+check skills/sec-review/SKILL.md "Cargo.toml" "SKILL.md §2 rust rule missing Cargo.toml trigger"
+check skills/sec-review/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing rust key"
+check skills/sec-review/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
+echo "rust-inventory: SKILL.md §2 documents rust stack detection"
+
+# --- orchestrator §3.9 wire-up (v0.7.0 Stage 2 Task 2.2):
+# SKILL.md must declare §3.9, reference rust-runner, and document all
+# three sentinel states (ok / partial / unavailable). Shape mirrors
+# §3.6 / §3.7 / §3.8.
+check skills/sec-review/SKILL.md "### 3.9 Rust toolchain pass" "SKILL.md missing §3.9"
+check skills/sec-review/SKILL.md "rust-runner" "SKILL.md §3.9 missing rust-runner reference"
+check skills/sec-review/SKILL.md "__rust_status__" "SKILL.md §3.9 missing rust sentinel"
+check skills/sec-review/SKILL.md "cargo-audit\|cargo audit" "SKILL.md §3.9 missing cargo-audit"
+check skills/sec-review/SKILL.md "cargo-geiger\|cargo geiger" "SKILL.md §3.9 missing cargo-geiger"
+echo "rust-orchestrator: SKILL.md §3.9 documents rust-runner wire-up"
+
+# --- rust fixture-match sanity: synthetic Cargo.toml must match rule
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+cat > "$tmp/Cargo.toml" <<'TOML'
+[package]
+name = "fixture"
+version = "0.0.1"
+edition = "2021"
+TOML
+if ! grep -q '\[package\]' "$tmp/Cargo.toml"; then
+    echo "rust-inventory: FAIL — fixture lacks [package] section" >&2
+    fail=1
+fi
+echo "rust-inventory: synthetic Cargo.toml fixture matches §2 detection rule"
 
 # --- webext fixture-match sanity: a synthetic manifest.json containing
 # "manifest_version": 3 must match the grep hint the SKILL.md rule uses.

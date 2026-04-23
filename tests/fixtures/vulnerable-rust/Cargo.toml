@@ -1,0 +1,18 @@
+[package]
+name = "vulnerable-rust-fixture"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+# RUSTSEC-2020-0071 — time before 0.2.23 has a soundness issue
+# in localtime_r on unix. Intentionally pinned here for fixture purposes.
+time = "0.1.43"
+
+# A git-URL dep to trigger cargo-ecosystem.md CWE-494 pattern.
+# NOT resolvable; fixture is static — tools read the manifest, not the repo.
+serde_gremlin = { git = "https://example.com/gremlin.git" }
+
+[profile.release]
+overflow-checks = false
+lto = false

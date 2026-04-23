@@ -74,6 +74,20 @@ Detect the technology stack. Read only — do not install or execute.
   inventory and load `references/frontend/webext-chrome-mv3.md`,
   `references/frontend/webext-firefox-amo.md`, and
   `references/frontend/webext-shared-patterns.md` as appropriate.
+- **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
+  for workspaces) AND the file contains `[package]` or `[workspace]`.
+  Distinguish by project shape:
+  - `[package]` only → `"rust": ["binary"]` or `"rust": ["library"]`
+    (derive from `[lib]` / `[[bin]]` sections, or from `src/main.rs`
+    vs `src/lib.rs`).
+  - `[workspace]` → `"rust": ["workspace"]`, plus one nested entry per
+    workspace member detected under `members = [...]`.
+  When detected, add `"rust"` to the inventory and load
+  `references/rust/cargo-ecosystem.md`, `references/rust/unsafe-surface.md`,
+  and the tool-lane reference `references/rust-tools.md`. Cargo.lock
+  presence is expected for binaries (commit the lockfile) and optional
+  for libraries; its absence is not a detection trigger, only a signal
+  to the runner that cargo-audit will have less to chew on.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -87,11 +101,21 @@ Emit an `inventory.json` record (in-memory only) like:
   "proxies":     [],
   "frontend":    ["django-templates"],
   "webext":      [],
+  "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
   "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}]
 }
 ```
+
+For a Rust target the `rust` key carries the detected project shape,
+e.g. `"rust": ["binary"]`, `"rust": ["library"]`, or
+`"rust": ["workspace", "binary", "library"]` for a workspace with
+mixed members. `ecosystems` gains an entry
+`{"ecosystem": "crates.io", "manifest": "Cargo.lock"}` (preferred) or
+`{"ecosystem": "crates.io", "manifest": "Cargo.toml"}` when the lock
+is absent — OSV's `querybatch` handles `crates.io` natively so
+cve-enricher needs no adapter change.
 
 For a browser-extension target the `webext` key carries the detected
 platform(s), e.g. `"webext": ["chrome-mv3"]`, `"webext": ["firefox-amo"]`,
@@ -275,6 +299,63 @@ package-version signal (retire.js). The dep-inventory path IS affected:
 retire's `{component, version}` pairs feed the cve-enricher as an
 additional ecosystem entry with `ecosystem: "retire"` so OSV/NVD/GHSA
 lookups run against them.
+
+### 3.9 Rust toolchain pass — dispatch rust-runner
+
+When the inventory emitted by §2 contains `rust` (the `Cargo.toml`
++ `[package]`/`[workspace]` detection rule fired), dispatch the
+`rust-runner` agent (`agents/rust-runner.md`, pinned to haiku, tools:
+Read + Bash). The agent shells out to four cargo subcommands —
+`cargo audit`, `cargo deny`, `cargo geiger`, `cargo vet` — against
+the Rust project root, parses each tool's native JSON output, and
+emits sec-expert-compatible JSONL on stdout — every line carrying
+`origin: "rust"` and `tool: "cargo-audit" | "cargo-deny" |
+"cargo-geiger" | "cargo-vet"`.
+
+rust-runner runs in parallel with sec-expert, sast-runner, dast-runner,
+webext-runner, and cve-enricher — its input is the project tree (read
+only, no mutation), so other agents may read the same files without
+observable conflict. Collect the Rust JSONL into a `rust_findings` list
+alongside the other streams.
+
+Skill-level invariants the orchestrator enforces on the Rust stream:
+
+- **No `rust` in inventory** — skip this pass entirely. Do NOT probe
+  for cargo on an unrelated project; it is heavyweight to install and
+  irrelevant to non-Rust targets.
+- **`__rust_status__: "unavailable"`** — `cargo` was absent entirely,
+  or none of the four subcommands responded to `--version`, or every
+  subcommand crashed. Add the `⚠ Rust toolchain tools unavailable —
+  install cargo + cargo-audit/deny/geiger/vet to enable Rust analysis
+  pass` banner to the Review metadata block. Do NOT fabricate findings.
+- **`__rust_status__: "partial"`** — some subcommands ran successfully
+  and others were missing or crashed. Merge the findings from the ones
+  that ran; note the missing/failed ones in the Review-metadata
+  section (`Rust tools run: cargo-audit, cargo-geiger; cargo-deny
+  skipped — not installed; cargo-vet failed — exit 2`).
+- **`__rust_status__: "ok"`** — every available subcommand ran. Merge
+  the Rust findings into the triaged stream. Rust findings carry
+  `file: <Cargo.toml | Cargo.lock | crate-name>` and `line: <integer
+  or 0>` depending on whether the tool reported a span.
+- **cargo-audit findings with a CVE alias** — when the finding's `id`
+  is a `CVE-YYYY-NNNN` string, the cve-enricher MUST pick it up and
+  attach CVSS / KEV / fix-version metadata. cargo-audit populates
+  `advisory.aliases[]` from the RustSec DB's CVE cross-reference.
+- **cargo-geiger INFO ceiling** — geiger findings are INFO-severity
+  signals, not defects. The report-writer renders them in a separate
+  "Unsafe-code surface (informational)" bucket below the LOW severity
+  bucket; they are NOT counted in the header severity tallies.
+
+Rust findings combine code-pattern signal (deny bans, geiger unsafe
+counts, vet unaudited entries) with package-version signal (audit
+CVEs). The dep-inventory path IS affected: cargo-audit's package
+list feeds the cve-enricher as an ecosystem entry
+`{"ecosystem": "crates.io", "manifest": "Cargo.lock"}` — OSV's
+`querybatch` endpoint handles crates.io natively, so no new feed
+adapter is required. A Rust project with a Cargo.lock and cargo-audit
+on PATH will have its advisories double-covered (RustSec DB via
+audit + OSV via cve-enricher); that redundancy is expected and the
+CVE dedupe logic in §4 handles it.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
