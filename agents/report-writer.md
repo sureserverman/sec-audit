@@ -109,6 +109,47 @@ If all three feeds are offline, prepend this banner immediately after the
 > ⚠ CVE enrichment offline — re-run with network to populate
 ```
 
+### Step 2.5 — Per-lane summary table  (v1.0.0+)
+
+Render a per-lane summary table immediately after the header block
+and severity tallies, before the severity-bucket sections. One row
+per dispatched lane; lanes filtered out by `--only` / `--skip` do
+NOT appear here but are noted in Step 6 Review metadata instead.
+
+```markdown
+## Per-lane summary
+
+| Lane      | Status       | Tools run                     | Findings | Skipped                        |
+|-----------|--------------|-------------------------------|---------:|--------------------------------|
+| sec-expert| ok           | (code reasoning)              | 12       | —                              |
+| webext    | ok           | addons-linter, retire         | 6        | —                              |
+| rust      | partial      | cargo-audit, cargo-geiger     | 4        | cargo-deny (tool-missing)      |
+| android   | ok           | mobsfscan, android-lint       | 6        | apkleaks (no-apk)              |
+| ios       | ok           | mobsfscan                     | 4        | codesign, spctl, notarytool (requires-macos-host) |
+```
+
+Data source: each runner's trailing status record
+(`__sast_status__` / `__dast_status__` / `__webext_status__` /
+`__rust_status__` / `__android_status__` / `__ios_status__` /
+`__linux_status__` / `__macos_status__` / `__windows_status__`).
+Format rules:
+
+- **Lane**: lowercase canonical name matching the inventory key,
+  plus `sec-expert` as the first row when sec-expert dispatched.
+- **Status**: verbatim `ok` / `partial` / `unavailable` from the
+  status record. `sec-expert` always reports `ok` (no sentinel).
+- **Tools run**: comma-joined from the status record's `tools`
+  list. For sec-expert, render `(code reasoning)`.
+- **Findings**: integer count from the status record's `findings`
+  field, or `0` when absent.
+- **Skipped**: comma-joined `{tool} ({reason})` from the status
+  record's `skipped` list; empty render `—`. The ten canonical
+  reasons are enumerated in `references/COVERAGE.md`.
+
+Do NOT add a row for a lane that did not dispatch (whether due to
+absent inventory key, filter, or runner crash). Absent-entirely
+lanes are listed under Step 6 "Lanes dispatched" metadata.
+
 ### Step 3 — Emit severity buckets
 
 Order: CRITICAL, then HIGH, then MEDIUM, then LOW. Within each bucket, order
@@ -263,15 +304,30 @@ risk comparable to manifest-declared-dependency risk in a single table.
 - Plugin version: sec-review <version>
 - Reference packs loaded: <comma-separated list from inventory or orchestrator>
 - sec-expert runs: <n>
+- Lanes dispatched: <comma-separated list of lane keys that actually ran>
+- Lane filter applied: <"--only=<...>" or "--skip=<...>" or "none">
 - SAST tools run: <list or "skipped — not on PATH">
 - DAST tools run: <list or "skipped — no target_url supplied">
 - WebExt tools run: <list or "skipped — no webext detected" or "skipped — not on PATH">
+- Rust tools run: <list or skip reason>
+- Android tools run: <list or skip reason>
+- iOS tools run: <list or skip reason>
+- Linux tools run: <list or skip reason>
+- macOS tools run: <list or skip reason>
+- Windows tools run: <list or skip reason>
 - Total CVE lookups: <n>
 - Limits hit: <list or "none">
 ```
 
 `<version>` is the current value of `.claude-plugin/plugin.json`'s
 `version` field; read it from the plugin manifest (do not hardcode).
+
+`Lanes dispatched` enumerates the inventory-key-matched runners that
+actually ran (including sec-expert when any source was reviewed).
+Lanes filtered out via `only_lanes` / `skip_lanes` inputs are NOT
+listed here — they appear instead in the `Lane filter applied` line
+so the reader can distinguish "lane was out of scope" from "lane
+was explicitly excluded by the caller."
 
 All values must come from the inputs. If a value is not supplied, write
 `unknown` rather than inventing a number.

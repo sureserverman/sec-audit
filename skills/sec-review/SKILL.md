@@ -18,6 +18,16 @@ code analysis; this skill orchestrates and enriches.
   same project, for the DAST lane (§3.7). When absent, DAST is
   skipped; static code analysis and CVE enrichment still run. Read
   from `$DAST_TARGET_URL` env var if unset.
+- `only_lanes` (optional, v1.0.0+) — list of canonical lane names
+  the caller wants to run exclusively. Valid values: `sec-expert`,
+  `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
+  `macos`, `windows`. When set, the orchestrator dispatches ONLY
+  the named lanes and records the filter in the Review-metadata
+  block. Mutually exclusive with `skip_lanes`.
+- `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
+  the caller wants to exclude. Same vocabulary as `only_lanes`.
+  When set, the orchestrator dispatches every applicable lane
+  EXCEPT the named ones. Mutually exclusive with `only_lanes`.
 - `github_token` (optional) — used to raise the GHSA rate limit from 60/hr
   to 5000/hr. Read from `$GITHUB_TOKEN` env var if unset.
 - `nvd_api_key` (optional) — raises NVD rate limit from ~5/30s to 50/30s.
@@ -249,6 +259,52 @@ The agent returns JSONL findings per the schema documented in
 `agents/sec-expert.md`. Collect all findings (including the final
 `__dep_inventory__` object) into a list called `findings`. The dep
 inventory feeds step 4.
+
+### 3.0 Dispatch discipline (multi-stack default)
+
+Multi-stack dispatch is the default behaviour. When §2 Inventory
+detects ≥2 lane keys simultaneously (e.g. a Tauri app with `rust`
++ `webext` + `macos`/`windows`/`linux`; a Flutter app with
+`android` + `ios`; a React-Native app with `android` + `ios` +
+`webext`), ALL corresponding runners dispatch in parallel per the
+`dispatching-parallel-agents` skill. This has been the de-facto
+behaviour since v0.7; v1.0 makes it the documented contract.
+
+**Invariants the orchestrator enforces:**
+
+1. **Independent dispatch.** Each lane's runner reads only files it
+   needs. Runners share no mutable state. Origin-tag isolation is
+   enforced by `tests/contract-check.sh` — no `origin: "webext"`
+   finding may carry a `rust` tool name, etc.
+2. **Independent status records.** Each runner emits its own
+   `__<lane>_status__` sentinel with its own `skipped` / `failed`
+   lists. The report-writer renders each lane's findings in a
+   separate section, headed by the per-lane summary row from
+   §7 Report consolidation.
+3. **Dep-inventory dedup.** When multiple lanes share an ecosystem
+   (iOS + macOS both resolve CocoaPods; android depends on Maven
+   which windows doesn't touch), the ecosystems list in the
+   cve-enricher input deduplicates by `(ecosystem, manifest)`
+   pair — no ecosystem is scanned twice.
+4. **Lane filters (v1.0).** If the caller passed `only_lanes` or
+   `skip_lanes` (see `## Inputs`), the orchestrator filters the
+   dispatch list BEFORE step 3. Filtered-out lanes do not dispatch,
+   do not emit status records, and are noted in the Review-metadata
+   section as "Lane filter applied: ...". The two flags are mutually
+   exclusive — the slash command rejects invocations setting both.
+5. **Parallel-safe file access.** Runners are read-only against
+   the target tree; the one exception is gradle's
+   `./gradlew lintDebug` writing to `build/reports/` under target
+   (documented in `agents/android-runner.md`). No two runners write
+   to the same `$TMPDIR` subpath.
+6. **Consolidated report.** §6 Report writing renders a per-lane
+   summary table at the top of the Review-metadata block with one
+   row per dispatched lane. See `agents/report-writer.md` Step 2.5.
+
+The canonical lane list (10 total) is enumerated in
+`references/COVERAGE.md` — the single source of truth for which
+inventory keys map to which runners, reference packs, tools, and
+skip reasons.
 
 ### 3.5 Triage findings — dispatch finding-triager
 

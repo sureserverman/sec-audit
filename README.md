@@ -547,6 +547,66 @@ fixture (Sparkle HTTP feed + UserDefaults secret + JIT entitlement)
 produces mobsfscan findings with all four Apple binaries cleanly-
 skipped on Linux.
 
+## Cross-platform polish (v1.0.0)
+
+The v1.0 release adds no new reference packs and no new runners.
+Instead it formalises multi-stack dispatch as a first-class contract,
+adds lane-selection flags to the `/sec-review` slash command, and
+ships a single-source-of-truth coverage enumeration.
+
+**Multi-stack dispatch (formalised in §3.0).** When the inventory
+in §2 detects ≥2 lane keys simultaneously — a Tauri app has `rust`
++ `webext` + `macos`/`windows`/`linux`; a Flutter app has `android`
++ `ios`; a React-Native app has all three of those plus
+optionally `webext` — ALL corresponding runners dispatch in parallel
+per the `dispatching-parallel-agents` skill. Each runner has its
+own origin tag, status record, and report section. Cross-lane
+origin-tag isolation is enforced by `tests/contract-check.sh`. The
+dep-inventory path deduplicates ecosystems shared across lanes
+(iOS + macOS both use CocoaPods → one CocoaPods entry, not two).
+This has been the de-facto behaviour since v0.7; v1.0 makes it the
+documented contract with §3.0 invariants and a new `tests/multi-
+stack-e2e.sh` integration test.
+
+**Lane-selection flags.** The `/sec-review` command now accepts:
+
+```
+/sec-review /path/to/repo
+/sec-review /path/to/repo --only=webext,rust
+/sec-review /path/to/repo --skip=dast,windows
+```
+
+`--only=<lanes>` restricts dispatch to the named lanes; `--skip=<lanes>`
+excludes them. The two flags are mutually exclusive. Valid lane
+names: `sec-expert`, `sast`, `dast`, `webext`, `rust`, `android`,
+`ios`, `linux`, `macos`, `windows` — any other value is rejected
+before the skill dispatches. The Review-metadata block surfaces a
+`Lane filter applied: ...` line when either flag is set.
+
+**Consolidated per-lane summary in reports.** The final markdown
+report now opens with a `## Per-lane summary` table listing one row
+per dispatched lane with status, tools run, finding count, and any
+cleanly-skipped tools with their reasons. `references/COVERAGE.md`
+is the single source of truth for which inventory keys map to which
+runners, reference packs, tools, ecosystems, and skip reasons.
+
+**Skip-reason vocabulary (stable at 10 canonical values).** The
+structured `{tool, reason}` skipped-list schema introduced in v0.8
+has absorbed every new tool family through v0.12 without a single
+contract-check schema change. Ten canonical reasons grouped by
+category:
+
+- 7 target-shape: `no-apk`, `no-bundle`, `no-pkg`, `no-debian-source`,
+  `no-elf`, `no-systemd-unit`, `no-pe`
+- 3 host-OS-gated: `requires-macos-host`, `requires-systemd-host`,
+  `requires-windows-host`
+- 1 profile-absent: `no-notary-profile`
+- 1 universal catch-all: `tool-missing`
+
+Future lanes beyond v1.0 (embedded Rust, IoT firmware, Kubernetes
+admission controllers, etc.) are out of the current roadmap and
+would ship under a v1.x or v2.0 numbering if pursued.
+
 ## Desktop Windows lane (v0.12.0)
 
 A thirteenth agent, **`windows-runner`** (haiku-pinned, `Read` +

@@ -823,6 +823,37 @@ check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule mi
 check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
 echo "webext-inventory: SKILL.md §2 documents webext stack detection"
 
+# --- dispatch discipline (v1.0.0 Stage 1 Task 1.2):
+# SKILL.md §3.0 formally documents multi-stack dispatch + lane-filter semantics.
+check skills/sec-review/SKILL.md "### 3.0 Dispatch discipline" "SKILL.md missing §3.0 Dispatch discipline"
+check skills/sec-review/SKILL.md "Multi-stack dispatch" "SKILL.md §3.0 missing multi-stack documentation"
+check skills/sec-review/SKILL.md "only_lanes\|skip_lanes" "SKILL.md §3.0 missing lane-filter references"
+check skills/sec-review/SKILL.md "COVERAGE.md" "SKILL.md §3.0 missing COVERAGE.md pointer"
+echo "dispatch-discipline: SKILL.md §3.0 formalises multi-stack dispatch"
+
+# --- COVERAGE.md presence (v1.0.0 Stage 1 Task 1.1):
+check skills/sec-review/references/COVERAGE.md "^## Lanes" "COVERAGE.md missing Lanes section"
+check skills/sec-review/references/COVERAGE.md "^## Ecosystems" "COVERAGE.md missing Ecosystems section"
+check skills/sec-review/references/COVERAGE.md "^## Skip-reason vocabulary" "COVERAGE.md missing skip-reason vocabulary"
+check skills/sec-review/references/COVERAGE.md "requires-macos-host" "COVERAGE.md missing requires-macos-host"
+check skills/sec-review/references/COVERAGE.md "requires-systemd-host" "COVERAGE.md missing requires-systemd-host"
+check skills/sec-review/references/COVERAGE.md "requires-windows-host" "COVERAGE.md missing requires-windows-host"
+echo "coverage-md: references/COVERAGE.md enumerates all lanes + skip vocabulary"
+
+# --- report-writer per-lane summary (v1.0.0 Stage 1 Task 1.3):
+check agents/report-writer.md "Per-lane summary" "report-writer missing per-lane summary table"
+check agents/report-writer.md "Step 2\.5" "report-writer missing Step 2.5"
+check agents/report-writer.md "Lanes dispatched" "report-writer missing Lanes-dispatched metadata line"
+check agents/report-writer.md "Lane filter applied" "report-writer missing Lane-filter-applied line"
+echo "per-lane-summary: report-writer renders per-lane summary table + filter metadata"
+
+# --- CLI --only/--skip flags (v1.0.0 Stage 2 Task 2.1):
+check commands/sec-review.md "\-\-only=" "commands/sec-review.md missing --only flag"
+check commands/sec-review.md "\-\-skip=" "commands/sec-review.md missing --skip flag"
+check commands/sec-review.md "mutually exclusive" "commands/sec-review.md missing --only/--skip mutual-exclusion rule"
+check commands/sec-review.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-review.md missing canonical lane list"
+echo "cli-flags: commands/sec-review.md documents --only/--skip with mutual-exclusion"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
