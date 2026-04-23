@@ -688,6 +688,29 @@ check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing 
 check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
 echo "ios-inventory: SKILL.md §2 documents ios stack detection"
 
+# --- macos inventory rule (v0.11.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "macOS desktop signals" "SKILL.md §2 missing macOS detection rule"
+check skills/sec-review/SKILL.md "LSMinimumSystemVersion" "SKILL.md §2 macos rule missing LSMinimumSystemVersion trigger"
+check skills/sec-review/SKILL.md "\"macos\"" "SKILL.md §2 inventory JSON missing macos key"
+check skills/sec-review/SKILL.md "Sparkle\|SUFeedURL" "SKILL.md §2 missing Sparkle trigger"
+check skills/sec-review/SKILL.md "\.pkg\|\.dmg" "SKILL.md §2 missing pkg/dmg trigger"
+echo "macos-inventory: SKILL.md §2 documents macos stack detection"
+
+# --- macos fixture-match sanity: synthetic Info.plist with LSMinimumSystemVersion
+tmp_m=$(mktemp -d); trap 'rm -rf "$tmp_m"' EXIT
+cat > "$tmp_m/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.example.fixture</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+</dict></plist>
+PLIST
+if ! grep -q 'LSMinimumSystemVersion' "$tmp_m/Info.plist"; then
+    echo "macos-inventory: FAIL — fixture Info.plist missing LSMinimumSystemVersion" >&2; fail=1
+fi
+echo "macos-inventory: synthetic macOS Info.plist fixture matches §2 detection rule"
+
 # --- linux inventory rule (v0.10.0 Stage 1 Task 1.5):
 check skills/sec-review/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
 check skills/sec-review/SKILL.md "\.service\|\.socket\|\.timer" "SKILL.md §2 linux rule missing systemd unit trigger"

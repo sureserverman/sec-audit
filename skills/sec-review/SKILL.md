@@ -107,6 +107,23 @@ Detect the technology stack. Read only — do not install or execute.
   both ecosystems have partial OSV coverage (CocoaPods: via GHSA
   fallback; SwiftPM: best-effort) — document as a known limit rather
   than a blocker; cve-enricher's multi-feed routing handles the gap.
+- **macOS desktop signals**: distinguished from iOS by macOS-specific
+  markers — `Info.plist` containing `LSMinimumSystemVersion` (macOS
+  deployment target key; iOS uses `MinimumOSVersion` or
+  `UIDeviceFamily`), OR a `*.pkg` installer / `*.dmg` disk image
+  file under the target, OR a `Sparkle.framework/` directory or
+  `SUFeedURL` key in Info.plist (Sparkle auto-update framework), OR
+  a `.app` bundle whose Info.plist has the macOS deployment-target
+  key. When detected, add `"macos"` with values reflecting the
+  artifact shape — `"macos": ["app"]` / `["pkg"]` / `["framework"]`
+  / `["app", "pkg"]`. Cross-platform SwiftPM packages (targeting
+  both iOS and macOS) MAY emit BOTH `ios` and `macos` keys
+  simultaneously — the two lanes dispatch independently and render
+  in separate report sections. Load
+  `references/desktop/macos-hardened-runtime.md`,
+  `references/desktop/macos-tcc.md`,
+  `references/desktop/macos-packaging.md`, and the shared
+  `references/mobile-tools.md` (iOS/macOS subsections).
 - **Linux-desktop signals**: any of the following triggers the
   `linux` inventory key:
   - Systemd units anywhere in the tree — `*.service`, `*.socket`,
@@ -159,6 +176,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "webext":      [],
   "android":     [],
   "ios":         [],
+  "macos":       [],
   "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
