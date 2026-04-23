@@ -62,7 +62,7 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
             "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku" \
             "agents/webext-runner.md:haiku" "agents/rust-runner.md:haiku" \
-            "agents/android-runner.md:haiku"; do
+            "agents/android-runner.md:haiku" "agents/ios-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -183,6 +183,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __android_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the iOS status summary line emitted by ios-runner.
+        # Same skipped-list schema as android; adds requires-macos-host as a valid reason.
+        if "__ios_status__" in obj:
+            status = obj.get("__ios_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __ios_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __ios_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __ios_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __ios_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -257,9 +277,22 @@ with open(path) as fh:
             elif obj["tool"] not in {"mobsfscan", "apkleaks", "android-lint"}:
                 print(f"CONTRACT FAIL: {path}:{i} android tool must be mobsfscan|apkleaks|android-lint, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: android findings must NOT carry SAST/DAST/webext/rust tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+            # Origin-tag isolation: android findings must NOT carry other lanes' tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "codesign", "spctl", "notarytool"}:
                 print(f"CONTRACT FAIL: {path}:{i} android finding carries non-android tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: ios findings must carry `tool` and `origin`.
+        if obj.get("origin") == "ios":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} ios finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"mobsfscan", "codesign", "spctl", "notarytool"}:
+                print(f"CONTRACT FAIL: {path}:{i} ios tool must be mobsfscan|codesign|spctl|notarytool, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: ios findings must NOT carry the other 7 lanes' tool names
+            # (note: mobsfscan is allowed for both android and ios — dispatch context disambiguates).
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint"}:
+                print(f"CONTRACT FAIL: {path}:{i} ios finding carries non-ios tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -446,6 +479,60 @@ sys.exit(1 if errs else 0)
 fi
 echo "android negative-test: malformed skipped-list entry correctly rejected"
 
+# --- Negative tests for ios origin: missing tool + cross-tag + malformed skipped
+bad_ios_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ios"}'
+if echo "$bad_ios_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ios" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ios line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: malformed ios line (missing tool) correctly rejected"
+
+bad_ios_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ios","tool":"apkleaks"}'
+if echo "$bad_ios_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ios" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: ios finding with non-ios tool was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: origin-tag isolation enforced (ios cannot carry other lanes' tool names)"
+
+bad_ios_skipped='{"__ios_status__":"ok","tools":["mobsfscan"],"runs":1,"findings":2,"skipped":[{"bad":"entry"}]}'
+if echo "$bad_ios_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__ios_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ios skipped entry was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: malformed skipped-list entry correctly rejected"
+
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
 bad_dast='{"id":"40018","severity":"HIGH","cwe":"CWE-89","title":"t","file":"http://x/","line":0,"evidence":"e","reference":"dast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"dast"}'
@@ -506,6 +593,29 @@ check skills/sec-review/SKILL.md "com.android.application\|com.android.library" 
 check skills/sec-review/SKILL.md "Maven" "SKILL.md §2 missing Maven ecosystem routing"
 echo "android-inventory: SKILL.md §2 documents android stack detection"
 
+# --- ios inventory rule (v0.9.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "iOS / Apple-platform signals" "SKILL.md §2 missing iOS detection rule"
+check skills/sec-review/SKILL.md "Info.plist" "SKILL.md §2 ios rule missing Info.plist trigger"
+check skills/sec-review/SKILL.md "xcodeproj\|Package.swift\|Podfile" "SKILL.md §2 missing Xcode/SwiftPM/CocoaPods trigger"
+check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing ios key"
+check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
+echo "ios-inventory: SKILL.md §2 documents ios stack detection"
+
+# --- ios fixture-match sanity: synthetic Info.plist
+tmp_i=$(mktemp -d); trap 'rm -rf "$tmp_i"' EXIT
+cat > "$tmp_i/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.example.fixture</string>
+  <key>CFBundleVersion</key><string>1</string>
+</dict></plist>
+PLIST
+if ! grep -q '<plist' "$tmp_i/Info.plist"; then
+    echo "ios-inventory: FAIL — fixture Info.plist malformed" >&2; fail=1
+fi
+echo "ios-inventory: synthetic Info.plist fixture matches §2 detection rule"
+
 # --- android fixture-match sanity: synthetic AndroidManifest.xml + build.gradle
 tmp_a=$(mktemp -d); trap 'rm -rf "$tmp_a"' EXIT
 mkdir -p "$tmp_a/app/src/main"
@@ -546,6 +656,15 @@ check skills/sec-review/SKILL.md "mobsfscan" "SKILL.md §3.10 missing mobsfscan"
 check skills/sec-review/SKILL.md "apkleaks" "SKILL.md §3.10 missing apkleaks"
 check skills/sec-review/SKILL.md "no-apk\|Clean-skip" "SKILL.md §3.10 missing clean-skip documentation"
 echo "android-orchestrator: SKILL.md §3.10 documents android-runner wire-up"
+
+# --- orchestrator §3.11 wire-up (v0.9.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.11 iOS pass" "SKILL.md missing §3.11"
+check skills/sec-review/SKILL.md "ios-runner" "SKILL.md §3.11 missing ios-runner reference"
+check skills/sec-review/SKILL.md "__ios_status__" "SKILL.md §3.11 missing ios sentinel"
+check skills/sec-review/SKILL.md "requires-macos-host" "SKILL.md §3.11 missing macOS-host clean-skip reason"
+check skills/sec-review/SKILL.md "codesign" "SKILL.md §3.11 missing codesign"
+check skills/sec-review/SKILL.md "notarytool" "SKILL.md §3.11 missing notarytool"
+echo "ios-orchestrator: SKILL.md §3.11 documents ios-runner wire-up"
 
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

@@ -90,6 +90,23 @@ Detect the technology stack. Read only — do not install or execute.
   no enricher change). Transitive deps are covered when the project
   commits a resolved lockfile (`gradle.lockfile`); direct
   `build.gradle` parsing gives top-level deps only.
+- **iOS / Apple-platform signals**: any of
+  `Info.plist` (anywhere in the tree — typically at
+  `<App>/Info.plist` or `<App>/Resources/Info.plist`), a `*.xcodeproj`
+  directory, `Package.swift` (SwiftPM manifest), or `Podfile`
+  (CocoaPods). When detected, add `"ios"` to the inventory with values
+  reflecting project shape — `"ios": ["app"]` for application
+  targets, `"ios": ["library"]` for SwiftPM/CocoaPod-producing
+  libraries, or `"ios": ["app", "library"]` for multi-target
+  projects. Load `references/mobile/ios-plist.md`,
+  `references/mobile/ios-data.md`,
+  `references/mobile/ios-codesign.md`, and the tool-lane reference
+  `references/mobile-tools.md`. `ecosystems` gains one or both of
+  `{"ecosystem": "CocoaPods", "manifest": "Podfile.lock"}` and
+  `{"ecosystem": "SwiftPM", "manifest": "Package.resolved"}`. Note
+  both ecosystems have partial OSV coverage (CocoaPods: via GHSA
+  fallback; SwiftPM: best-effort) — document as a known limit rather
+  than a blocker; cve-enricher's multi-feed routing handles the gap.
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -118,6 +135,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "frontend":    ["django-templates"],
   "webext":      [],
   "android":     [],
+  "ios":         [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -428,6 +446,57 @@ gradle-declared dependencies feed cve-enricher as an ecosystem entry
 `querybatch` handles Maven natively, so no new feed adapter is
 required. When a `gradle.lockfile` is present, transitive
 dependencies are also enriched; without it, only direct declarations.
+
+### 3.11 iOS pass — dispatch ios-runner
+
+When the inventory emitted by §2 contains `ios` (any of the four iOS
+signals: `Info.plist` / `*.xcodeproj` / `Package.swift` / `Podfile`),
+dispatch the `ios-runner` agent (`agents/ios-runner.md`, pinned to
+haiku, tools: Read + Bash). The agent shells out to up to four tools:
+`mobsfscan` (cross-platform, same binary as §3.10's Android lane) +
+Apple's `codesign`, `spctl`, and `xcrun notarytool` when the runner is
+on a macOS host AND a `.app`/`.framework`/`.xcarchive` bundle is
+present under the target.
+
+ios-runner runs in parallel with every other pass agent. Collect the
+iOS JSONL into an `ios_findings` list alongside the other streams.
+
+Skill-level invariants:
+
+- **No `ios` in inventory** — skip entirely. Do NOT probe for mobsfscan
+  or any Apple binary on unrelated targets.
+- **`__ios_status__: "unavailable"`** — no tool could run (all tools
+  missing, OR no tool was applicable to the host+target combination,
+  OR every available tool crashed).
+- **`__ios_status__: "partial"`** — some tools ran successfully and
+  others failed; `failed` + `skipped` lists document the partial state.
+- **`__ios_status__: "ok"`** — every available tool ran; `skipped`
+  list may still be present when tools were cleanly inapplicable.
+- **Host-OS clean-skip (NEW in v0.9)** — when the runner is executed
+  on Linux or Windows (common CI case), codesign / spctl / notarytool
+  cannot run. The runner records them in `skipped` with
+  `reason: "requires-macos-host"`. This is NOT a failure — it is a
+  host-environment limitation, surfaced so the report reader knows the
+  review was partial by design. This skip reason extends the v0.8
+  apkleaks-no-apk primitive with a new subcategory: tool applicability
+  depending on the RUNNER'S host rather than the TARGET'S artifacts.
+- **Three skip reasons total (iOS lane)** — `requires-macos-host`,
+  `no-bundle` (codesign/spctl require a `.app`/`.framework`/
+  `.xcarchive` that a source-only target lacks), `no-notary-profile`
+  (notarytool requires `$NOTARY_PROFILE`). All three preserve the
+  structured `{tool, reason}` schema introduced in v0.8 — no contract-
+  check schema change.
+
+iOS findings combine code-pattern signal (mobsfscan on Swift/Obj-C) +
+binary-signing signal (codesign entitlement audit + hardened-runtime
+check) + Gatekeeper signal (spctl assessment) + notarization-history
+signal (notarytool). The dep-inventory path IS affected: CocoaPods
+and SwiftPM dependencies feed cve-enricher as
+`{"ecosystem": "CocoaPods", "manifest": "Podfile.lock"}` and
+`{"ecosystem": "SwiftPM", "manifest": "Package.resolved"}`. Both
+ecosystems have best-effort OSV coverage (CocoaPods via GHSA
+fallback; SwiftPM partial) — the orchestrator tolerates misses
+rather than failing the pipeline.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
