@@ -74,6 +74,20 @@ Detect the technology stack. Read only — do not install or execute.
   inventory and load `references/frontend/webext-chrome-mv3.md`,
   `references/frontend/webext-firefox-amo.md`, and
   `references/frontend/webext-shared-patterns.md` as appropriate.
+- **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
+  for workspaces) AND the file contains `[package]` or `[workspace]`.
+  Distinguish by project shape:
+  - `[package]` only → `"rust": ["binary"]` or `"rust": ["library"]`
+    (derive from `[lib]` / `[[bin]]` sections, or from `src/main.rs`
+    vs `src/lib.rs`).
+  - `[workspace]` → `"rust": ["workspace"]`, plus one nested entry per
+    workspace member detected under `members = [...]`.
+  When detected, add `"rust"` to the inventory and load
+  `references/rust/cargo-ecosystem.md`, `references/rust/unsafe-surface.md`,
+  and the tool-lane reference `references/rust-tools.md`. Cargo.lock
+  presence is expected for binaries (commit the lockfile) and optional
+  for libraries; its absence is not a detection trigger, only a signal
+  to the runner that cargo-audit will have less to chew on.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -87,11 +101,21 @@ Emit an `inventory.json` record (in-memory only) like:
   "proxies":     [],
   "frontend":    ["django-templates"],
   "webext":      [],
+  "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
   "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}]
 }
 ```
+
+For a Rust target the `rust` key carries the detected project shape,
+e.g. `"rust": ["binary"]`, `"rust": ["library"]`, or
+`"rust": ["workspace", "binary", "library"]` for a workspace with
+mixed members. `ecosystems` gains an entry
+`{"ecosystem": "crates.io", "manifest": "Cargo.lock"}` (preferred) or
+`{"ecosystem": "crates.io", "manifest": "Cargo.toml"}` when the lock
+is absent — OSV's `querybatch` handles `crates.io` natively so
+cve-enricher needs no adapter change.
 
 For a browser-extension target the `webext` key carries the detected
 platform(s), e.g. `"webext": ["chrome-mv3"]`, `"webext": ["firefox-amo"]`,

@@ -321,6 +321,29 @@ check skills/sec-review/SKILL.md '__webext_status__.*"unavailable"\|"unavailable
 check skills/sec-review/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
 echo "webext-orchestrator: SKILL.md §3.8 documents webext-runner wire-up"
 
+# --- rust inventory rule (v0.7.0 Stage 1 Task 1.4):
+# SKILL.md §2 must document the Rust detection rule (Cargo.toml +
+# [package] or [workspace]) and emit a `rust` inventory key.
+check skills/sec-review/SKILL.md "Rust / Cargo signals" "SKILL.md §2 missing Rust detection rule"
+check skills/sec-review/SKILL.md "Cargo.toml" "SKILL.md §2 rust rule missing Cargo.toml trigger"
+check skills/sec-review/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing rust key"
+check skills/sec-review/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
+echo "rust-inventory: SKILL.md §2 documents rust stack detection"
+
+# --- rust fixture-match sanity: synthetic Cargo.toml must match rule
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+cat > "$tmp/Cargo.toml" <<'TOML'
+[package]
+name = "fixture"
+version = "0.0.1"
+edition = "2021"
+TOML
+if ! grep -q '\[package\]' "$tmp/Cargo.toml"; then
+    echo "rust-inventory: FAIL — fixture lacks [package] section" >&2
+    fail=1
+fi
+echo "rust-inventory: synthetic Cargo.toml fixture matches §2 detection rule"
+
 # --- webext fixture-match sanity: a synthetic manifest.json containing
 # "manifest_version": 3 must match the grep hint the SKILL.md rule uses.
 # This is a documentation-vs-fixture alignment check, not a full
