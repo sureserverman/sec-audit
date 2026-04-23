@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>VulnerableiOS</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.example.vulnerable</string>
+  <key>CFBundleName</key>
+  <string>VulnerableiOS</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+
+  <!-- CWE-319: ATS globally disabled. -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+  </dict>
+
+  <!-- CWE-939: custom URL scheme without origin validation. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.example.vulnerable.scheme</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>vulnerableapp</string>
+      </array>
+    </dict>
+  </array>
+
+  <!-- App Store policy: background audio without a user-facing rationale. -->
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>audio</string>
+  </array>
+
+  <!-- Intentionally missing NSCameraUsageDescription (paired code calls AVCaptureDevice). -->
+</dict>
+</plist>

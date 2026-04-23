@@ -1,0 +1,79 @@
+{
+  "results": {
+    "ios_ats_arbitrary_loads": {
+      "metadata": {
+        "description": "NSAllowsArbitraryLoads globally disables App Transport Security; all HTTP traffic proceeds over cleartext",
+        "severity": "ERROR",
+        "cwe": "CWE-319: Cleartext Transmission of Sensitive Information",
+        "owasp-mobile": "M3: Insecure Communication",
+        "masvs": "MSTG-NETWORK-1",
+        "reference": "https://developer.apple.com/documentation/security/preventing_insecure_network_connections"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableiOS/Info.plist",
+          "match_lines": [20, 22],
+          "match_position": [5, 11],
+          "match_string": "<key>NSAllowsArbitraryLoads</key>\n    <true/>"
+        }
+      ]
+    },
+    "ios_userdefaults_secret": {
+      "metadata": {
+        "description": "Secret stored in UserDefaults is not encrypted and is included in device backups",
+        "severity": "ERROR",
+        "cwe": "CWE-312: Cleartext Storage of Sensitive Information",
+        "owasp-mobile": "M2: Insecure Data Storage",
+        "masvs": "MSTG-STORAGE-1",
+        "reference": "https://developer.apple.com/documentation/foundation/userdefaults"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [16],
+          "match_position": [9, 80],
+          "match_string": "UserDefaults.standard.set(\"sk_live_DEADBEEFCAFEBABE1234567890ABCDEF\", forKey: \"api_key\")"
+        }
+      ]
+    },
+    "ios_keychain_accessible_always": {
+      "metadata": {
+        "description": "Keychain item stored with kSecAttrAccessibleAlways — accessible even while device is locked",
+        "severity": "WARNING",
+        "cwe": "CWE-522: Insufficiently Protected Credentials",
+        "owasp-mobile": "M2: Insecure Data Storage",
+        "masvs": "MSTG-STORAGE-2",
+        "reference": "https://developer.apple.com/documentation/security/keychain_services"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [28],
+          "match_position": [13, 50],
+          "match_string": "kSecAttrAccessible: kSecAttrAccessibleAlways"
+        }
+      ]
+    },
+    "ios_webview_js_bridge": {
+      "metadata": {
+        "description": "WKWebView userContentController.add exposes the native app to arbitrary JavaScript running in loaded pages",
+        "severity": "WARNING",
+        "cwe": "CWE-749: Exposed Dangerous Method or Function",
+        "owasp-mobile": "M7: Client Code Quality",
+        "masvs": "MSTG-PLATFORM-7",
+        "reference": "https://developer.apple.com/documentation/webkit/wkwebview"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [36],
+          "match_position": [9, 65],
+          "match_string": "cfg.userContentController.add(self as! WKScriptMessageHandler, name: \"VulnerableBridge\")"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "total_findings": 4,
+  "version": "0.4.2"
+}

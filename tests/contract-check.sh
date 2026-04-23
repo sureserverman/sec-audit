@@ -183,6 +183,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __android_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the iOS status summary line emitted by ios-runner.
+        # Same skipped-list schema as android; adds requires-macos-host as a valid reason.
+        if "__ios_status__" in obj:
+            status = obj.get("__ios_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __ios_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __ios_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __ios_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __ios_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -257,9 +277,22 @@ with open(path) as fh:
             elif obj["tool"] not in {"mobsfscan", "apkleaks", "android-lint"}:
                 print(f"CONTRACT FAIL: {path}:{i} android tool must be mobsfscan|apkleaks|android-lint, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: android findings must NOT carry SAST/DAST/webext/rust tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+            # Origin-tag isolation: android findings must NOT carry other lanes' tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "codesign", "spctl", "notarytool"}:
                 print(f"CONTRACT FAIL: {path}:{i} android finding carries non-android tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: ios findings must carry `tool` and `origin`.
+        if obj.get("origin") == "ios":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} ios finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"mobsfscan", "codesign", "spctl", "notarytool"}:
+                print(f"CONTRACT FAIL: {path}:{i} ios tool must be mobsfscan|codesign|spctl|notarytool, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: ios findings must NOT carry the other 7 lanes' tool names
+            # (note: mobsfscan is allowed for both android and ios — dispatch context disambiguates).
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint"}:
+                print(f"CONTRACT FAIL: {path}:{i} ios finding carries non-ios tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -445,6 +478,60 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "android negative-test: malformed skipped-list entry correctly rejected"
+
+# --- Negative tests for ios origin: missing tool + cross-tag + malformed skipped
+bad_ios_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ios"}'
+if echo "$bad_ios_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ios" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ios line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: malformed ios line (missing tool) correctly rejected"
+
+bad_ios_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ios","tool":"apkleaks"}'
+if echo "$bad_ios_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ios" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: ios finding with non-ios tool was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: origin-tag isolation enforced (ios cannot carry other lanes' tool names)"
+
+bad_ios_skipped='{"__ios_status__":"ok","tools":["mobsfscan"],"runs":1,"findings":2,"skipped":[{"bad":"entry"}]}'
+if echo "$bad_ios_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__ios_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ios skipped entry was accepted" >&2
+    exit 1
+fi
+echo "ios negative-test: malformed skipped-list entry correctly rejected"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
