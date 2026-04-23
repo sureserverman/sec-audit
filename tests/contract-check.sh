@@ -937,6 +937,16 @@ check skills/sec-review/SKILL.md "stapler" "SKILL.md §3.13 missing stapler"
 check skills/sec-review/SKILL.md "no-pkg" "SKILL.md §3.13 missing no-pkg clean-skip reason"
 echo "macos-orchestrator: SKILL.md §3.13 documents macos-runner wire-up"
 
+# --- orchestrator §3.14 wire-up (v0.12.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.14 Desktop Windows pass" "SKILL.md missing §3.14"
+check skills/sec-review/SKILL.md "windows-runner" "SKILL.md §3.14 missing windows-runner reference"
+check skills/sec-review/SKILL.md "__windows_status__" "SKILL.md §3.14 missing windows sentinel"
+check skills/sec-review/SKILL.md "requires-windows-host" "SKILL.md §3.14 missing Windows-host clean-skip reason"
+check skills/sec-review/SKILL.md "binskim" "SKILL.md §3.14 missing binskim"
+check skills/sec-review/SKILL.md "osslsigncode\|sigcheck" "SKILL.md §3.14 missing osslsigncode/sigcheck"
+check skills/sec-review/SKILL.md "no-pe" "SKILL.md §3.14 missing no-pe clean-skip reason"
+echo "windows-orchestrator: SKILL.md §3.14 documents windows-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
