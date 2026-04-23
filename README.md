@@ -387,6 +387,62 @@ sentinel + clean-skip contract. `tests/android-e2e.sh` validates the
 findings, 7-lane origin-tag isolation, the trailing status line, and
 the apkleaks clean-skip. No Android finding is ever fabricated.
 
+## iOS lane (v0.9.0)
+
+A tenth agent, **`ios-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects an iOS /
+Apple-platform project — any of `Info.plist`, `*.xcodeproj`,
+`Package.swift`, or `Podfile`. The runner is dispatched in parallel
+with every other pass agent. It shells out to up to four tools:
+
+- **`mobsfscan`** — the same pip-installable tool used by the
+  Android lane; its rule set covers both Android and iOS, so the
+  runner does not need a separate binary. The only lane-specific
+  difference is `origin: "ios"` vs `"android"`.
+- **`codesign`** (macOS-only) — dumps entitlements and hardened-
+  runtime state from a `.app` / `.framework` / `.xcarchive` bundle.
+  Findings map per the `mobile/ios-codesign.md` pack.
+- **`spctl`** (macOS-only) — runs a Gatekeeper assessment; a
+  rejected assessment produces one HIGH finding.
+- **`xcrun notarytool history`** (macOS-only, needs `$NOTARY_PROFILE`)
+  — one MEDIUM finding per `Invalid` or `Rejected` notarization in
+  the developer team's history.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "ios"` and one of
+`tool: "mobsfscan" | "codesign" | "spctl" | "notarytool"`. Field-
+mapping recipes live in `skills/sec-review/references/mobile-tools.md`
+(iOS subsection); code-pattern reference packs live in
+`skills/sec-review/references/mobile/ios-*.md`.
+
+**Dependencies feed cve-enricher** via CocoaPods and SwiftPM ecosystem
+entries (OSV best-effort — CocoaPods through GHSA fallback, SwiftPM
+partial). Coverage gaps are tolerated rather than failed.
+
+**NEW in v0.9 — host-OS-gated clean-skip.** The three Apple binaries
+are macOS-only. When the runner is on Linux or Windows (the common CI
+case), they are CLEANLY SKIPPED with
+`reason: "requires-macos-host"` — not failed, not fabricated. This
+extends v0.8's skipped-list primitive (apkleaks-no-apk was "target
+lacks artifact"; ios now adds "host lacks capability"). The
+report-writer surfaces both as informational metadata rather than
+reviewer-fixable gaps. The iOS lane's total skip vocabulary:
+
+- `reason: "requires-macos-host"` (codesign / spctl / notarytool on Linux/Windows)
+- `reason: "no-bundle"` (codesign / spctl need a built `.app` / `.framework` / `.xcarchive`)
+- `reason: "no-notary-profile"` (notarytool needs `$NOTARY_PROFILE`)
+- `reason: "tool-missing"` (the binary is absent when its preconditions held)
+
+**Degrade path.** No `ios` in inventory → skip entirely. Target has
+no iOS signals → unavailable sentinel. All tools skipped on a Linux
+host with no bundle → unavailable sentinel with a populated `skipped`
+list (so the reviewer learns that the review was partial by design).
+`tests/ios-drill.sh` enforces the spec's probe + sentinel + host-OS-
+gate + all-four-skip-reasons contracts. `tests/ios-e2e.sh` validates
+the `vulnerable-ios` fixture produces mobsfscan findings, a status
+line with three `requires-macos-host` skipped entries, and 12-way
+origin-tag isolation.
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -398,7 +454,8 @@ the apkleaks clean-skip. No Android finding is ever fabricated.
 | Browser extensions        | MV3 / AMO extension source tree                  | `addons-linter`, `web-ext lint`, `retire`  | `references/frontend/webext-{chrome-mv3,firefox-amo,shared-patterns}.md`, `references/webext-tools.md` | v0.6.0     |
 | Rust toolchain            | Cargo project (`Cargo.toml` + `[package]`/`[workspace]`) | `cargo-audit`, `cargo-deny`, `cargo-geiger`, `cargo-vet` | `references/rust/{cargo-ecosystem,unsafe-surface}.md`, `references/rust-tools.md` | v0.7.0     |
 | Android                   | Source tree (`AndroidManifest.xml` + gradle Android plugin) | `mobsfscan`, `apkleaks` (APK-present), `android-lint` (gradle or standalone) | `references/mobile/{android-manifest,android-data,android-runtime}.md`, `references/mobile-tools.md` | v0.8.0     |
-| CVE enrichment            | Manifests + retire components + crates.io + Maven | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| iOS                       | Source tree (`Info.plist` / `*.xcodeproj` / `Package.swift` / `Podfile`) | `mobsfscan`, `codesign` / `spctl` / `xcrun notarytool` (macOS-host + bundle-present) | `references/mobile/{ios-plist,ios-data,ios-codesign}.md`, `references/mobile-tools.md` | v0.9.0     |
+| CVE enrichment            | Manifests + retire components + crates.io + Maven + CocoaPods/SwiftPM (best-effort) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 

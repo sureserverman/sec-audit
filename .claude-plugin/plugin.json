@@ -1,7 +1,7 @@
 {
   "name": "sec-review",
-  "version": "0.8.0",
-  "description": "Cybersecurity review plugin for web services, servers, browser extensions, Rust projects, and Android apps: a pipelined nine-agent architecture (sec-expert, finding-triager, cve-enricher, sast-runner, dast-runner, webext-runner, rust-runner, android-runner, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O and SAST/DAST/webext/rust/android tool dispatch. Citation-grounded expertise across databases, frameworks, webservers (including Windows/IIS as of v0.4.0), proxies, frontend, browser extensions (Chrome MV3 + Firefox AMO as of v0.6.0), the Rust/Cargo ecosystem and unsafe-surface (as of v0.7.0), Android (manifest + data + runtime, as of v0.8.0), auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev (native coverage for crates.io and Maven), and GHSA with CISA KEV cross-reference for exploit-in-wild prioritization; SAST adapter invoking semgrep (OWASP Top Ten) and bandit; DAST lane invoking OWASP ZAP baseline against a running target URL; webext lane invoking addons-linter, web-ext lint, and retire.js against extension source directories; Rust lane invoking cargo-audit (RustSec DB), cargo-deny, cargo-geiger (unsafe-code surface, INFO-ceiling), and cargo-vet against Cargo projects; Android lane invoking mobsfscan (MASVS-mapped rules), apkleaks (secret scanning on compiled APK when present), and android-lint (via gradle wrapper or standalone) against Android source trees — with origin-tagged findings and three-state sentinels (ok/partial/unavailable) plus a clean-skip-vs-failure distinction for artifact-dependent tools; per-run token-cost accounting; offline-degradation drills for CVE feeds, SAST, DAST, webext, Rust, and Android tools; prioritized markdown report with reliable, primary-source-cited fixes.",
+  "version": "0.9.0",
+  "description": "Cybersecurity review plugin for web services, servers, browser extensions, Rust projects, Android apps, and iOS apps: a pipelined ten-agent architecture (sec-expert, finding-triager, cve-enricher, sast-runner, dast-runner, webext-runner, rust-runner, android-runner, ios-runner, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O and SAST/DAST/webext/rust/android/ios tool dispatch. Citation-grounded expertise across databases, frameworks, webservers (including Windows/IIS as of v0.4.0), proxies, frontend, browser extensions (Chrome MV3 + Firefox AMO as of v0.6.0), the Rust/Cargo ecosystem (as of v0.7.0), Android (manifest + data + runtime, as of v0.8.0), iOS (Info.plist + data + codesign/entitlements, as of v0.9.0), auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev (native for crates.io and Maven; best-effort via GHSA for CocoaPods and SwiftPM), and GHSA with CISA KEV cross-reference; SAST adapter invoking semgrep (OWASP Top Ten) and bandit; DAST lane invoking OWASP ZAP baseline; webext lane invoking addons-linter, web-ext lint, and retire.js; Rust lane invoking cargo-audit (RustSec DB), cargo-deny, cargo-geiger (INFO-ceiling), and cargo-vet; Android lane invoking mobsfscan, apkleaks (when APK present), and android-lint; iOS lane invoking mobsfscan (cross-platform with the Android lane) plus Apple's codesign, spctl, and xcrun notarytool on macOS hosts — with origin-tagged findings, three-state sentinels (ok/partial/unavailable), and a structured skipped-list primitive that distinguishes clean skips (artifact-absent: no-apk/no-bundle; host-OS-gated: requires-macos-host; profile-absent: no-notary-profile) from tool failures; per-run token-cost accounting; offline-degradation drills for CVE feeds and all six tool lanes; prioritized markdown report with reliable, primary-source-cited fixes.",
   "author": {
     "name": "holyfiremin",
     "email": "holyfiremin@gmail.com"
@@ -55,6 +55,14 @@
     "apkleaks",
     "android-lint",
     "masvs",
-    "mobsf"
+    "mobsf",
+    "ios",
+    "apple",
+    "swift",
+    "xcode",
+    "codesign",
+    "notarize",
+    "ats",
+    "keychain"
   ]
 }
