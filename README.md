@@ -443,6 +443,56 @@ the `vulnerable-ios` fixture produces mobsfscan findings, a status
 line with three `requires-macos-host` skipped entries, and 12-way
 origin-tag isolation.
 
+## Desktop Linux lane (v0.10.0)
+
+An eleventh agent, **`linux-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects a Linux
+desktop target — any of `*.service` / `*.socket` / `*.timer` units,
+`debian/control`, `*.spec`, a Flatpak manifest, or `snapcraft.yaml`.
+The runner dispatches up to three tools:
+
+- **`systemd-analyze security`** (bundled with systemd; needs a
+  systemd host) — scores a `.service` unit's hardening per-directive.
+  `--offline=true --profile=strict` on systemd ≥ 252 enables offline
+  scoring. macOS/Windows/Alpine-without-systemd CLEANLY SKIP with
+  `reason: "requires-systemd-host"`. Absent systemd unit →
+  `reason: "no-systemd-unit"`.
+- **`lintian`** (apt/brew-installable; Debian source reviewer) —
+  emits tag-based findings against `debian/control`, maintainer
+  scripts, and packaging metadata. `--output-format=json` (Lintian
+  ≥ 2.117). Absent `debian/control` → `reason: "no-debian-source"`.
+- **`checksec`** (pip `checksec-py` or apt) — ELF hardening flag
+  check (RELRO, canary, NX, PIE, RPATH). Absent ELF under target →
+  `reason: "no-elf"` (source-only reviews are the common case).
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "linux"` and one of
+`tool: "systemd-analyze" | "lintian" | "checksec"`. Field-mapping
+recipes live in `skills/sec-review/references/linux-tools.md`; the
+three code-pattern reference packs (systemd directives, sandboxing,
+packaging) live in `skills/sec-review/references/desktop/linux-*.md`.
+
+**Dependencies feed cve-enricher** via the `Debian` ecosystem
+(best-effort via the Debian Security Tracker — OSV partial; same
+tolerance model as CocoaPods/SwiftPM in the iOS lane).
+
+**NEW in v0.10 — second host-OS-gated clean-skip.** The `requires-
+systemd-host` skip reason extends v0.9's host-OS vocabulary with a
+Linux-specific host requirement. Six canonical Linux-lane skip
+reasons: `requires-systemd-host` (host-gate), `no-debian-source` /
+`no-elf` / `no-systemd-unit` (target-shape gates), `tool-missing`
+(binary absent when preconditions hold). All still `{tool, reason}`
+structured.
+
+**Degrade path.** No `linux` in inventory → skip entirely. Target
+lacks Linux signals → unavailable sentinel. All tools skipped on a
+macOS CI with no `.service` unit → unavailable with populated
+`skipped` list. `tests/linux-drill.sh` enforces the spec's four
+probes + host-systemd check + all four skip reasons. `tests/linux-
+e2e.sh` validates the `vulnerable-linux` fixture (systemd unit +
+debian/ source + postinst hazards, no ELF) produces systemd-analyze
++ lintian findings with `no-elf` cleanly-skipped.
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -455,7 +505,8 @@ origin-tag isolation.
 | Rust toolchain            | Cargo project (`Cargo.toml` + `[package]`/`[workspace]`) | `cargo-audit`, `cargo-deny`, `cargo-geiger`, `cargo-vet` | `references/rust/{cargo-ecosystem,unsafe-surface}.md`, `references/rust-tools.md` | v0.7.0     |
 | Android                   | Source tree (`AndroidManifest.xml` + gradle Android plugin) | `mobsfscan`, `apkleaks` (APK-present), `android-lint` (gradle or standalone) | `references/mobile/{android-manifest,android-data,android-runtime}.md`, `references/mobile-tools.md` | v0.8.0     |
 | iOS                       | Source tree (`Info.plist` / `*.xcodeproj` / `Package.swift` / `Podfile`) | `mobsfscan`, `codesign` / `spctl` / `xcrun notarytool` (macOS-host + bundle-present) | `references/mobile/{ios-plist,ios-data,ios-codesign}.md`, `references/mobile-tools.md` | v0.9.0     |
-| CVE enrichment            | Manifests + retire components + crates.io + Maven + CocoaPods/SwiftPM (best-effort) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| Desktop Linux             | Source tree (`*.service` / `debian/control` / `*.spec` / flatpak-manifest / `snapcraft.yaml`) | `systemd-analyze security` (systemd-host), `lintian` (debian/ source), `checksec` (ELF present) | `references/desktop/{linux-systemd,linux-sandboxing,linux-packaging}.md`, `references/linux-tools.md` | v0.10.0    |
+| CVE enrichment            | Manifests + retire components + crates.io + Maven + CocoaPods/SwiftPM + Debian (all best-effort beyond crates.io/Maven) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 
