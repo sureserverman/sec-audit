@@ -493,6 +493,60 @@ e2e.sh` validates the `vulnerable-linux` fixture (systemd unit +
 debian/ source + postinst hazards, no ELF) produces systemd-analyze
 + lintian findings with `no-elf` cleanly-skipped.
 
+## Desktop macOS lane (v0.11.0)
+
+A twelfth agent, **`macos-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects a macOS
+desktop target — `Info.plist` with `LSMinimumSystemVersion`, a
+`*.pkg` / `*.dmg` file, a `Sparkle.framework`/`SUFeedURL` marker, or
+a `.app` bundle with the macOS deployment-target key. macos-runner
+is a **sibling of `ios-runner`** (§3.11); cross-platform SwiftPM
+packages can satisfy both inventory signals and dispatch both
+runners into separate report sections.
+
+The runner dispatches up to five tools:
+
+- **`mobsfscan`** — cross-platform Swift/Obj-C rule engine, shared
+  with the Android and iOS lanes.
+- **`codesign`** (macOS-only) — entitlements + hardened-runtime on
+  `.app`/`.framework`; same binary as iOS, different target shape.
+- **`spctl`** (macOS-only) — Gatekeeper assessment on `.app`.
+- **`pkgutil --check-signature`** (macOS-only, NEW in v0.11) —
+  verifies `.pkg` installer signatures.
+- **`xcrun stapler validate`** (macOS-only, NEW in v0.11) — checks
+  notarization-ticket stapling on `.app`/`.pkg`/`.dmg`.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "macos"` and one of
+`tool: "mobsfscan" | "codesign" | "spctl" | "pkgutil" | "stapler"`.
+Field-mapping recipes live in
+`skills/sec-review/references/mobile-tools.md` (iOS + macOS
+subsections); code-pattern reference packs live in
+`skills/sec-review/references/desktop/macos-*.md`.
+
+Three desktop-macOS-specific reference packs cover concerns iOS
+doesn't share: **hardened runtime** flags on GUI apps
+(`cs.allow-jit`, `disable-library-validation`, etc.), **TCC
+entitlements** + paired `NS*UsageDescription` discipline, and
+**`.pkg`/Sparkle packaging** — including the canonical **Sparkle
+over HTTP** vulnerability (CVE-2014-9390 class) where auto-update
+payloads are delivered without transport integrity.
+
+**NEW in v0.11: `no-pkg` clean-skip reason.** pkgutil requires a
+`.pkg` under target; source-only reviews cleanly-skip. Parallel to
+Android's `no-apk` and iOS's `no-bundle`. The macOS lane has five
+canonical skip reasons: `requires-macos-host` (shared with iOS),
+`no-bundle`, `no-pkg` (new), `no-notary-profile`, `tool-missing`.
+
+**Degrade path.** No `macos` in inventory → skip entirely. Linux CI
+with Sparkle-using source tree but no Apple binaries → `ok` with
+four `requires-macos-host` skipped entries. `tests/macos-drill.sh`
+enforces the spec's five-tool probe + host-gate + five-skip-reason
+contracts. `tests/macos-e2e.sh` validates the `vulnerable-macos`
+fixture (Sparkle HTTP feed + UserDefaults secret + JIT entitlement)
+produces mobsfscan findings with all four Apple binaries cleanly-
+skipped on Linux.
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -506,7 +560,8 @@ debian/ source + postinst hazards, no ELF) produces systemd-analyze
 | Android                   | Source tree (`AndroidManifest.xml` + gradle Android plugin) | `mobsfscan`, `apkleaks` (APK-present), `android-lint` (gradle or standalone) | `references/mobile/{android-manifest,android-data,android-runtime}.md`, `references/mobile-tools.md` | v0.8.0     |
 | iOS                       | Source tree (`Info.plist` / `*.xcodeproj` / `Package.swift` / `Podfile`) | `mobsfscan`, `codesign` / `spctl` / `xcrun notarytool` (macOS-host + bundle-present) | `references/mobile/{ios-plist,ios-data,ios-codesign}.md`, `references/mobile-tools.md` | v0.9.0     |
 | Desktop Linux             | Source tree (`*.service` / `debian/control` / `*.spec` / flatpak-manifest / `snapcraft.yaml`) | `systemd-analyze security` (systemd-host), `lintian` (debian/ source), `checksec` (ELF present) | `references/desktop/{linux-systemd,linux-sandboxing,linux-packaging}.md`, `references/linux-tools.md` | v0.10.0    |
-| CVE enrichment            | Manifests + retire components + crates.io + Maven + CocoaPods/SwiftPM + Debian (all best-effort beyond crates.io/Maven) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| Desktop macOS             | Source tree (`Info.plist` with `LSMinimumSystemVersion` / `*.pkg` / `*.dmg` / Sparkle) | `mobsfscan`, `codesign` / `spctl` / `pkgutil` / `stapler` (macOS-host + artifact-present) | `references/desktop/{macos-hardened-runtime,macos-tcc,macos-packaging}.md`, `references/mobile-tools.md` | v0.11.0    |
+| CVE enrichment            | Manifests + retire + crates.io + Maven + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 

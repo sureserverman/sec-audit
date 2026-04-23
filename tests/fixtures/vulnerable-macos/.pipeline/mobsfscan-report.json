@@ -1,0 +1,79 @@
+{
+  "results": {
+    "macos_userdefaults_secret": {
+      "metadata": {
+        "description": "Secret stored in UserDefaults is not encrypted and is included in device backups / Time Machine",
+        "severity": "ERROR",
+        "cwe": "CWE-312: Cleartext Storage of Sensitive Information",
+        "owasp-mobile": "M2: Insecure Data Storage",
+        "masvs": "MSTG-STORAGE-1",
+        "reference": "https://developer.apple.com/documentation/foundation/userdefaults"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableMac/AppDelegate.swift",
+          "match_lines": [9],
+          "match_position": [9, 80],
+          "match_string": "UserDefaults.standard.set(\"sk_live_MACOSDEADBEEFCAFEBABE1234567890\", forKey: \"api_key\")"
+        }
+      ]
+    },
+    "macos_sparkle_http_feed": {
+      "metadata": {
+        "description": "Sparkle SUFeedURL uses cleartext HTTP — vulnerable to MITM update injection (CVE-2014-9390 class)",
+        "severity": "ERROR",
+        "cwe": "CWE-319: Cleartext Transmission of Sensitive Information",
+        "owasp-mobile": "M3: Insecure Communication",
+        "masvs": "MSTG-NETWORK-1",
+        "reference": "https://sparkle-project.org/documentation/"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableMac/Info.plist",
+          "match_lines": [22],
+          "match_position": [5, 60],
+          "match_string": "<key>SUFeedURL</key>\n  <string>http://example.com/appcast.xml</string>"
+        }
+      ]
+    },
+    "macos_sparkle_missing_edkey": {
+      "metadata": {
+        "description": "Sparkle SUPublicEDKey absent — no EdDSA signature verification on update payloads",
+        "severity": "WARNING",
+        "cwe": "CWE-494: Download of Code Without Integrity Check",
+        "owasp-mobile": "M9: Reverse Engineering",
+        "masvs": "MSTG-RESILIENCE-9",
+        "reference": "https://sparkle-project.org/documentation/"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableMac/Info.plist",
+          "match_lines": [25],
+          "match_position": [5, 40],
+          "match_string": "SUAllowsAutomaticUpdates without SUPublicEDKey"
+        }
+      ]
+    },
+    "macos_entitlement_allow_jit": {
+      "metadata": {
+        "description": "Hardened runtime entitlement com.apple.security.cs.allow-jit=true on release — bypasses codesign JIT protection",
+        "severity": "ERROR",
+        "cwe": "CWE-693: Protection Mechanism Failure",
+        "owasp-mobile": "M7: Client Code Quality",
+        "masvs": "MSTG-RESILIENCE-3",
+        "reference": "https://developer.apple.com/documentation/security/hardened_runtime"
+      },
+      "files": [
+        {
+          "file_path": "VulnerableMac/VulnerableMac.entitlements",
+          "match_lines": [7],
+          "match_position": [5, 50],
+          "match_string": "<key>com.apple.security.cs.allow-jit</key>\n    <true/>"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "total_findings": 4,
+  "version": "0.4.2"
+}

@@ -306,6 +306,51 @@ Source: https://developer.apple.com/documentation/security/notarizing_your_app_b
 
 Source: https://developer.apple.com/documentation/security/notarizing_your_app_before_distribution
 
+### pkgutil  — macOS desktop lane (v0.11.0+)
+
+- Install: ships with macOS. macOS-only.
+- Invocation (signature check on a `.pkg`):
+  ```bash
+  pkgutil --check-signature "$path_to_pkg" \
+    2> "$TMPDIR/macos-runner-pkgutil-$(basename "$path_to_pkg").stderr"
+  rc_pu=$?
+  ```
+- Target: `.pkg` installer file. When no `.pkg` is present under the
+  caller's `target_path`, the tool is CLEANLY SKIPPED with
+  `reason: "no-pkg"` (NEW skip reason in v0.11, parallel to iOS
+  `no-bundle` and Android `no-apk`).
+- Output: stderr text — `Status: signed by a certificate trusted by
+  Mac OS X` vs `Status: no signature` vs `Status: signed Apple
+  Software`. Parse as pass/fail; failure → HIGH finding with CWE-693.
+- Primary source: `man pkgutil(1)` (macOS system manual);
+  https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac
+
+Source: https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac
+
+### stapler validate  — macOS desktop lane (v0.11.0+)
+
+- Install: ships with Xcode (`xcrun stapler`). macOS-only.
+- Invocation (validate a stapled notarization ticket):
+  ```bash
+  xcrun stapler validate "$path_to_app_or_pkg_or_dmg" \
+    2> "$TMPDIR/macos-runner-stapler-$(basename "$path_to_artifact").stderr"
+  rc_st=$?
+  ```
+- Target: `.app` / `.pkg` / `.dmg`. When none is present, clean-skip
+  with `reason: "no-bundle"` (for `.app`/`.dmg`) or
+  `reason: "no-pkg"` (for `.pkg`-only targets). The runner chooses
+  the reason matching the target-shape detection.
+- Output: stderr text with one of three states —
+  `The validate action worked!` (stapled), `Processing: ... does not
+  have a ticket stapled to it.` (not stapled — emit finding), or an
+  error for invalid tickets. Parse the stderr string for the
+  "worked!" substring as pass signal; any other output → MEDIUM
+  finding with CWE-693.
+- Primary source: `man stapler(1)`;
+  https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution
+
+Source: https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution
+
 ### xcrun notarytool  — iOS lane (v0.9.0+)
 
 - Install: Xcode 13+; requires a valid `AuthKey_<keyId>.p8` or
@@ -510,6 +555,25 @@ in the returned history. Severity MEDIUM (legacy releases may be
 acceptable to leave unstapled if never distributed); CWE-693.
 `evidence` is the verbatim rejection reason. `tool: "notarytool"`.
 
+### pkgutil → sec-review finding (macOS lane, v0.11.0+)
+
+Emit ONE finding per `.pkg` whose `pkgutil --check-signature` result
+is not "signed". Severity HIGH; CWE-693. `file` is the pkg basename;
+`line` 0. `evidence` is the verbatim stderr line (e.g. `Status: no
+signature`). `fix_recipe` = "Sign the .pkg with productsign, then
+re-run xcrun notarytool submit + stapler staple." `tool: "pkgutil"`.
+`confidence: "high"` (deterministic signature check).
+
+### stapler validate → sec-review finding (macOS lane, v0.11.0+)
+
+Emit ONE finding per artifact that `xcrun stapler validate` reports
+as NOT having a stapled notarization ticket. Severity MEDIUM
+(historic / internal-only artifacts may be legitimately unstapled;
+release artifacts should be). CWE-693. `evidence` is the verbatim
+stderr message. `fix_recipe` = "After notarization completes, run
+`xcrun stapler staple <artifact>` before distribution." `tool:
+"stapler"`. `confidence: "high"`.
+
 ## Degrade rules
 
 The `android-runner` agent follows a three-state sentinel contract consistent
@@ -537,6 +601,27 @@ Downstream consumers (finding-triager, report-writer) MUST treat
 rather than as reviewer-fixable gaps. The sec-review report surfaces
 them in a separate "Host-OS-unavailable" metadata line so readers
 know the review was partial-by-design rather than partial-by-failure.
+
+The `macos-runner` agent (v0.11.0+) follows an identical three-state
+sentinel `__macos_status__` with the same schema. macOS-specific
+clean-skip reasons extend the vocabulary:
+
+- `{"tool": "<name>", "reason": "requires-macos-host"}` — same as the
+  iOS lane; shared across both Apple-ecosystem runners.
+- `{"tool": "<name>", "reason": "no-bundle"}` — codesign/spctl/stapler
+  require a `.app`/`.framework`/`.dmg` artifact under the target.
+- `{"tool": "pkgutil", "reason": "no-pkg"}` — pkgutil requires a
+  `.pkg` installer. Source-only reviews lack one. NEW in v0.11.
+- `{"tool": "<name>", "reason": "tool-missing"}` — the binary is
+  absent when its host+target preconditions held (rare; `.app` on
+  macOS without codesign is essentially impossible).
+
+Cross-platform targets (e.g. SwiftPM libraries) may satisfy both iOS
+and macOS inventory signals. Both runners dispatch independently,
+producing `__ios_status__` and `__macos_status__` status records
+that the report-writer renders under separate "iOS findings" and
+"macOS findings" subsections. The two lanes do NOT share findings —
+origin-tag isolation keeps them distinct.
 
 > **APK-absence sub-case — unique to this lane:** apkleaks requires a
 > compiled APK/AAB. When no `*.apk` or `*.aab` file is found under the

@@ -107,6 +107,23 @@ Detect the technology stack. Read only — do not install or execute.
   both ecosystems have partial OSV coverage (CocoaPods: via GHSA
   fallback; SwiftPM: best-effort) — document as a known limit rather
   than a blocker; cve-enricher's multi-feed routing handles the gap.
+- **macOS desktop signals**: distinguished from iOS by macOS-specific
+  markers — `Info.plist` containing `LSMinimumSystemVersion` (macOS
+  deployment target key; iOS uses `MinimumOSVersion` or
+  `UIDeviceFamily`), OR a `*.pkg` installer / `*.dmg` disk image
+  file under the target, OR a `Sparkle.framework/` directory or
+  `SUFeedURL` key in Info.plist (Sparkle auto-update framework), OR
+  a `.app` bundle whose Info.plist has the macOS deployment-target
+  key. When detected, add `"macos"` with values reflecting the
+  artifact shape — `"macos": ["app"]` / `["pkg"]` / `["framework"]`
+  / `["app", "pkg"]`. Cross-platform SwiftPM packages (targeting
+  both iOS and macOS) MAY emit BOTH `ios` and `macos` keys
+  simultaneously — the two lanes dispatch independently and render
+  in separate report sections. Load
+  `references/desktop/macos-hardened-runtime.md`,
+  `references/desktop/macos-tcc.md`,
+  `references/desktop/macos-packaging.md`, and the shared
+  `references/mobile-tools.md` (iOS/macOS subsections).
 - **Linux-desktop signals**: any of the following triggers the
   `linux` inventory key:
   - Systemd units anywhere in the tree — `*.service`, `*.socket`,
@@ -159,6 +176,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "webext":      [],
   "android":     [],
   "ios":         [],
+  "macos":       [],
   "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
@@ -570,6 +588,49 @@ which feed cve-enricher as
 `{"ecosystem": "Debian", "manifest": "debian/control"}`. Debian
 ecosystem OSV coverage is partial via the Debian Security Tracker —
 document as best-effort, same tolerance as CocoaPods/SwiftPM in §3.11.
+
+### 3.13 Desktop macOS pass — dispatch macos-runner
+
+When the inventory emitted by §2 contains `macos` (Info.plist with
+`LSMinimumSystemVersion` OR `*.pkg` / `*.dmg` OR Sparkle framework
+markers OR `.app` with macOS deployment-target), dispatch the
+`macos-runner` agent (`agents/macos-runner.md`, pinned to haiku,
+tools: Read + Bash). The agent runs up to five tools: `mobsfscan`
+(cross-platform Swift/Obj-C), plus the macOS-only Apple binaries
+`codesign`, `spctl`, `pkgutil` (NEW for .pkg signature checks), and
+`stapler` (NEW for notarization-ticket validation).
+
+macos-runner is a SIBLING of ios-runner (§3.11) — both dispatch
+codesign/spctl on .app bundles, but macos-runner adds pkgutil/stapler
+for .pkg / .dmg release artifacts. Cross-platform SwiftPM packages
+may satisfy BOTH iOS and macOS inventory signals simultaneously; in
+that case both runners dispatch independently and the report-writer
+renders findings in separate "iOS" and "macOS" sections.
+
+Skill-level invariants:
+
+- **No `macos` in inventory** — skip entirely.
+- **`__macos_status__: "unavailable"`** — no tool could run.
+- **`__macos_status__: "partial"`** — mix of successful runs + failures.
+- **`__macos_status__: "ok"`** — every available tool ran; `skipped`
+  list may be populated for cleanly-inapplicable tools.
+- **Five clean-skip reasons:**
+  - `requires-macos-host` (shared with iOS lane; codesign/spctl/
+    pkgutil/stapler are macOS-only binaries).
+  - `no-bundle` (codesign/spctl/stapler need a `.app`/`.framework`/
+    `.dmg` artifact).
+  - `no-pkg` (pkgutil needs a `.pkg`) — NEW in v0.11; target-shape
+    parallel to Android's `no-apk` and iOS's `no-bundle`.
+  - `no-notary-profile` (inherited from iOS; present only when
+    macos-runner chooses to invoke notarytool for history lookups;
+    v0.11's macos-runner skips notarytool — v0.12+ may add it).
+  - `tool-missing`.
+
+The dep-inventory path is NOT materially affected by this pass —
+macOS uses the same CocoaPods/SwiftPM ecosystems as iOS, routed in
+§3.11. When both `ios` and `macos` are in the inventory, the
+ecosystems entry is emitted once per unique `manifest`, not
+duplicated per lane.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

@@ -63,7 +63,7 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku" \
             "agents/webext-runner.md:haiku" "agents/rust-runner.md:haiku" \
             "agents/android-runner.md:haiku" "agents/ios-runner.md:haiku" \
-            "agents/linux-runner.md:haiku"; do
+            "agents/linux-runner.md:haiku" "agents/macos-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -224,6 +224,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __linux_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the macOS desktop status summary line emitted by macos-runner.
+        # Same skipped-list schema as ios; adds no-pkg reason (NEW in v0.11).
+        if "__macos_status__" in obj:
+            status = obj.get("__macos_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __macos_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __macos_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __macos_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __macos_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -324,8 +344,21 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} linux tool must be systemd-analyze|lintian|checksec, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: linux findings must NOT carry any other lane's tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler"}:
                 print(f"CONTRACT FAIL: {path}:{i} linux finding carries non-linux tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: macos findings must carry `tool` and `origin`.
+        if obj.get("origin") == "macos":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} macos finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"mobsfscan", "codesign", "spctl", "pkgutil", "stapler"}:
+                print(f"CONTRACT FAIL: {path}:{i} macos tool must be mobsfscan|codesign|spctl|pkgutil|stapler, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: macos findings must NOT carry other lanes' exclusive tool names.
+            # Note: mobsfscan is shared across android/ios/macos; codesign+spctl are shared across ios/macos.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint", "notarytool", "systemd-analyze", "lintian", "checksec"}:
+                print(f"CONTRACT FAIL: {path}:{i} macos finding carries non-macos tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -620,6 +653,60 @@ sys.exit(1 if errs else 0)
 fi
 echo "linux negative-test: malformed skipped-list entry correctly rejected"
 
+# --- Negative tests for macos origin
+bad_macos_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"macos"}'
+if echo "$bad_macos_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "macos" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed macos line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "macos negative-test: malformed macos line (missing tool) correctly rejected"
+
+bad_macos_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Info.plist","line":1,"evidence":"e","reference":"mobile-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"macos","tool":"apkleaks"}'
+if echo "$bad_macos_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "macos" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint", "notarytool", "systemd-analyze", "lintian", "checksec"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: macos finding with non-macos tool was accepted" >&2
+    exit 1
+fi
+echo "macos negative-test: origin-tag isolation enforced (macos cannot carry other lanes' exclusive tool names)"
+
+bad_macos_skipped='{"__macos_status__":"ok","tools":["mobsfscan"],"runs":1,"findings":1,"skipped":[{"bad":"entry"}]}'
+if echo "$bad_macos_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__macos_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed macos skipped entry was accepted" >&2
+    exit 1
+fi
+echo "macos negative-test: malformed skipped-list entry correctly rejected"
+
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
 bad_dast='{"id":"40018","severity":"HIGH","cwe":"CWE-89","title":"t","file":"http://x/","line":0,"evidence":"e","reference":"dast-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"dast"}'
@@ -687,6 +774,29 @@ check skills/sec-review/SKILL.md "xcodeproj\|Package.swift\|Podfile" "SKILL.md �
 check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing ios key"
 check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
 echo "ios-inventory: SKILL.md §2 documents ios stack detection"
+
+# --- macos inventory rule (v0.11.0 Stage 1 Task 1.5):
+check skills/sec-review/SKILL.md "macOS desktop signals" "SKILL.md §2 missing macOS detection rule"
+check skills/sec-review/SKILL.md "LSMinimumSystemVersion" "SKILL.md §2 macos rule missing LSMinimumSystemVersion trigger"
+check skills/sec-review/SKILL.md "\"macos\"" "SKILL.md §2 inventory JSON missing macos key"
+check skills/sec-review/SKILL.md "Sparkle\|SUFeedURL" "SKILL.md §2 missing Sparkle trigger"
+check skills/sec-review/SKILL.md "\.pkg\|\.dmg" "SKILL.md §2 missing pkg/dmg trigger"
+echo "macos-inventory: SKILL.md §2 documents macos stack detection"
+
+# --- macos fixture-match sanity: synthetic Info.plist with LSMinimumSystemVersion
+tmp_m=$(mktemp -d); trap 'rm -rf "$tmp_m"' EXIT
+cat > "$tmp_m/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.example.fixture</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+</dict></plist>
+PLIST
+if ! grep -q 'LSMinimumSystemVersion' "$tmp_m/Info.plist"; then
+    echo "macos-inventory: FAIL — fixture Info.plist missing LSMinimumSystemVersion" >&2; fail=1
+fi
+echo "macos-inventory: synthetic macOS Info.plist fixture matches §2 detection rule"
 
 # --- linux inventory rule (v0.10.0 Stage 1 Task 1.5):
 check skills/sec-review/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
@@ -790,6 +900,15 @@ check skills/sec-review/SKILL.md "systemd-analyze" "SKILL.md §3.12 missing syst
 check skills/sec-review/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
 check skills/sec-review/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
 echo "linux-orchestrator: SKILL.md §3.12 documents linux-runner wire-up"
+
+# --- orchestrator §3.13 wire-up (v0.11.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.13 Desktop macOS pass" "SKILL.md missing §3.13"
+check skills/sec-review/SKILL.md "macos-runner" "SKILL.md §3.13 missing macos-runner reference"
+check skills/sec-review/SKILL.md "__macos_status__" "SKILL.md §3.13 missing macos sentinel"
+check skills/sec-review/SKILL.md "pkgutil" "SKILL.md §3.13 missing pkgutil"
+check skills/sec-review/SKILL.md "stapler" "SKILL.md §3.13 missing stapler"
+check skills/sec-review/SKILL.md "no-pkg" "SKILL.md §3.13 missing no-pkg clean-skip reason"
+echo "macos-orchestrator: SKILL.md §3.13 documents macos-runner wire-up"
 
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
