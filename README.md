@@ -263,6 +263,71 @@ validates the `vulnerable-webext` fixture produces addons-linter
 findings, retire findings, origin-tag isolation, and the trailing
 status line. No webext finding is ever fabricated.
 
+## Rust toolchain lane (v0.7.0)
+
+An eighth agent, **`rust-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects a
+Rust/Cargo project — a `Cargo.toml` at project root containing
+`[package]` or `[workspace]`. The runner is dispatched in parallel
+with `sec-expert`, `sast-runner`, `dast-runner`, `webext-runner`, and
+`cve-enricher`. It shells out to four cargo subcommands when available:
+
+- **`cargo-audit`** (RustSec advisory DB) — scans `Cargo.lock`
+  against the RustSec DB; findings with a CVE alias flow through
+  `cve-enricher` via the `crates.io` OSV-native ecosystem. CVSS →
+  severity mapping and `advisory.cwe[0]` → `CWE-<n>` (with `CWE-1104`
+  fallback) are documented in `references/rust-tools.md`.
+- **`cargo-deny`** (Embark's multi-check gate) — emits per-line JSON
+  diagnostics for `advisories`, `bans`, `licenses`, and `sources`
+  checks. Per-check CWE mapping: advisories → embedded advisory CWE
+  or CWE-1104; bans → CWE-1104; licenses → `null` (compliance, not
+  security); sources → CWE-494.
+- **`cargo-geiger`** (unsafe-surface counter) — one INFO-severity
+  finding per dependency with `unsafety.used.functions.unsafe_ > 0`.
+  **Geiger findings are hard-capped at INFO by both the runner and the
+  contract-check validator** — unsafe presence is a signal, not a
+  defect; human triage decides whether a specific crate is concerning.
+- **`cargo-vet`** (Mozilla's supply-chain attestation) — one LOW
+  finding per unaudited dep from `cargo vet suggest`, with a
+  `fix_recipe` instructing the developer to run `cargo vet diff` and
+  either certify or add a justified exemption.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "rust"` and one of
+`tool: "cargo-audit" | "cargo-deny" | "cargo-geiger" | "cargo-vet"`.
+`file` is `Cargo.toml` / `Cargo.lock` / a crate name; `line` is an
+integer span when the tool supplies one, otherwise `0`. Field-mapping
+recipes live in `skills/sec-review/references/rust-tools.md`; the
+code-pattern reference packs (Cargo ecosystem, unsafe surface) live
+in `skills/sec-review/references/rust/`.
+
+**Fixes for advisory findings come from the advisory** (patched-
+versions range); fixes for ecosystem findings come from
+`rust/cargo-ecosystem.md` and `rust/unsafe-surface.md`. Retire.js-
+style bundled-library flagging has no direct equivalent in Rust —
+cargo-audit plays that role against `Cargo.lock`, and the results
+appear in the Dependency CVE summary table as `crates.io` ecosystem
+rows.
+
+**Three-state sentinel.** Like the webext lane,
+`__rust_status__` ∈ {`"ok"`, `"partial"`, `"unavailable"`}. `cargo`
+missing entirely is unavailable; some subcommands installed and
+others missing is partial; all four running cleanly is ok. cargo-
+audit and cargo-deny exit non-zero when they FIND findings — the
+runner correctly treats this as success with findings, not as a
+crash.
+
+**Degrade path.** When the inventory does NOT contain `rust`, the
+pass is skipped entirely (no cargo probe). When rust is detected but
+cargo is not on PATH, the agent emits a single sentinel line
+`{"__rust_status__": "unavailable", "tools": []}` and exits clean.
+`tests/rust-drill.sh` enforces this contract by scrubbing PATH and
+asserting the unavailable output shape. `tests/rust-e2e.sh` validates
+the `vulnerable-rust` fixture produces cargo-audit CVE findings,
+cargo-geiger INFO-ceiling findings, origin-tag isolation across all
+six other lanes, and the trailing status line. No Rust finding is
+ever fabricated.
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -272,7 +337,8 @@ status line. No webext finding is ever fabricated.
 | SAST                      | Source tree                                      | `semgrep` (OWASP Top Ten), `bandit`        | `references/sast-tools.md`                                                             | v0.4.0     |
 | DAST                      | Running `http(s)://…` instance                   | `zap-baseline.py` (docker or local)        | `references/dast-tools.md`                                                             | v0.5.0     |
 | Browser extensions        | MV3 / AMO extension source tree                  | `addons-linter`, `web-ext lint`, `retire`  | `references/frontend/webext-{chrome-mv3,firefox-amo,shared-patterns}.md`, `references/webext-tools.md` | v0.6.0     |
-| CVE enrichment            | Manifests + retire components                    | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| Rust toolchain            | Cargo project (`Cargo.toml` + `[package]`/`[workspace]`) | `cargo-audit`, `cargo-deny`, `cargo-geiger`, `cargo-vet` | `references/rust/{cargo-ecosystem,unsafe-surface}.md`, `references/rust-tools.md` | v0.7.0     |
+| CVE enrichment            | Manifests + retire components + crates.io        | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 

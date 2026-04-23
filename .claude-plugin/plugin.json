@@ -1,7 +1,7 @@
 {
   "name": "sec-review",
-  "version": "0.6.0",
-  "description": "Cybersecurity review plugin for web services, servers, and browser extensions: a pipelined seven-agent architecture (sec-expert, finding-triager, cve-enricher, sast-runner, dast-runner, webext-runner, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O and SAST/DAST/webext tool dispatch. Citation-grounded expertise across databases, frameworks, webservers (including Windows/IIS as of v0.4.0), proxies, frontend, browser extensions (Chrome MV3 + Firefox AMO as of v0.6.0), auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev, and GHSA with CISA KEV cross-reference for exploit-in-wild prioritization; SAST adapter invoking semgrep (OWASP Top Ten) and bandit; DAST lane invoking OWASP ZAP baseline against a running target URL; webext lane invoking addons-linter, web-ext lint, and retire.js against extension source directories with origin-tagged findings and three-state sentinels (ok/partial/unavailable); per-run token-cost accounting; offline-degradation drills for CVE feeds, SAST tools, DAST tools, and webext tools; prioritized markdown report with reliable, primary-source-cited fixes.",
+  "version": "0.7.0",
+  "description": "Cybersecurity review plugin for web services, servers, browser extensions, and Rust projects: a pipelined eight-agent architecture (sec-expert, finding-triager, cve-enricher, sast-runner, dast-runner, webext-runner, rust-runner, report-writer) with model pinning — sonnet-grade code reasoning, haiku-grade CVE feed I/O and SAST/DAST/webext/rust tool dispatch. Citation-grounded expertise across databases, frameworks, webservers (including Windows/IIS as of v0.4.0), proxies, frontend, browser extensions (Chrome MV3 + Firefox AMO as of v0.6.0), the Rust/Cargo ecosystem and unsafe-surface (as of v0.7.0), auth, TLS, containers, secrets, and supply-chain; live CVE enrichment from NVD 2.0, OSV.dev (native coverage for crates.io), and GHSA with CISA KEV cross-reference for exploit-in-wild prioritization; SAST adapter invoking semgrep (OWASP Top Ten) and bandit; DAST lane invoking OWASP ZAP baseline against a running target URL; webext lane invoking addons-linter, web-ext lint, and retire.js against extension source directories; Rust lane invoking cargo-audit (RustSec DB), cargo-deny (bans/licenses/sources/advisories), cargo-geiger (unsafe-code surface, INFO-ceiling), and cargo-vet (supply-chain attestation) against Cargo projects with origin-tagged findings and three-state sentinels (ok/partial/unavailable); per-run token-cost accounting; offline-degradation drills for CVE feeds, SAST tools, DAST tools, webext tools, and Rust tools; prioritized markdown report with reliable, primary-source-cited fixes.",
   "author": {
     "name": "holyfiremin",
     "email": "holyfiremin@gmail.com"
@@ -40,6 +40,14 @@
     "mv3",
     "amo",
     "addons-linter",
-    "retire"
+    "retire",
+    "rust",
+    "cargo",
+    "cargo-audit",
+    "cargo-deny",
+    "cargo-geiger",
+    "cargo-vet",
+    "rustsec",
+    "crates-io"
   ]
 }
