@@ -74,6 +74,22 @@ Detect the technology stack. Read only — do not install or execute.
   inventory and load `references/frontend/webext-chrome-mv3.md`,
   `references/frontend/webext-firefox-amo.md`, and
   `references/frontend/webext-shared-patterns.md` as appropriate.
+- **Android signals**: either `AndroidManifest.xml` anywhere in the
+  tree (typically `app/src/main/AndroidManifest.xml` for gradle-based
+  projects) OR a gradle build script (`build.gradle` or
+  `build.gradle.kts`) that applies the `com.android.application` or
+  `com.android.library` plugin. When detected, add `"android"` to the
+  inventory with values reflecting module shape — `"android": ["app"]`
+  for application modules, `"android": ["library"]` for library
+  modules, or `"android": ["app", "library"]` for multi-module
+  projects with both. Load `references/mobile/android-manifest.md`,
+  `references/mobile/android-data.md`, `references/mobile/android-runtime.md`,
+  and the tool-lane reference `references/mobile-tools.md`.
+  `ecosystems` gains an entry
+  `{"ecosystem": "Maven", "manifest": "build.gradle"}` (OSV-native,
+  no enricher change). Transitive deps are covered when the project
+  commits a resolved lockfile (`gradle.lockfile`); direct
+  `build.gradle` parsing gives top-level deps only.
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -101,6 +117,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "proxies":     [],
   "frontend":    ["django-templates"],
   "webext":      [],
+  "android":     [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],

@@ -408,6 +408,37 @@ check skills/sec-review/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing
 check skills/sec-review/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
 echo "rust-inventory: SKILL.md §2 documents rust stack detection"
 
+# --- android inventory rule (v0.8.0 Stage 1 Task 1.5):
+# SKILL.md §2 must document the Android detection rule (AndroidManifest.xml
+# OR com.android.application/library plugin) and emit an `android` key.
+check skills/sec-review/SKILL.md "Android signals" "SKILL.md §2 missing Android detection rule"
+check skills/sec-review/SKILL.md "AndroidManifest.xml" "SKILL.md §2 android rule missing AndroidManifest.xml trigger"
+check skills/sec-review/SKILL.md "\"android\"" "SKILL.md §2 inventory JSON missing android key"
+check skills/sec-review/SKILL.md "com.android.application\|com.android.library" "SKILL.md §2 missing gradle Android plugin trigger"
+check skills/sec-review/SKILL.md "Maven" "SKILL.md §2 missing Maven ecosystem routing"
+echo "android-inventory: SKILL.md §2 documents android stack detection"
+
+# --- android fixture-match sanity: synthetic AndroidManifest.xml + build.gradle
+tmp_a=$(mktemp -d); trap 'rm -rf "$tmp_a"' EXIT
+mkdir -p "$tmp_a/app/src/main"
+cat > "$tmp_a/app/src/main/AndroidManifest.xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example">
+  <application android:label="fixture" />
+</manifest>
+XML
+cat > "$tmp_a/app/build.gradle" <<'GRADLE'
+plugins { id 'com.android.application' }
+android { compileSdk 34 }
+GRADLE
+if ! grep -q '<manifest' "$tmp_a/app/src/main/AndroidManifest.xml"; then
+    echo "android-inventory: FAIL — fixture manifest malformed" >&2; fail=1
+fi
+if ! grep -q 'com.android.application' "$tmp_a/app/build.gradle"; then
+    echo "android-inventory: FAIL — fixture gradle missing plugin" >&2; fail=1
+fi
+echo "android-inventory: synthetic AndroidManifest.xml + build.gradle fixture matches §2 detection rule"
+
 # --- orchestrator §3.9 wire-up (v0.7.0 Stage 2 Task 2.2):
 # SKILL.md must declare §3.9, reference rust-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
