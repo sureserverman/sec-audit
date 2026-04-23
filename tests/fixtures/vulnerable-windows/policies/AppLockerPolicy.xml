@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AppLockerPolicy Version="1">
+  <RuleCollection Type="Exe" EnforcementMode="Enabled">
+    <!-- CWE-732: allows execution from user-writable directory. -->
+    <FilePathRule Id="aaaaaaaa-0000-0000-0000-000000000001"
+                  Name="Allow Exe from Users"
+                  Description="Allow .exe from user profile (dangerous)"
+                  UserOrGroupSid="S-1-1-0"
+                  Action="Allow">
+      <Conditions>
+        <FilePathCondition Path="%OSDRIVE%\Users\*" />
+      </Conditions>
+    </FilePathRule>
+
+    <!-- CWE-693: wildcard publisher rule. -->
+    <FilePublisherRule Id="bbbbbbbb-0000-0000-0000-000000000002"
+                       Name="Any signed publisher"
+                       UserOrGroupSid="S-1-1-0"
+                       Action="Allow">
+      <Conditions>
+        <FilePublisherCondition PublisherName="*" ProductName="*" BinaryName="*">
+          <BinaryVersionRange LowSection="*" HighSection="*" />
+        </FilePublisherCondition>
+      </Conditions>
+    </FilePublisherRule>
+  </RuleCollection>
+</AppLockerPolicy>

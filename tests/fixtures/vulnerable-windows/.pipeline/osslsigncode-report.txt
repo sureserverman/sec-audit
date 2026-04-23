@@ -1,0 +1,6 @@
+Current PE checksum   : 00012345
+Calculated PE checksum: 00012345
+
+No signature found.
+Signature verification: failed
+Timestamp: none

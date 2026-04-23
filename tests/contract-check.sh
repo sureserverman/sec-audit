@@ -245,6 +245,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __macos_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the Windows desktop status summary line emitted by windows-runner.
+        # Same skipped-list schema; adds requires-windows-host (3rd host gate) + no-pe reasons.
+        if "__windows_status__" in obj:
+            status = obj.get("__windows_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __windows_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __windows_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __windows_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __windows_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -357,9 +377,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} macos tool must be mobsfscan|codesign|spctl|pkgutil|stapler, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: macos findings must NOT carry other lanes' exclusive tool names.
-            # Note: mobsfscan is shared across android/ios/macos; codesign+spctl are shared across ios/macos.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint", "notarytool", "systemd-analyze", "lintian", "checksec"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint", "notarytool", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck"}:
                 print(f"CONTRACT FAIL: {path}:{i} macos finding carries non-macos tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: windows findings must carry `tool` and `origin`.
+        if obj.get("origin") == "windows":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} windows finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"binskim", "osslsigncode", "sigcheck"}:
+                print(f"CONTRACT FAIL: {path}:{i} windows tool must be binskim|osslsigncode|sigcheck, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: windows findings must NOT carry any other lane's tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec"}:
+                print(f"CONTRACT FAIL: {path}:{i} windows finding carries non-windows tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -707,6 +738,60 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "macos negative-test: malformed skipped-list entry correctly rejected"
+
+# --- Negative tests for windows origin
+bad_win_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.exe","line":0,"evidence":"e","reference":"windows-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"windows"}'
+if echo "$bad_win_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "windows" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed windows line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "windows negative-test: malformed windows line (missing tool) correctly rejected"
+
+bad_win_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.exe","line":0,"evidence":"e","reference":"windows-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"windows","tool":"codesign"}'
+if echo "$bad_win_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "windows" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: windows finding with non-windows tool was accepted" >&2
+    exit 1
+fi
+echo "windows negative-test: origin-tag isolation enforced (windows cannot carry any of the other 12 lanes' tools)"
+
+bad_win_skipped='{"__windows_status__":"ok","tools":["binskim"],"runs":1,"findings":2,"skipped":[{"no_reason":"shape"}]}'
+if echo "$bad_win_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__windows_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed windows skipped entry was accepted" >&2
+    exit 1
+fi
+echo "windows negative-test: malformed skipped-list entry correctly rejected"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.

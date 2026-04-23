@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="VulnerableWin" Manufacturer="Fixture" Version="1.0.0"
+           UpgradeCode="00000000-0000-0000-0000-000000000001"
+           InstallScope="perUser">
+
+    <!-- CWE-250: Type 3426 custom action (deferred + impersonate + exe-from-installed-file).
+         Explicitly disallowed by Microsoft SDL. -->
+    <CustomAction Id="DangerousHelper"
+                  Type="3426"
+                  FileRef="HelperExe"
+                  ExeCommand="--do-privileged-thing"
+                  Return="check" />
+
+    <!-- CWE-459: Commit action without a matching Rollback. -->
+    <CustomAction Id="CommitStateChange"
+                  Type="1"
+                  Execute="commit"
+                  BinaryRef="StateCAB"
+                  DllEntry="CommitEntry" />
+
+    <InstallExecuteSequence>
+      <Custom Action="DangerousHelper" Before="InstallFinalize" />
+      <Custom Action="CommitStateChange" Before="InstallFinalize" />
+    </InstallExecuteSequence>
+
+  </Package>
+</Wix>
