@@ -328,6 +328,65 @@ cargo-geiger INFO-ceiling findings, origin-tag isolation across all
 six other lanes, and the trailing status line. No Rust finding is
 ever fabricated.
 
+## Android lane (v0.8.0)
+
+A ninth agent, **`android-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects an
+Android project — an `AndroidManifest.xml` anywhere in the tree OR a
+`build.gradle(.kts)` applying the `com.android.application` or
+`com.android.library` plugin. The runner is dispatched in parallel
+with the other seven pass agents. It shells out to three Android
+static-analysis tools when available:
+
+- **`mobsfscan`** (the pip-installable MobSF static-analyzer
+  component) — regex/semgrep-rule engine mapped to OWASP MASVS
+  categories. Runs against the source tree. Emits per-rule findings
+  with CWE and `reference_url` pointing to MobSF docs.
+- **`apkleaks`** (compiled-APK secret + endpoint scanner) — runs
+  against any `*.apk` / `*.aab` found under the target tree. When
+  no APK is present (the common case for source-only checkouts),
+  the runner CLEANLY SKIPS apkleaks and records that in the status
+  line's `"skipped"` list with `reason: "no-apk"`. Clean-skip is
+  distinct from failure (on PATH but crashed). This distinction is
+  new in v0.8 and may be reused by future lanes where tool
+  applicability depends on target artifacts.
+- **`android-lint`** (via `./gradlew :app:lintDebug` when a gradle
+  wrapper is present, else standalone `lint`) — emits Security-
+  category issues like `HardcodedDebugMode`, `AllowBackup`,
+  `ExportedReceiver`, `SetJavaScriptEnabled`, with a hand-curated
+  CWE lookup table in `references/mobile-tools.md`.
+
+Output is sec-expert-compatible JSONL: every finding carries
+`origin: "android"` and one of
+`tool: "mobsfscan" | "apkleaks" | "android-lint"`. `file` is the
+relative path under the target root (e.g.
+`app/src/main/AndroidManifest.xml`, `app/src/main/java/com/example/MainActivity.java`)
+or the APK basename for apkleaks findings. Field-mapping recipes and
+the lint-rule → CWE lookup table live in
+`skills/sec-review/references/mobile-tools.md`; the code-pattern
+reference packs (manifest, data, runtime) live in
+`skills/sec-review/references/mobile/`.
+
+**Dependencies feed cve-enricher** via the `Maven` OSV-native
+ecosystem entry; transitive coverage depends on whether a
+`gradle.lockfile` is committed.
+
+**Four-state status.** `__android_status__` ∈ {`"ok"`, `"partial"`,
+`"unavailable"`} and the trailing line may include a structured
+`"skipped"` list (each entry `{"tool": "...", "reason": "..."}`).
+A common shape is `"ok"` with `skipped: [{"tool": "apkleaks",
+"reason": "no-apk"}]` for source-only reviews where mobsfscan and
+android-lint ran cleanly.
+
+**Degrade path.** When the inventory does NOT contain `android`, the
+pass is skipped entirely. When Android is detected but no tool is on
+PATH, the agent emits the unavailable sentinel and exits 0.
+`tests/android-drill.sh` scrubs PATH and asserts the spec's probe +
+sentinel + clean-skip contract. `tests/android-e2e.sh` validates the
+`vulnerable-android` fixture produces mobsfscan + android-lint
+findings, 7-lane origin-tag isolation, the trailing status line, and
+the apkleaks clean-skip. No Android finding is ever fabricated.
+
 ## Coverage matrix
 
 | Lane                      | Target                                           | Tools                                      | Reference packs                                                                        | Shipped in |
@@ -338,7 +397,8 @@ ever fabricated.
 | DAST                      | Running `http(s)://…` instance                   | `zap-baseline.py` (docker or local)        | `references/dast-tools.md`                                                             | v0.5.0     |
 | Browser extensions        | MV3 / AMO extension source tree                  | `addons-linter`, `web-ext lint`, `retire`  | `references/frontend/webext-{chrome-mv3,firefox-amo,shared-patterns}.md`, `references/webext-tools.md` | v0.6.0     |
 | Rust toolchain            | Cargo project (`Cargo.toml` + `[package]`/`[workspace]`) | `cargo-audit`, `cargo-deny`, `cargo-geiger`, `cargo-vet` | `references/rust/{cargo-ecosystem,unsafe-surface}.md`, `references/rust-tools.md` | v0.7.0     |
-| CVE enrichment            | Manifests + retire components + crates.io        | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
+| Android                   | Source tree (`AndroidManifest.xml` + gradle Android plugin) | `mobsfscan`, `apkleaks` (APK-present), `android-lint` (gradle or standalone) | `references/mobile/{android-manifest,android-data,android-runtime}.md`, `references/mobile-tools.md` | v0.8.0     |
+| CVE enrichment            | Manifests + retire components + crates.io + Maven | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
 
