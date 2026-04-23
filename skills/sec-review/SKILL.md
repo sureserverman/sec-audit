@@ -374,6 +374,61 @@ on PATH will have its advisories double-covered (RustSec DB via
 audit + OSV via cve-enricher); that redundancy is expected and the
 CVE dedupe logic in §4 handles it.
 
+### 3.10 Android pass — dispatch android-runner
+
+When the inventory emitted by §2 contains `android` (the
+`AndroidManifest.xml` OR `com.android.application`/`com.android.library`
+gradle-plugin detection rule fired), dispatch the `android-runner`
+agent (`agents/android-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to three Android static-analysis tools —
+`mobsfscan`, `apkleaks`, and `android-lint` (via the gradle wrapper
+when available, else the standalone `lint` binary) — against the
+project root, parses each tool's native output, and emits sec-expert-
+compatible JSONL on stdout — every line carrying `origin: "android"`
+and `tool: "mobsfscan" | "apkleaks" | "android-lint"`.
+
+android-runner runs in parallel with sec-expert, sast-runner,
+dast-runner, webext-runner, rust-runner, and cve-enricher. Collect
+the Android JSONL into an `android_findings` list alongside the
+other streams.
+
+Skill-level invariants the orchestrator enforces on the Android stream:
+
+- **No `android` in inventory** — skip this pass entirely. Do NOT
+  probe for mobsfscan/apkleaks/android-lint on unrelated projects;
+  the tools are heavy and irrelevant to non-Android targets.
+- **`__android_status__: "unavailable"`** — none of the three tools
+  responded, or the target_path had no Android signals, or every tool
+  crashed. Add the `⚠ Android tools unavailable — install mobsfscan,
+  apkleaks, and/or android-lint to enable the Android static-analysis
+  pass` banner to the Review metadata block.
+- **`__android_status__: "partial"`** — some tools ran successfully
+  and others failed or were missing. Merge the findings; note
+  missing/failed tools in the Review-metadata section (`Android tools
+  run: mobsfscan, android-lint; apkleaks failed — exit 2`).
+- **`__android_status__: "ok"`** — every available tool ran. Merge
+  the Android findings into the triaged stream.
+- **Clean-skip vs failure distinction (NEW in v0.8)** — the
+  `android-runner` status line carries a `skipped` list, separate
+  from `failed`. The canonical case is apkleaks-with-no-APK-found:
+  apkleaks is on PATH, legitimately cannot run (no binary artifact
+  exists in a source-only checkout), and this is recorded as
+  `{"tool": "apkleaks", "reason": "no-apk"}` in the `skipped` list,
+  NOT as a failure. The report-writer surfaces cleanly-skipped tools
+  in a separate metadata line (`Android tools skipped: apkleaks
+  (no-apk)`) so the reader distinguishes "couldn't run due to target
+  shape" from "ran and crashed." This pattern may be reused by future
+  lanes where tool applicability depends on target artifacts.
+
+Android findings combine code-pattern signal (mobsfscan rules,
+android-lint Security-category rules) with secret-scanner signal
+(apkleaks when an APK is present). The dep-inventory path IS affected:
+gradle-declared dependencies feed cve-enricher as an ecosystem entry
+`{"ecosystem": "Maven", "manifest": "build.gradle"}` — OSV's
+`querybatch` handles Maven natively, so no new feed adapter is
+required. When a `gradle.lockfile` is present, transitive
+dependencies are also enriched; without it, only direct declarations.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

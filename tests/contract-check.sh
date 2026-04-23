@@ -451,6 +451,15 @@ check skills/sec-review/SKILL.md "cargo-audit\|cargo audit" "SKILL.md §3.9 miss
 check skills/sec-review/SKILL.md "cargo-geiger\|cargo geiger" "SKILL.md §3.9 missing cargo-geiger"
 echo "rust-orchestrator: SKILL.md §3.9 documents rust-runner wire-up"
 
+# --- orchestrator §3.10 wire-up (v0.8.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.10 Android pass" "SKILL.md missing §3.10"
+check skills/sec-review/SKILL.md "android-runner" "SKILL.md §3.10 missing android-runner reference"
+check skills/sec-review/SKILL.md "__android_status__" "SKILL.md §3.10 missing android sentinel"
+check skills/sec-review/SKILL.md "mobsfscan" "SKILL.md §3.10 missing mobsfscan"
+check skills/sec-review/SKILL.md "apkleaks" "SKILL.md §3.10 missing apkleaks"
+check skills/sec-review/SKILL.md "no-apk\|Clean-skip" "SKILL.md §3.10 missing clean-skip documentation"
+echo "android-orchestrator: SKILL.md §3.10 documents android-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
