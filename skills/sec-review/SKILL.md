@@ -589,6 +589,49 @@ which feed cve-enricher as
 ecosystem OSV coverage is partial via the Debian Security Tracker —
 document as best-effort, same tolerance as CocoaPods/SwiftPM in §3.11.
 
+### 3.13 Desktop macOS pass — dispatch macos-runner
+
+When the inventory emitted by §2 contains `macos` (Info.plist with
+`LSMinimumSystemVersion` OR `*.pkg` / `*.dmg` OR Sparkle framework
+markers OR `.app` with macOS deployment-target), dispatch the
+`macos-runner` agent (`agents/macos-runner.md`, pinned to haiku,
+tools: Read + Bash). The agent runs up to five tools: `mobsfscan`
+(cross-platform Swift/Obj-C), plus the macOS-only Apple binaries
+`codesign`, `spctl`, `pkgutil` (NEW for .pkg signature checks), and
+`stapler` (NEW for notarization-ticket validation).
+
+macos-runner is a SIBLING of ios-runner (§3.11) — both dispatch
+codesign/spctl on .app bundles, but macos-runner adds pkgutil/stapler
+for .pkg / .dmg release artifacts. Cross-platform SwiftPM packages
+may satisfy BOTH iOS and macOS inventory signals simultaneously; in
+that case both runners dispatch independently and the report-writer
+renders findings in separate "iOS" and "macOS" sections.
+
+Skill-level invariants:
+
+- **No `macos` in inventory** — skip entirely.
+- **`__macos_status__: "unavailable"`** — no tool could run.
+- **`__macos_status__: "partial"`** — mix of successful runs + failures.
+- **`__macos_status__: "ok"`** — every available tool ran; `skipped`
+  list may be populated for cleanly-inapplicable tools.
+- **Five clean-skip reasons:**
+  - `requires-macos-host` (shared with iOS lane; codesign/spctl/
+    pkgutil/stapler are macOS-only binaries).
+  - `no-bundle` (codesign/spctl/stapler need a `.app`/`.framework`/
+    `.dmg` artifact).
+  - `no-pkg` (pkgutil needs a `.pkg`) — NEW in v0.11; target-shape
+    parallel to Android's `no-apk` and iOS's `no-bundle`.
+  - `no-notary-profile` (inherited from iOS; present only when
+    macos-runner chooses to invoke notarytool for history lookups;
+    v0.11's macos-runner skips notarytool — v0.12+ may add it).
+  - `tool-missing`.
+
+The dep-inventory path is NOT materially affected by this pass —
+macOS uses the same CocoaPods/SwiftPM ecosystems as iOS, routed in
+§3.11. When both `ios` and `macos` are in the inventory, the
+ecosystems entry is emitted once per unique `manifest`, not
+duplicated per lane.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

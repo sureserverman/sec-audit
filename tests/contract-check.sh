@@ -814,6 +814,15 @@ check skills/sec-review/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
 check skills/sec-review/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
 echo "linux-orchestrator: SKILL.md §3.12 documents linux-runner wire-up"
 
+# --- orchestrator §3.13 wire-up (v0.11.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.13 Desktop macOS pass" "SKILL.md missing §3.13"
+check skills/sec-review/SKILL.md "macos-runner" "SKILL.md §3.13 missing macos-runner reference"
+check skills/sec-review/SKILL.md "__macos_status__" "SKILL.md §3.13 missing macos sentinel"
+check skills/sec-review/SKILL.md "pkgutil" "SKILL.md §3.13 missing pkgutil"
+check skills/sec-review/SKILL.md "stapler" "SKILL.md §3.13 missing stapler"
+check skills/sec-review/SKILL.md "no-pkg" "SKILL.md §3.13 missing no-pkg clean-skip reason"
+echo "macos-orchestrator: SKILL.md §3.13 documents macos-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
