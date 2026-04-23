@@ -570,6 +570,15 @@ check skills/sec-review/SKILL.md "apkleaks" "SKILL.md §3.10 missing apkleaks"
 check skills/sec-review/SKILL.md "no-apk\|Clean-skip" "SKILL.md §3.10 missing clean-skip documentation"
 echo "android-orchestrator: SKILL.md §3.10 documents android-runner wire-up"
 
+# --- orchestrator §3.11 wire-up (v0.9.0 Stage 2 Task 2.2):
+check skills/sec-review/SKILL.md "### 3.11 iOS pass" "SKILL.md missing §3.11"
+check skills/sec-review/SKILL.md "ios-runner" "SKILL.md §3.11 missing ios-runner reference"
+check skills/sec-review/SKILL.md "__ios_status__" "SKILL.md §3.11 missing ios sentinel"
+check skills/sec-review/SKILL.md "requires-macos-host" "SKILL.md §3.11 missing macOS-host clean-skip reason"
+check skills/sec-review/SKILL.md "codesign" "SKILL.md §3.11 missing codesign"
+check skills/sec-review/SKILL.md "notarytool" "SKILL.md §3.11 missing notarytool"
+echo "ios-orchestrator: SKILL.md §3.11 documents ios-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
