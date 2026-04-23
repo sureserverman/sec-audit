@@ -330,6 +330,17 @@ check skills/sec-review/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing
 check skills/sec-review/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
 echo "rust-inventory: SKILL.md §2 documents rust stack detection"
 
+# --- orchestrator §3.9 wire-up (v0.7.0 Stage 2 Task 2.2):
+# SKILL.md must declare §3.9, reference rust-runner, and document all
+# three sentinel states (ok / partial / unavailable). Shape mirrors
+# §3.6 / §3.7 / §3.8.
+check skills/sec-review/SKILL.md "### 3.9 Rust toolchain pass" "SKILL.md missing §3.9"
+check skills/sec-review/SKILL.md "rust-runner" "SKILL.md §3.9 missing rust-runner reference"
+check skills/sec-review/SKILL.md "__rust_status__" "SKILL.md §3.9 missing rust sentinel"
+check skills/sec-review/SKILL.md "cargo-audit\|cargo audit" "SKILL.md §3.9 missing cargo-audit"
+check skills/sec-review/SKILL.md "cargo-geiger\|cargo geiger" "SKILL.md §3.9 missing cargo-geiger"
+echo "rust-orchestrator: SKILL.md §3.9 documents rust-runner wire-up"
+
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/Cargo.toml" <<'TOML'
