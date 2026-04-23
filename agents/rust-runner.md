@@ -153,10 +153,10 @@ If `cargo` is missing, emit the unavailable sentinel (Step 4). If
 present, probe each subcommand:
 
 ```bash
-cargo audit   --version 2>/dev/null
-cargo deny    --version 2>/dev/null
-cargo geiger  --version 2>/dev/null
-cargo vet     --version 2>/dev/null
+cargo audit --version 2>/dev/null
+cargo deny --version 2>/dev/null
+cargo geiger --version 2>/dev/null
+cargo vet --version 2>/dev/null
 ```
 
 Write one stderr line per subcommand:

@@ -1,0 +1,20 @@
+{
+  "packages": [
+    {
+      "package": {"id": {"name": "vulnerable-rust-fixture", "version": "0.1.0"}},
+      "unsafety": {
+        "used": {"functions": {"safe": 1, "unsafe_": 3}, "exprs": {"safe": 20, "unsafe_": 4}, "item_impls": {"safe": 0, "unsafe_": 1}, "item_traits": {"safe": 0, "unsafe_": 0}, "methods": {"safe": 0, "unsafe_": 0}},
+        "unused": {"functions": {"safe": 0, "unsafe_": 0}, "exprs": {"safe": 0, "unsafe_": 0}, "item_impls": {"safe": 0, "unsafe_": 0}, "item_traits": {"safe": 0, "unsafe_": 0}, "methods": {"safe": 0, "unsafe_": 0}},
+        "forbids_unsafe": false
+      }
+    },
+    {
+      "package": {"id": {"name": "time", "version": "0.1.43"}},
+      "unsafety": {
+        "used": {"functions": {"safe": 12, "unsafe_": 2}, "exprs": {"safe": 40, "unsafe_": 3}, "item_impls": {"safe": 0, "unsafe_": 0}, "item_traits": {"safe": 0, "unsafe_": 0}, "methods": {"safe": 0, "unsafe_": 0}},
+        "unused": {"functions": {"safe": 0, "unsafe_": 0}, "exprs": {"safe": 0, "unsafe_": 0}, "item_impls": {"safe": 0, "unsafe_": 0}, "item_traits": {"safe": 0, "unsafe_": 0}, "methods": {"safe": 0, "unsafe_": 0}},
+        "forbids_unsafe": false
+      }
+    }
+  ]
+}

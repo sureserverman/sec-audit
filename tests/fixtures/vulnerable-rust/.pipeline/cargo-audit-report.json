@@ -1,0 +1,48 @@
+{
+  "database": {
+    "advisory-count": 534,
+    "last-commit": "abc123",
+    "last-updated": "2026-04-22T00:00:00Z"
+  },
+  "lockfile": {
+    "dependency-count": 2
+  },
+  "vulnerabilities": {
+    "found": true,
+    "count": 1,
+    "list": [
+      {
+        "advisory": {
+          "id": "RUSTSEC-2020-0071",
+          "package": "time",
+          "title": "Potential segfault in the time crate",
+          "description": "Unix-like operating systems may segfault due to dereferencing a dangling pointer in specific circumstances. This requires an environment variable to be set in a different thread than the affected functions.",
+          "date": "2020-11-18",
+          "aliases": ["CVE-2020-26235"],
+          "related": [],
+          "collection": "crates",
+          "categories": ["memory-exposure", "memory-corruption"],
+          "keywords": ["segfault"],
+          "cvss": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:H",
+          "cwe": [476],
+          "url": "https://rustsec.org/advisories/RUSTSEC-2020-0071.html",
+          "informational": null,
+          "references": [],
+          "source": null,
+          "patched_versions": [">=0.2.23"],
+          "unaffected_versions": []
+        },
+        "versions": {
+          "patched": [">=0.2.23"],
+          "unaffected": []
+        },
+        "package": {
+          "name": "time",
+          "version": "0.1.43",
+          "source": "registry+https://github.com/rust-lang/crates.io-index"
+        }
+      }
+    ]
+  },
+  "warnings": {}
+}

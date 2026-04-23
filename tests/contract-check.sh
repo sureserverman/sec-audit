@@ -151,6 +151,16 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} __webext_status__ tools must be a list", file=sys.stderr)
                 errs += 1
             continue
+        # Allow the rust status summary line emitted by rust-runner.
+        if "__rust_status__" in obj:
+            status = obj.get("__rust_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __rust_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __rust_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -197,9 +207,25 @@ with open(path) as fh:
             elif obj["tool"] not in {"addons-linter", "web-ext", "retire"}:
                 print(f"CONTRACT FAIL: {path}:{i} webext tool must be addons-linter|web-ext|retire, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: webext findings must NOT carry SAST/DAST tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline"}:
+            # Origin-tag isolation: webext findings must NOT carry SAST/DAST/rust tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
                 print(f"CONTRACT FAIL: {path}:{i} webext finding carries non-webext tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: rust findings must carry `tool` and `origin`.
+        if obj.get("origin") == "rust":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} rust finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet"}:
+                print(f"CONTRACT FAIL: {path}:{i} rust tool must be cargo-audit|cargo-deny|cargo-geiger|cargo-vet, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: rust findings must NOT carry SAST/DAST/webext tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire"}:
+                print(f"CONTRACT FAIL: {path}:{i} rust finding carries non-rust tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+            # cargo-geiger findings MUST be INFO — never elevated.
+            if obj.get("tool") == "cargo-geiger" and obj.get("severity") != "INFO":
+                print(f"CONTRACT FAIL: {path}:{i} cargo-geiger finding must be INFO severity, got {obj.get('severity')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -279,6 +305,58 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "webext negative-test: origin-tag isolation enforced (webext cannot carry semgrep/bandit/zap-baseline)"
+
+# --- Negative tests for rust origin: missing tool + cross-tag + INFO ceiling
+bad_rust_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Cargo.toml","line":1,"evidence":"e","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"rust"}'
+if echo "$bad_rust_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "rust" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed rust line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: malformed rust line (missing tool) correctly rejected"
+
+bad_rust_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Cargo.toml","line":1,"evidence":"e","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"rust","tool":"semgrep"}'
+if echo "$bad_rust_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "rust" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: rust finding with non-rust tool was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: origin-tag isolation enforced (rust cannot carry semgrep/bandit/zap-baseline/addons-linter/web-ext/retire)"
+
+bad_geiger_severity='{"id":"serde@1.0.0","severity":"HIGH","cwe":null,"title":"Unsafe code in serde","file":"serde","line":0,"evidence":"unsafe fns: 5","reference":"rust-tools.md","reference_url":null,"fix_recipe":null,"confidence":"low","origin":"rust","tool":"cargo-geiger"}'
+if echo "$bad_geiger_severity" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("tool") == "cargo-geiger" and obj.get("severity") != "INFO":
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: cargo-geiger finding with non-INFO severity was accepted" >&2
+    exit 1
+fi
+echo "rust negative-test: cargo-geiger INFO ceiling enforced"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
