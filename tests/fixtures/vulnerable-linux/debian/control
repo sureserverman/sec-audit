@@ -1,0 +1,13 @@
+Source: vulnerableapp
+Section: misc
+Priority: optional
+Maintainer: Fixture Author <fixture@example.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.0
+
+Package: vulnerableapp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Intentionally vulnerable fixture package
+ Exists solely to exercise the sec-review Linux lane E2E assertions.
+ Intentionally missing Homepage: and Vcs-Git: fields (Lintian tags).

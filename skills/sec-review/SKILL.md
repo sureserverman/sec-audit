@@ -107,6 +107,29 @@ Detect the technology stack. Read only — do not install or execute.
   both ecosystems have partial OSV coverage (CocoaPods: via GHSA
   fallback; SwiftPM: best-effort) — document as a known limit rather
   than a blocker; cve-enricher's multi-feed routing handles the gap.
+- **Linux-desktop signals**: any of the following triggers the
+  `linux` inventory key:
+  - Systemd units anywhere in the tree — `*.service`, `*.socket`,
+    `*.timer` under `systemd/`, `debian/`, `etc/systemd/system/`, or
+    `usr/lib/systemd/system/`.
+  - Debian packaging — `debian/control` + `debian/rules`.
+  - RPM packaging — `*.spec` at project root or under a `rpm/` or
+    `packaging/rpm/` subdir.
+  - Flatpak manifest — `*.flatpak` manifest file OR `*.y(a)ml` /
+    `*.json` file under a `flatpak/` subdir whose contents declare
+    an `id:` + `sdk:` pair (flatpak-builder manifest shape).
+  - Snap manifest — `snapcraft.yaml` at project root or under
+    `snap/`.
+  When detected, add `"linux"` with values indicating the mechanism(s):
+  `"linux": ["systemd"]`, `["deb"]`, `["rpm"]`, `["flatpak"]`,
+  `["snap"]`, or combinations (`["systemd", "deb"]` is common).
+  Load `references/desktop/linux-systemd.md`,
+  `references/desktop/linux-sandboxing.md`,
+  `references/desktop/linux-packaging.md`, and the tool-lane
+  reference `references/linux-tools.md`. `ecosystems` gains a
+  `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
+  Debian packaging is detected (OSV partial via the Debian Security
+  Tracker — best-effort coverage; document as a known limit).
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -136,6 +159,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "webext":      [],
   "android":     [],
   "ios":         [],
+  "linux":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -497,6 +521,55 @@ and SwiftPM dependencies feed cve-enricher as
 ecosystems have best-effort OSV coverage (CocoaPods via GHSA
 fallback; SwiftPM partial) — the orchestrator tolerates misses
 rather than failing the pipeline.
+
+### 3.12 Desktop Linux pass — dispatch linux-runner
+
+When the inventory emitted by §2 contains `linux` (any of the five
+signals: systemd units, `debian/control`, `*.spec`, Flatpak manifest,
+or `snapcraft.yaml`), dispatch the `linux-runner` agent
+(`agents/linux-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to up to three tools: `systemd-analyze security`
+(when the runner is on a systemd host AND a `.service` unit exists
+under the target), `lintian` (when `debian/control` exists under the
+target), and `checksec` (when an ELF binary exists under the target).
+
+linux-runner runs in parallel with every other pass agent. Collect
+the Linux JSONL into a `linux_findings` list.
+
+Skill-level invariants:
+
+- **No `linux` in inventory** — skip entirely.
+- **`__linux_status__: "unavailable"`** — no tool could run (all
+  missing / no applicable targets / every run crashed).
+- **`__linux_status__: "partial"`** — some tools ran, some failed;
+  `failed` + `skipped` lists document.
+- **`__linux_status__: "ok"`** — every available tool ran; `skipped`
+  may still be populated for cleanly-inapplicable tools.
+- **Six clean-skip reasons across the Linux lane (NEW in v0.10):**
+  - `requires-systemd-host` — the runner is not on a systemd host
+    (macOS/Windows/Alpine-without-systemd). Parallel to the v0.9
+    `requires-macos-host` — this is the second host-OS-gated
+    skip reason in the plugin.
+  - `no-debian-source` — `debian/control` absent under the target;
+    lintian has nothing to process. Parallel to v0.8 `no-apk` and
+    v0.9 `no-bundle` — target-shape clean-skip.
+  - `no-elf` — no ELF binary under the target; checksec has nothing
+    to scan. Target-shape clean-skip.
+  - `no-systemd-unit` — systemd-analyze available and host is
+    systemd, but no `.service` in the target.
+  - `tool-missing` — the tool is absent when its host/target
+    preconditions held.
+  The structured `{tool, reason}` skipped-list schema introduced in
+  v0.8 absorbs these without contract-check schema change.
+
+Linux findings combine code-pattern signal (systemd-analyze
+per-directive scoring + lintian tag matches) with ELF-hardening
+signal (checksec). The dep-inventory path IS affected when Debian
+packaging is detected: `debian/control` declares Depends/Build-Depends,
+which feed cve-enricher as
+`{"ecosystem": "Debian", "manifest": "debian/control"}`. Debian
+ecosystem OSV coverage is partial via the Debian Security Tracker —
+document as best-effort, same tolerance as CocoaPods/SwiftPM in §3.11.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

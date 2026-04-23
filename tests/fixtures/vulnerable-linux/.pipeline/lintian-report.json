@@ -1,0 +1,34 @@
+[
+  {
+    "tag": "no-homepage-field",
+    "severity": "info",
+    "context": "",
+    "visibility": "debian/control",
+    "type": "source",
+    "package": "vulnerableapp"
+  },
+  {
+    "tag": "missing-vcs-browser-field",
+    "severity": "info",
+    "context": "",
+    "visibility": "debian/control",
+    "type": "source",
+    "package": "vulnerableapp"
+  },
+  {
+    "tag": "maintainer-script-without-set-e",
+    "severity": "warning",
+    "context": "debian/postinst",
+    "visibility": "debian/postinst",
+    "type": "binary",
+    "package": "vulnerableapp"
+  },
+  {
+    "tag": "setuid-binary",
+    "severity": "error",
+    "context": "usr/local/bin/vulnerableapp",
+    "visibility": "usr/local/bin/vulnerableapp",
+    "type": "binary",
+    "package": "vulnerableapp"
+  }
+]

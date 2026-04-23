@@ -1,0 +1,18 @@
+[Unit]
+Description=Intentionally-vulnerable systemd unit for sec-review Linux lane E2E
+After=network.target
+
+[Service]
+# CWE-732: no ProtectSystem, no PrivateTmp, no NoNewPrivileges
+# CWE-269: no CapabilityBoundingSet
+# CWE-250: explicit root user
+Type=simple
+ExecStart=/usr/local/bin/vulnerableapp --port 8080
+User=root
+# CWE-732: broad ReadWritePaths reintroduces full write access
+ReadWritePaths=/
+# CWE-532: unit logs to a writable file path
+StandardOutput=file:/var/log/vulnerableapp.log
+
+[Install]
+WantedBy=multi-user.target
