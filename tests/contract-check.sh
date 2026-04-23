@@ -61,7 +61,7 @@ done
 for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/finding-triager.md:sonnet" "agents/report-writer.md:sonnet" \
             "agents/sast-runner.md:haiku" "agents/dast-runner.md:haiku" \
-            "agents/webext-runner.md:haiku"; do
+            "agents/webext-runner.md:haiku" "agents/rust-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
