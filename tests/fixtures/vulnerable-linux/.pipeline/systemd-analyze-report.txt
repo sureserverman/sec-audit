@@ -1,0 +1,16 @@
+  NAME                                                        DESCRIPTION                                                         EXPOSURE
+✗ PrivateNetwork=                                              Service has access to the host's network                               0.5
+✗ User=/DynamicUser=                                           Service runs as root user                                              0.4
+✗ CapabilityBoundingSet=~CAP_SYS_ADMIN                         Service has no capability to escalate                                  0.3
+✗ CapabilityBoundingSet=~CAP_SYS_PTRACE                        Service has ptrace() debugging abilities                               0.3
+✗ ProtectSystem=                                               Service has full write access to system directories                   0.2
+✗ ProtectHome=                                                 Service has full access to home directories                            0.2
+✗ PrivateTmp=                                                  Service has access to other software's temporary files                0.2
+✗ PrivateDevices=                                              Service potentially has access to hardware devices                    0.2
+✗ NoNewPrivileges=                                             Service processes may acquire new privileges                           0.2
+✗ SystemCallFilter=~@clock                                     Service may change system clock                                        0.1
+✗ SystemCallFilter=~@debug                                     Service may perform debugging                                          0.1
+✗ RestrictAddressFamilies=                                     Service may allocate exotic sockets                                    0.1
+✗ ReadWritePaths=/                                             Service has full write access to filesystem                            0.5
+
+→ Overall exposure level for vulnerableapp.service: 9.3 UNSAFE 😨

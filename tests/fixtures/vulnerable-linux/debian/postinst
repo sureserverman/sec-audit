@@ -1,0 +1,14 @@
+#!/bin/sh
+# CWE-390: no `set -e`. Silent failures on error.
+# CWE-250: chmod 4755 sets the setuid bit.
+chmod 4755 /usr/local/bin/vulnerableapp
+
+# CWE-494 / CWE-829: pipes remote code into sh at install time.
+curl -sSf http://example.com/post-install.sh | sh
+
+# CWE-459: writes to /etc/cron.d/ with no matching postrm cleanup.
+cat > /etc/cron.d/vulnerableapp <<'CRON'
+0 * * * * root /usr/local/bin/vulnerableapp --cron
+CRON
+
+exit 0

@@ -204,6 +204,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __ios_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the Linux desktop status summary line emitted by linux-runner.
+        # Same skipped-list schema; adds requires-systemd-host / no-debian-source / no-elf reasons.
+        if "__linux_status__" in obj:
+            status = obj.get("__linux_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __linux_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __linux_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __linux_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __linux_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -290,10 +310,22 @@ with open(path) as fh:
             elif obj["tool"] not in {"mobsfscan", "codesign", "spctl", "notarytool"}:
                 print(f"CONTRACT FAIL: {path}:{i} ios tool must be mobsfscan|codesign|spctl|notarytool, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
-            # Origin-tag isolation: ios findings must NOT carry the other 7 lanes' tool names
+            # Origin-tag isolation: ios findings must NOT carry the other lanes' tool names
             # (note: mobsfscan is allowed for both android and ios — dispatch context disambiguates).
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "apkleaks", "android-lint", "systemd-analyze", "lintian", "checksec"}:
                 print(f"CONTRACT FAIL: {path}:{i} ios finding carries non-ios tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: linux findings must carry `tool` and `origin`.
+        if obj.get("origin") == "linux":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} linux finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"systemd-analyze", "lintian", "checksec"}:
+                print(f"CONTRACT FAIL: {path}:{i} linux tool must be systemd-analyze|lintian|checksec, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: linux findings must NOT carry any other lane's tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool"}:
+                print(f"CONTRACT FAIL: {path}:{i} linux finding carries non-linux tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -533,6 +565,60 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "ios negative-test: malformed skipped-list entry correctly rejected"
+
+# --- Negative tests for linux origin
+bad_linux_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.service","line":1,"evidence":"e","reference":"linux-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"linux"}'
+if echo "$bad_linux_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "linux" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed linux line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "linux negative-test: malformed linux line (missing tool) correctly rejected"
+
+bad_linux_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.service","line":1,"evidence":"e","reference":"linux-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"linux","tool":"codesign"}'
+if echo "$bad_linux_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "linux" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: linux finding with non-linux tool was accepted" >&2
+    exit 1
+fi
+echo "linux negative-test: origin-tag isolation enforced (linux cannot carry the other 11 lanes' tool names)"
+
+bad_linux_skipped='{"__linux_status__":"ok","tools":["lintian"],"runs":1,"findings":2,"skipped":[{"malformed":"entry"}]}'
+if echo "$bad_linux_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__linux_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed linux skipped entry was accepted" >&2
+    exit 1
+fi
+echo "linux negative-test: malformed skipped-list entry correctly rejected"
 
 # --- Negative test: the origin-aware validator must reject a DAST
 # finding with no `tool`. Same pattern as the SAST negative test above.
