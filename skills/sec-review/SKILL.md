@@ -134,6 +134,21 @@ Detect the technology stack. Read only — do not install or execute.
   `references/desktop/macos-tcc.md`,
   `references/desktop/macos-packaging.md`, and the shared
   `references/mobile-tools.md` (iOS/macOS subsections).
+- **Kubernetes signals**: any `*.yaml`/`*.yml` file containing both
+  top-level `apiVersion:` AND `kind:` keys where `kind:` matches a
+  known K8s resource (Pod, Deployment, StatefulSet, DaemonSet, Job,
+  CronJob, Service, Ingress, ConfigMap, Secret, ServiceAccount,
+  Role, RoleBinding, ClusterRole, ClusterRoleBinding, NetworkPolicy,
+  ValidatingWebhookConfiguration, MutatingWebhookConfiguration,
+  CustomResourceDefinition). Scan common paths: `k8s/`, `deploy/`,
+  `manifests/`, `kustomize/`, `helm/templates/`, repo root. Emit
+  `"k8s"` with values indicating resource mix — `["workloads"]` if
+  Pods/Deployments present, `["rbac"]` if Role/ClusterRole present,
+  `["network"]` if NetworkPolicy/Ingress present, or combinations.
+  Load `references/infra/k8s-workloads.md`, `infra/k8s-api.md`,
+  `references/k8s-tools.md`. No ecosystem entry (K8s manifests are
+  image-references, not package-manifest dependencies — image CVE
+  enrichment is a separate future concern).
 - **Windows-desktop signals**: any of the following triggers the
   `windows` inventory key:
   - .NET project files (`*.csproj`, `*.vbproj`), C++ project files
@@ -213,6 +228,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "macos":       [],
   "windows":     [],
   "linux":       [],
+  "k8s":         [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],

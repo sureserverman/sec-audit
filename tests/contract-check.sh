@@ -823,6 +823,25 @@ check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule mi
 check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
 echo "webext-inventory: SKILL.md §2 documents webext stack detection"
 
+# --- k8s inventory rule (v1.1.0 Stage 1):
+check skills/sec-review/SKILL.md "Kubernetes signals" "SKILL.md §2 missing K8s detection rule"
+check skills/sec-review/SKILL.md "apiVersion" "SKILL.md §2 k8s rule missing apiVersion trigger"
+check skills/sec-review/SKILL.md "\"k8s\"" "SKILL.md §2 inventory JSON missing k8s key"
+echo "k8s-inventory: SKILL.md §2 documents k8s stack detection"
+
+# --- k8s fixture-match sanity
+tmp_k=$(mktemp -d); trap 'rm -rf "$tmp_k"' EXIT
+cat > "$tmp_k/deploy.yaml" <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fixture
+YAML
+if ! grep -qE '^apiVersion:|^kind:' "$tmp_k/deploy.yaml"; then
+    echo "k8s-inventory: FAIL — fixture manifest malformed" >&2; fail=1
+fi
+echo "k8s-inventory: synthetic Deployment fixture matches §2 detection rule"
+
 # --- dispatch discipline (v1.0.0 Stage 1 Task 1.2):
 # SKILL.md §3.0 formally documents multi-stack dispatch + lane-filter semantics.
 check skills/sec-review/SKILL.md "### 3.0 Dispatch discipline" "SKILL.md missing §3.0 Dispatch discipline"
