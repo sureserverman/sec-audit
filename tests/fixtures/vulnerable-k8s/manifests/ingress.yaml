@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vulnerable-ingress
+spec:
+  # CWE-319: no tls: block — cleartext HTTP.
+  rules:
+  - host: vulnerable.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vulnerable-app
+            port:
+              number: 80

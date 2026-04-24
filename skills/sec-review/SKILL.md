@@ -773,6 +773,36 @@ The dep-inventory path IS affected when `.csproj` with
 enricher as `{"ecosystem": "NuGet", "manifest": "packages.lock.json"}`.
 OSV's `querybatch` handles NuGet natively, so no adapter change.
 
+### 3.15 Kubernetes admission pass — dispatch k8s-runner
+
+When the inventory emitted by §2 contains `k8s` (any YAML manifest
+with `apiVersion:` + `kind:` at root), dispatch the `k8s-runner`
+agent (`agents/k8s-runner.md`, pinned to haiku, tools: Read + Bash).
+The agent shells out to `kube-score` and `kubesec` — both cross-
+platform Go binaries with JSON output. Neither requires a live
+cluster. No host-OS gate. No artifact-absence gate beyond manifest
+discovery under target.
+
+k8s-runner runs in parallel with every other pass agent. Collect
+the findings into a `k8s_findings` list.
+
+Skill-level invariants:
+
+- **No `k8s` in inventory** — skip entirely.
+- **`__k8s_status__: "unavailable"`** — neither tool on PATH, or
+  both crashed.
+- **`__k8s_status__: "partial"`** — one ran, one failed.
+- **`__k8s_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.1 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. The skipped-list schema
+  is the same `{tool, reason}` structure used since v0.8.
+
+K8s findings are code-pattern signal against manifests. **The dep-
+inventory path is NOT affected by this lane** — K8s image references
+(e.g. `image: nginx:1.21`) are not package-manifest dependencies and
+would need a separate image-CVE enrichment path (future work). The
+ecosystems list emitted to cve-enricher does NOT gain a K8s entry.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

@@ -64,7 +64,7 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/webext-runner.md:haiku" "agents/rust-runner.md:haiku" \
             "agents/android-runner.md:haiku" "agents/ios-runner.md:haiku" \
             "agents/linux-runner.md:haiku" "agents/macos-runner.md:haiku" \
-            "agents/windows-runner.md:haiku"; do
+            "agents/windows-runner.md:haiku" "agents/k8s-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -265,6 +265,25 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __windows_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the K8s status summary line emitted by k8s-runner.
+        if "__k8s_status__" in obj:
+            status = obj.get("__k8s_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __k8s_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __k8s_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __k8s_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __k8s_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -389,8 +408,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} windows tool must be binskim|osslsigncode|sigcheck, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: windows findings must NOT carry any other lane's tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "kube-score", "kubesec"}:
                 print(f"CONTRACT FAIL: {path}:{i} windows finding carries non-windows tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: k8s findings must carry `tool` and `origin`.
+        if obj.get("origin") == "k8s":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} k8s finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"kube-score", "kubesec"}:
+                print(f"CONTRACT FAIL: {path}:{i} k8s tool must be kube-score|kubesec, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: k8s findings must NOT carry other lanes' tool names.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck"}:
+                print(f"CONTRACT FAIL: {path}:{i} k8s finding carries non-k8s tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -841,6 +872,13 @@ if ! grep -qE '^apiVersion:|^kind:' "$tmp_k/deploy.yaml"; then
     echo "k8s-inventory: FAIL — fixture manifest malformed" >&2; fail=1
 fi
 echo "k8s-inventory: synthetic Deployment fixture matches §2 detection rule"
+
+# --- orchestrator §3.15 wire-up (v1.1.0 Stage 2):
+check skills/sec-review/SKILL.md "### 3.15 Kubernetes admission pass" "SKILL.md missing §3.15"
+check skills/sec-review/SKILL.md "k8s-runner" "SKILL.md §3.15 missing k8s-runner reference"
+check skills/sec-review/SKILL.md "__k8s_status__" "SKILL.md §3.15 missing k8s sentinel"
+check skills/sec-review/SKILL.md "kube-score\|kubesec" "SKILL.md §3.15 missing kube-score/kubesec"
+echo "k8s-orchestrator: SKILL.md §3.15 documents k8s-runner wire-up"
 
 # --- dispatch discipline (v1.0.0 Stage 1 Task 1.2):
 # SKILL.md §3.0 formally documents multi-stack dispatch + lane-filter semantics.

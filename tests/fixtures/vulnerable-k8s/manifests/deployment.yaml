@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-app
+  template:
+    metadata:
+      labels:
+        app: vulnerable-app
+    spec:
+      # CWE-522: auto-mounts default SA token.
+      # (no automountServiceAccountToken: false)
+      containers:
+      - name: app
+        # CWE-494: :latest tag, no digest.
+        image: nginx:latest
+        # CWE-400: no resource limits.
+        ports:
+        - containerPort: 80
+        securityContext:
+          # CWE-250: privileged container.
+          privileged: true
+          # CWE-269: allowPrivilegeEscalation not set to false.
+          # CWE-732: readOnlyRootFilesystem not set.
+          capabilities:
+            add:
+              # CWE-250: SYS_ADMIN granted.
+              - SYS_ADMIN
+              - NET_ADMIN
+      # CWE-653: host namespaces shared.
+      hostNetwork: true
+      hostPID: true

@@ -1,0 +1,31 @@
+[
+  {
+    "file_name": "manifests/deployment.yaml",
+    "checks": [
+      {
+        "check": {"id": "container-security-context-privileged"},
+        "comments": [
+          {"summary": "The container is privileged","description": "Container 'app' is running with privileged: true which grants host-root access. Set privileged: false or remove the securityContext entry.","severity": "CRITICAL"}
+        ]
+      },
+      {
+        "check": {"id": "container-resources"},
+        "comments": [
+          {"summary": "Resource limits absent","description": "Container 'app' has no resources.limits set. Set CPU and memory limits to prevent Pod eviction under noisy-neighbour pressure.","severity": "WARNING"}
+        ]
+      },
+      {
+        "check": {"id": "container-image-tag"},
+        "comments": [
+          {"summary": "Image uses :latest tag","description": "Container 'app' references image 'nginx:latest'. Pin to a specific tag or digest.","severity": "CRITICAL"}
+        ]
+      },
+      {
+        "check": {"id": "pod-networkpolicy"},
+        "comments": [
+          {"summary": "Pod is not targeted by any NetworkPolicy","description": "No NetworkPolicy matches Pod 'vulnerable-app' in namespace 'default'. Consider a default-deny policy.","severity": "WARNING"}
+        ]
+      }
+    ]
+  }
+]
