@@ -547,6 +547,35 @@ fixture (Sparkle HTTP feed + UserDefaults secret + JIT entitlement)
 produces mobsfscan findings with all four Apple binaries cleanly-
 skipped on Linux.
 
+## Kubernetes admission lane (v1.1.0)
+
+A fourteenth agent, **`k8s-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects
+Kubernetes YAML manifests — any `*.yaml`/`*.yml` file under the
+target with both `apiVersion:` and `kind:` root keys (where `kind`
+matches Pod/Deployment/StatefulSet/etc). Cross-platform, no host-
+OS gate, no artifact preconditions.
+
+The runner dispatches two tools:
+
+- **`kube-score`** (Go binary) — scores manifests against security
+  best practices (privileged containers, resource limits, image
+  pinning, NetworkPolicy coverage, token auto-mount). JSON output.
+- **`kubesec`** (Go binary) — admission-style scoring focused on
+  privilege-escalation and host-namespace-sharing. Per-file JSON
+  output with critical/advise severity split.
+
+Output carries `origin: "k8s"` and `tool: "kube-score" | "kubesec"`.
+Reference packs live in `references/infra/k8s-workloads.md`
+(securityContext, resources, image pinning) and
+`references/infra/k8s-api.md` (RBAC, NetworkPolicy, Secrets,
+Ingress, webhooks). Neither tool requires a live cluster — both
+scan static YAML.
+
+**Dep-inventory NOT affected.** K8s image references are not
+package-manifest dependencies; image CVE enrichment is future
+work. **Skip vocabulary unchanged** — only `tool-missing` applies.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -679,6 +708,7 @@ names from the other 12 lanes).
 | Desktop Linux             | Source tree (`*.service` / `debian/control` / `*.spec` / flatpak-manifest / `snapcraft.yaml`) | `systemd-analyze security` (systemd-host), `lintian` (debian/ source), `checksec` (ELF present) | `references/desktop/{linux-systemd,linux-sandboxing,linux-packaging}.md`, `references/linux-tools.md` | v0.10.0    |
 | Desktop macOS             | Source tree (`Info.plist` with `LSMinimumSystemVersion` / `*.pkg` / `*.dmg` / Sparkle) | `mobsfscan`, `codesign` / `spctl` / `pkgutil` / `stapler` (macOS-host + artifact-present) | `references/desktop/{macos-hardened-runtime,macos-tcc,macos-packaging}.md`, `references/mobile-tools.md` | v0.11.0    |
 | Desktop Windows           | Source + PE artifacts (`.csproj` / `.vcxproj` / `.wxs` / `AppxManifest.xml` / `.exe` / `.msi` / AppLocker/WDAC XML) | `binskim` + `osslsigncode` (cross-platform), `sigcheck` (Windows-host) | `references/desktop/{windows-authenticode,windows-applocker,windows-packaging}.md`, `references/windows-tools.md` | v0.12.0    |
+| Kubernetes admission      | YAML manifests with `apiVersion:` + `kind:`     | `kube-score`, `kubesec` (both cross-platform) | `references/infra/{k8s-workloads,k8s-api}.md`, `references/k8s-tools.md` | v1.1.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
