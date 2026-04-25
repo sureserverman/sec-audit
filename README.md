@@ -576,6 +576,42 @@ scan static YAML.
 package-manifest dependencies; image CVE enrichment is future
 work. **Skip vocabulary unchanged** — only `tool-missing` applies.
 
+## IaC lane (v1.2.0)
+
+A fifteenth agent, **`iac-runner`** (haiku-pinned, `Read` + `Bash`
+tools), joins the pipeline whenever the §2 inventory detects
+Infrastructure-as-Code source — `*.tf`, `*.tfvars`, `*.hcl`,
+`Pulumi.yaml`, `Pulumi.<stack>.yaml`, or `terragrunt.hcl` under
+the target. Cross-platform, no host-OS gate, no artifact
+preconditions beyond IaC source presence under target.
+
+The runner dispatches two tools:
+
+- **`tfsec`** (Go binary, Terraform-focused) — scans HCL for AWS,
+  GCP, and Azure misconfigurations: public S3 ACLs, IAM wildcards,
+  open security groups, unencrypted RDS, hardcoded provider
+  credentials. JSON output keyed on Aqua Vulnerability Database
+  (`AVD-*`) rule IDs.
+- **`checkov`** (Python, multi-IaC) — scans Terraform AND Pulumi
+  with the same engine; complementary policy library to tfsec
+  (CKV-* rule IDs). Per-finding `severity` + upstream Bridgecrew
+  guideline URL. Run with `--framework terraform,pulumi` for the
+  IaC lane (broader frameworks belong to sec-expert + future lanes).
+
+Output carries `origin: "iac"` and `tool: "tfsec" | "checkov"`.
+Reference packs live in `references/infra/iac-cloud-resources.md`
+(S3, IAM, RDS, EC2 SG, GCP IAM bindings, Azure storage,
+CloudFront) and `references/infra/iac-secrets-state.md`
+(provider-block credential hygiene + remote-state backend
+encryption). Neither tool requires a live cloud account — both
+scan static IaC source.
+
+**Dep-inventory NOT affected.** Terraform and Pulumi declarations
+reference cloud resources and provider versions, not
+package-manifest dependencies; provider-version CVE enrichment is
+future work. **Skip vocabulary unchanged** — only `tool-missing`
+applies, since both tools are cross-platform with no host-OS gate.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -709,6 +745,7 @@ names from the other 12 lanes).
 | Desktop macOS             | Source tree (`Info.plist` with `LSMinimumSystemVersion` / `*.pkg` / `*.dmg` / Sparkle) | `mobsfscan`, `codesign` / `spctl` / `pkgutil` / `stapler` (macOS-host + artifact-present) | `references/desktop/{macos-hardened-runtime,macos-tcc,macos-packaging}.md`, `references/mobile-tools.md` | v0.11.0    |
 | Desktop Windows           | Source + PE artifacts (`.csproj` / `.vcxproj` / `.wxs` / `AppxManifest.xml` / `.exe` / `.msi` / AppLocker/WDAC XML) | `binskim` + `osslsigncode` (cross-platform), `sigcheck` (Windows-host) | `references/desktop/{windows-authenticode,windows-applocker,windows-packaging}.md`, `references/windows-tools.md` | v0.12.0    |
 | Kubernetes admission      | YAML manifests with `apiVersion:` + `kind:`     | `kube-score`, `kubesec` (both cross-platform) | `references/infra/{k8s-workloads,k8s-api}.md`, `references/k8s-tools.md` | v1.1.0     |
+| Infrastructure-as-Code    | Terraform / Pulumi / Terragrunt source (`*.tf`, `Pulumi.yaml`, `terragrunt.hcl`) | `tfsec`, `checkov` (both cross-platform) | `references/infra/{iac-cloud-resources,iac-secrets-state}.md`, `references/iac-tools.md` | v1.2.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

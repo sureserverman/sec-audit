@@ -210,6 +210,24 @@ Detect the technology stack. Read only — do not install or execute.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **IaC signals**: any of the following triggers the `iac`
+  inventory key:
+  - Terraform sources — `*.tf`, `*.tfvars`, `*.hcl` anywhere in the
+    tree (typically under `terraform/`, `infrastructure/`,
+    `infra/`, or repo root).
+  - Pulumi project — `Pulumi.yaml` at project root or under a
+    `pulumi/` subdir, or a `Pulumi.<stack>.yaml` stack-config file.
+  - Terragrunt — `terragrunt.hcl` files.
+  When detected, add `"iac"` with values reflecting the framework(s):
+  `"iac": ["terraform"]`, `"iac": ["pulumi"]`, `"iac": ["terragrunt"]`,
+  or combinations (`["terraform", "pulumi"]` is common in
+  multi-cloud monorepos). Load
+  `references/infra/iac-cloud-resources.md`,
+  `references/infra/iac-secrets-state.md`, and the tool-lane
+  reference `references/iac-tools.md`. No ecosystem entry — IaC
+  declarations reference cloud resources and provider versions, not
+  package-manifest dependencies; provider-version CVE enrichment is
+  a separate future concern.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -229,6 +247,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "windows":     [],
   "linux":       [],
   "k8s":         [],
+  "iac":         [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -802,6 +821,46 @@ inventory path is NOT affected by this lane** — K8s image references
 (e.g. `image: nginx:1.21`) are not package-manifest dependencies and
 would need a separate image-CVE enrichment path (future work). The
 ecosystems list emitted to cve-enricher does NOT gain a K8s entry.
+
+### 3.16 IaC pass — dispatch iac-runner
+
+When the inventory emitted by §2 contains `iac` (any of: `*.tf`,
+`*.tfvars`, `*.hcl`, `Pulumi.yaml`, `Pulumi.<stack>.yaml`, or
+`terragrunt.hcl` under target), dispatch the `iac-runner` agent
+(`agents/iac-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to `tfsec` (Go binary, Terraform-focused) and
+`checkov` (Python, multi-IaC including Terraform + Pulumi). Both
+tools are cross-platform — no host-OS gate. Neither requires a
+live cloud account; both run as pure source-tree static scanners.
+
+iac-runner runs in parallel with every other pass agent. Collect
+the findings into an `iac_findings` list.
+
+Skill-level invariants:
+
+- **No `iac` in inventory** — skip entirely.
+- **`__iac_status__: "unavailable"`** — neither tool on PATH, or
+  both crashed.
+- **`__iac_status__: "partial"`** — one ran, one failed.
+- **`__iac_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.2 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. Both tfsec and checkov
+  are cross-platform with no host-OS gates and no
+  artifact-absence preconditions beyond IaC source presence under
+  target. The skipped-list schema is the same `{tool, reason}`
+  structure used since v0.8.
+
+IaC findings are code-pattern signal against declarative cloud
+resource definitions. **The dep-inventory path is NOT affected by
+this lane** — Terraform/Pulumi declarations reference cloud
+resources and provider versions, not package-manifest
+dependencies; provider-version CVE enrichment is a separate future
+concern. The ecosystems list emitted to cve-enricher does NOT gain
+an IaC entry. **Origin-tag isolation:** every iac finding carries
+`origin: "iac"` and `tool: "tfsec" | "checkov"`. The
+contract-check rejects any iac finding tagged with another lane's
+tool (semgrep, kube-score, kubesec, etc.) — see
+`tests/contract-check.sh`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

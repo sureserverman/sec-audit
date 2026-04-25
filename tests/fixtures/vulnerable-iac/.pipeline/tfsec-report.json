@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "rule_id": "AVD-AWS-0086",
+      "severity": "HIGH",
+      "description": "S3 bucket has acl set to public-read.",
+      "impact": "The bucket's contents can be read by any unauthenticated user.",
+      "resolution": "Set acl = \"private\" and use bucket policies for narrow access.",
+      "link": "https://aquasecurity.github.io/tfsec/latest/checks/aws/s3/no-public-access-with-acl/",
+      "location": {"filename": "terraform/main.tf", "start_line": 19}
+    },
+    {
+      "rule_id": "AVD-AWS-0057",
+      "severity": "HIGH",
+      "description": "IAM policy document uses wildcard actions.",
+      "impact": "Overly permissive policy grants unintended access.",
+      "resolution": "Replace \"*\" with specific IAM actions scoped to the task.",
+      "link": "https://aquasecurity.github.io/tfsec/latest/checks/aws/iam/no-policy-wildcards/",
+      "location": {"filename": "terraform/main.tf", "start_line": 25}
+    },
+    {
+      "rule_id": "AVD-AWS-0107",
+      "severity": "CRITICAL",
+      "description": "Security group allows ingress from 0.0.0.0/0 on port 22.",
+      "impact": "SSH accessible to the entire internet.",
+      "resolution": "Restrict cidr_blocks to known admin CIDRs or use a bastion/SSM Session Manager.",
+      "link": "https://aquasecurity.github.io/tfsec/latest/checks/aws/ec2/no-public-ingress-sgr/",
+      "location": {"filename": "terraform/main.tf", "start_line": 40}
+    },
+    {
+      "rule_id": "AVD-AWS-0080",
+      "severity": "HIGH",
+      "description": "RDS instance does not have storage_encrypted set.",
+      "impact": "Data at rest is stored unencrypted.",
+      "resolution": "Set storage_encrypted = true on the aws_db_instance resource.",
+      "link": "https://aquasecurity.github.io/tfsec/latest/checks/aws/rds/encrypt-instance-storage-data/",
+      "location": {"filename": "terraform/main.tf", "start_line": 51}
+    }
+  ]
+}

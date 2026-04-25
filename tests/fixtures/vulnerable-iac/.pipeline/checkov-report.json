@@ -1,0 +1,37 @@
+{
+  "check_type": "terraform",
+  "results": {
+    "failed_checks": [
+      {
+        "check_id": "CKV_AWS_41",
+        "check_name": "Ensure no hard-coded secrets exist in provider blocks",
+        "severity": "HIGH",
+        "file_path": "/terraform/main.tf",
+        "file_line_range": [7, 11],
+        "resource": "provider.aws",
+        "guideline": "https://docs.bridgecrew.io/docs/secrets-policies"
+      },
+      {
+        "check_id": "CKV_AWS_19",
+        "check_name": "Ensure that S3 bucket has a lifecycle configuration to disable public read-write",
+        "severity": "HIGH",
+        "file_path": "/terraform/main.tf",
+        "file_line_range": [19, 22],
+        "resource": "aws_s3_bucket_acl.exposed",
+        "guideline": "https://docs.bridgecrew.io/docs/s3_13-enable-logging"
+      },
+      {
+        "check_id": "CKV_AWS_62",
+        "check_name": "Ensure no IAM policies documents allow \"*\" as a statement's actions",
+        "severity": "MEDIUM",
+        "file_path": "/terraform/main.tf",
+        "file_line_range": [27, 36],
+        "resource": "aws_iam_policy.wildcard",
+        "guideline": "https://docs.bridgecrew.io/docs/iam_48"
+      }
+    ],
+    "passed_checks": [],
+    "parsing_errors": []
+  },
+  "summary": {"passed": 0, "failed": 3}
+}
