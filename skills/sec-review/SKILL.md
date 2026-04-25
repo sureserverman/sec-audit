@@ -210,6 +210,24 @@ Detect the technology stack. Read only — do not install or execute.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **IaC signals**: any of the following triggers the `iac`
+  inventory key:
+  - Terraform sources — `*.tf`, `*.tfvars`, `*.hcl` anywhere in the
+    tree (typically under `terraform/`, `infrastructure/`,
+    `infra/`, or repo root).
+  - Pulumi project — `Pulumi.yaml` at project root or under a
+    `pulumi/` subdir, or a `Pulumi.<stack>.yaml` stack-config file.
+  - Terragrunt — `terragrunt.hcl` files.
+  When detected, add `"iac"` with values reflecting the framework(s):
+  `"iac": ["terraform"]`, `"iac": ["pulumi"]`, `"iac": ["terragrunt"]`,
+  or combinations (`["terraform", "pulumi"]` is common in
+  multi-cloud monorepos). Load
+  `references/infra/iac-cloud-resources.md`,
+  `references/infra/iac-secrets-state.md`, and the tool-lane
+  reference `references/iac-tools.md`. No ecosystem entry — IaC
+  declarations reference cloud resources and provider versions, not
+  package-manifest dependencies; provider-version CVE enrichment is
+  a separate future concern.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -229,6 +247,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "windows":     [],
   "linux":       [],
   "k8s":         [],
+  "iac":         [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
