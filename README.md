@@ -612,6 +612,48 @@ package-manifest dependencies; provider-version CVE enrichment is
 future work. **Skip vocabulary unchanged** — only `tool-missing`
 applies, since both tools are cross-platform with no host-OS gate.
 
+## GitHub Actions lane (v1.3.0)
+
+A sixteenth agent, **`gh-actions-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects GitHub Actions workflow source — any
+`.github/workflows/*.y(a)ml` file under target whose contents
+declare top-level `on:` and `jobs:` keys. Cross-platform, no
+host-OS gate, no artifact preconditions beyond a populated
+`.github/workflows/` directory.
+
+The runner dispatches two tools:
+
+- **`actionlint`** (Go binary) — broad workflow lint covering
+  syntax, expression context types, event-trigger correctness,
+  reusable-workflow inputs, and a bundled `shellcheck` pass on
+  every `run:` block (the latter catches script-injection via
+  GitHub-context expansions). JSON output keyed by `kind`.
+- **`zizmor`** (Python) — security-focused auditor with a narrower
+  but deeper rule set: `excessive-permissions`, `dangerous-triggers`
+  (the `pull_request_target` + checkout-PR-head Poisoned Pipeline
+  Execution class), `unpinned-uses` (tag vs SHA), `template-
+  injection`, `artipacked` (the persist-credentials class),
+  `secrets-inherit`. Per-finding severity + confidence, with
+  upstream audit-doc URLs.
+
+Output carries `origin: "gh-actions"` and
+`tool: "actionlint" | "zizmor"`. Reference packs live in
+`references/infra/gh-actions-permissions.md` (token permissions,
+pull_request_target, action pinning) and
+`references/infra/gh-actions-secrets.md` (script injection,
+persist-credentials, self-hosted runners, workflow_call typing).
+Neither tool contacts the GitHub API — both run as pure
+source-tree static scanners.
+
+**Dep-inventory NOT affected.** Workflow files reference action
+versions (`uses: org/repo@SHA`), not package-manifest
+dependencies; SHA-pinning compliance is enforced at the
+code-pattern layer (zizmor's `unpinned-uses` audit) rather than
+via CVE feeds. **Skip vocabulary unchanged** — only
+`tool-missing` applies, since both tools are cross-platform with
+no host-OS gate.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -643,11 +685,11 @@ stack-e2e.sh` integration test.
 
 `--only=<lanes>` restricts dispatch to the named lanes; `--skip=<lanes>`
 excludes them. The two flags are mutually exclusive. Valid lane
-names (12 total): `sec-expert`, `sast`, `dast`, `webext`, `rust`,
-`android`, `ios`, `linux`, `macos`, `windows`, `k8s`, `iac` — any
-other value is rejected before the skill dispatches. The
-Review-metadata block surfaces a `Lane filter applied: ...` line
-when either flag is set.
+names (13 total): `sec-expert`, `sast`, `dast`, `webext`, `rust`,
+`android`, `ios`, `linux`, `macos`, `windows`, `k8s`, `iac`,
+`gh-actions` — any other value is rejected before the skill
+dispatches. The Review-metadata block surfaces a `Lane filter
+applied: ...` line when either flag is set.
 
 **Consolidated per-lane summary in reports.** The final markdown
 report now opens with a `## Per-lane summary` table listing one row
@@ -747,6 +789,7 @@ names from the other 12 lanes).
 | Desktop Windows           | Source + PE artifacts (`.csproj` / `.vcxproj` / `.wxs` / `AppxManifest.xml` / `.exe` / `.msi` / AppLocker/WDAC XML) | `binskim` + `osslsigncode` (cross-platform), `sigcheck` (Windows-host) | `references/desktop/{windows-authenticode,windows-applocker,windows-packaging}.md`, `references/windows-tools.md` | v0.12.0    |
 | Kubernetes admission      | YAML manifests with `apiVersion:` + `kind:`     | `kube-score`, `kubesec` (both cross-platform) | `references/infra/{k8s-workloads,k8s-api}.md`, `references/k8s-tools.md` | v1.1.0     |
 | Infrastructure-as-Code    | Terraform / Pulumi / Terragrunt source (`*.tf`, `Pulumi.yaml`, `terragrunt.hcl`) | `tfsec`, `checkov` (both cross-platform) | `references/infra/{iac-cloud-resources,iac-secrets-state}.md`, `references/iac-tools.md` | v1.2.0     |
+| GitHub Actions            | `.github/workflows/*.y(a)ml` with `on:` + `jobs:`  | `actionlint`, `zizmor` (both cross-platform) | `references/infra/{gh-actions-permissions,gh-actions-secrets}.md`, `references/gh-actions-tools.md` | v1.3.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

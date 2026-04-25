@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.2.1. This file is the authoritative "what does
+    plugin as of v1.3.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across eleven tool lanes plus sec-expert code
+software projects across twelve tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to twelve review streams in parallel
-(eleven tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to thirteen review streams in parallel
+(twelve tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -242,6 +242,30 @@ Dispatch discipline.
   package-manifest dependencies; provider-version CVE enrichment
   is future work.
 - **Shipped in:** v1.2.0.
+
+### gh-actions (GitHub Actions workflows)
+
+- **Target shape:** any `.github/workflows/*.yml`/`*.yaml` file
+  under target whose contents declare both top-level `on:` and
+  `jobs:` keys (the canonical Actions workflow shape).
+- **Tools:** `actionlint` (Go binary; broad workflow lint with
+  bundled `shellcheck` for script-injection detection), `zizmor`
+  (Python; security-focused auditor for pinning, permissions,
+  template-injection, dangerous-triggers, artifact-poisoning).
+  Both cross-platform; neither contacts the GitHub API.
+- **Reference packs:**
+  `references/infra/gh-actions-permissions.md`,
+  `references/infra/gh-actions-secrets.md`,
+  `references/gh-actions-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`.
+- **Origin tag:** `"gh-actions"`. Tool whitelist: `actionlint`,
+  `zizmor`.
+- **Dep-inventory:** NOT affected — workflow files reference
+  action versions (`uses: org/repo@SHA`), not package-manifest
+  dependencies; SHA-pinning compliance is enforced at the
+  code-pattern layer (zizmor's `unpinned-uses` audit).
+- **Shipped in:** v1.3.0.
 
 ## Ecosystems
 

@@ -1,0 +1,26 @@
+[
+  {
+    "message": "object \"github\" has no attribute \"event.pull_request.title\" used in expression context — likely script-injection if expanded into shell",
+    "filepath": ".github/workflows/release.yml",
+    "line": 28,
+    "column": 21,
+    "kind": "expression",
+    "snippet": "echo \"Title: ${{ github.event.pull_request.title }}\""
+  },
+  {
+    "message": "use of pull_request_target with checkout of PR head ref is dangerous (Poisoned Pipeline Execution)",
+    "filepath": ".github/workflows/release.yml",
+    "line": 19,
+    "column": 11,
+    "kind": "events",
+    "snippet": "ref: ${{ github.event.pull_request.head.sha }}"
+  },
+  {
+    "message": "shellcheck reported issue in this script: the expression interpolated into the shell is attacker-controlled",
+    "filepath": ".github/workflows/release.yml",
+    "line": 28,
+    "column": 9,
+    "kind": "shellcheck",
+    "snippet": "echo \"Title: ${{ github.event.pull_request.title }}\""
+  }
+]

@@ -21,10 +21,10 @@ code analysis; this skill orchestrates and enriches.
 - `only_lanes` (optional, v1.0.0+) — list of canonical lane names
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
-  `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2). When
-  set, the orchestrator dispatches ONLY the named lanes and records
-  the filter in the Review-metadata block. Mutually exclusive with
-  `skip_lanes`.
+  `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
+  `gh-actions` (added v1.3). When set, the orchestrator dispatches
+  ONLY the named lanes and records the filter in the
+  Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
   the caller wants to exclude. Same vocabulary as `only_lanes`.
   When set, the orchestrator dispatches every applicable lane
@@ -211,6 +211,19 @@ Detect the technology stack. Read only — do not install or execute.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **GitHub Actions signals**: any `.github/workflows/*.yml` or
+  `.github/workflows/*.yaml` file under target whose contents
+  declare both top-level `on:` and `jobs:` keys (the canonical
+  Actions workflow shape). When detected, add `"gh-actions"` with
+  values reflecting the trigger surface — `"gh-actions": ["push"]`,
+  `["pull_request"]`, `["pull_request_target"]`, `["workflow_call"]`,
+  `["workflow_run"]`, `["schedule"]`, `["release"]`, or
+  combinations. Load `references/infra/gh-actions-permissions.md`,
+  `references/infra/gh-actions-secrets.md`, and the tool-lane
+  reference `references/gh-actions-tools.md`. No ecosystem entry
+  — workflow files reference action versions, not package-manifest
+  dependencies; action SHA-pinning is enforced at the
+  code-pattern layer, not via CVE feeds.
 - **IaC signals**: any of the following triggers the `iac`
   inventory key:
   - Terraform sources — `*.tf`, `*.tfvars`, `*.hcl` anywhere in the
@@ -249,6 +262,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "linux":       [],
   "k8s":         [],
   "iac":         [],
+  "gh-actions":  [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -862,6 +876,48 @@ an IaC entry. **Origin-tag isolation:** every iac finding carries
 contract-check rejects any iac finding tagged with another lane's
 tool (semgrep, kube-score, kubesec, etc.) — see
 `tests/contract-check.sh`.
+
+### 3.17 GitHub Actions pass — dispatch gh-actions-runner
+
+When the inventory emitted by §2 contains `gh-actions` (any
+`.github/workflows/*.y(a)ml` file with top-level `on:` + `jobs:`
+keys), dispatch the `gh-actions-runner` agent
+(`agents/gh-actions-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to `actionlint` (Go binary; broad
+workflow lint with bundled shellcheck for script-injection
+detection) and `zizmor` (Python; security-focused auditor for
+pinning, permissions, template-injection, artifact-poisoning).
+Both tools are cross-platform — no host-OS gate. Neither contacts
+the GitHub API; both run as pure source-tree static scanners.
+
+gh-actions-runner runs in parallel with every other pass agent.
+Collect the findings into a `gh_actions_findings` list.
+
+Skill-level invariants:
+
+- **No `gh-actions` in inventory** — skip entirely.
+- **`__gh_actions_status__: "unavailable"`** — neither tool on
+  PATH, or both crashed.
+- **`__gh_actions_status__: "partial"`** — one ran, one failed.
+- **`__gh_actions_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.3 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. Both actionlint and
+  zizmor are cross-platform with no host-OS gates and no
+  artifact-absence preconditions beyond `.github/workflows/`
+  presence under target. The skipped-list schema is the same
+  `{tool, reason}` structure used since v0.8.
+
+GitHub Actions findings are code-pattern signal against workflow
+YAML. **The dep-inventory path is NOT affected by this lane** —
+workflow files reference action versions (`uses: org/repo@SHA`),
+not package-manifest dependencies; SHA-pinning compliance is
+enforced at the code-pattern layer (zizmor's `unpinned-uses`
+audit) rather than via CVE feeds. The ecosystems list emitted to
+cve-enricher does NOT gain a gh-actions entry. **Origin-tag
+isolation:** every gh-actions finding carries
+`origin: "gh-actions"` and `tool: "actionlint" | "zizmor"`. The
+contract-check rejects any gh-actions finding tagged with another
+lane's tool — see `tests/contract-check.sh`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
