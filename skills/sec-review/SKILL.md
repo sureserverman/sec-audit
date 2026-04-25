@@ -211,6 +211,19 @@ Detect the technology stack. Read only — do not install or execute.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **GitHub Actions signals**: any `.github/workflows/*.yml` or
+  `.github/workflows/*.yaml` file under target whose contents
+  declare both top-level `on:` and `jobs:` keys (the canonical
+  Actions workflow shape). When detected, add `"gh-actions"` with
+  values reflecting the trigger surface — `"gh-actions": ["push"]`,
+  `["pull_request"]`, `["pull_request_target"]`, `["workflow_call"]`,
+  `["workflow_run"]`, `["schedule"]`, `["release"]`, or
+  combinations. Load `references/infra/gh-actions-permissions.md`,
+  `references/infra/gh-actions-secrets.md`, and the tool-lane
+  reference `references/gh-actions-tools.md`. No ecosystem entry
+  — workflow files reference action versions, not package-manifest
+  dependencies; action SHA-pinning is enforced at the
+  code-pattern layer, not via CVE feeds.
 - **IaC signals**: any of the following triggers the `iac`
   inventory key:
   - Terraform sources — `*.tf`, `*.tfvars`, `*.hcl` anywhere in the
@@ -249,6 +262,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "linux":       [],
   "k8s":         [],
   "iac":         [],
+  "gh-actions":  [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
