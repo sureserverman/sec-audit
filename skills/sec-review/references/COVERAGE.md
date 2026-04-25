@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.0.0. This file is the authoritative "what does
+    plugin as of v1.2.1. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across eight tool lanes plus sec-expert code
+software projects across eleven tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,11 +31,11 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to nine review streams in parallel (eight
-tool lanes plus the sec-expert code-reasoning stream). Each
-inventory key in `§2 Inventory` maps to one dispatch target. Two or
-more keys trigger multi-stack dispatch; see SKILL.md §3.0 Dispatch
-discipline.
+The plugin dispatches up to twelve review streams in parallel
+(eleven tool lanes plus the sec-expert code-reasoning stream).
+Each inventory key in `§2 Inventory` maps to one dispatch target.
+Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
+Dispatch discipline.
 
 ### sec-expert — code reasoning
 
@@ -196,6 +196,52 @@ discipline.
 - **Origin tag:** `"windows"`. Tool whitelist: `binskim`,
   `osslsigncode`, `sigcheck`.
 - **Shipped in:** v0.12.0.
+
+### k8s (Kubernetes admission)
+
+- **Target shape:** any `*.yaml`/`*.yml` under target with both
+  top-level `apiVersion:` AND `kind:` keys, where `kind:` matches
+  a known K8s resource (Pod, Deployment, StatefulSet, DaemonSet,
+  Job, CronJob, Service, Ingress, ConfigMap, Secret,
+  ServiceAccount, Role/ClusterRole, RoleBinding/ClusterRoleBinding,
+  NetworkPolicy, ValidatingWebhookConfiguration,
+  MutatingWebhookConfiguration, CustomResourceDefinition).
+- **Tools:** `kube-score` (Go binary; security-best-practice
+  scoring), `kubesec` (Go binary; admission-style
+  privilege-escalation + host-namespace scoring). Both
+  cross-platform; neither requires a live cluster.
+- **Reference packs:** `references/infra/k8s-workloads.md`,
+  `references/infra/k8s-api.md`, `references/k8s-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`.
+- **Origin tag:** `"k8s"`. Tool whitelist: `kube-score`, `kubesec`.
+- **Dep-inventory:** NOT affected — image references in manifests
+  are not package-manifest dependencies; image CVE enrichment is
+  future work.
+- **Shipped in:** v1.1.0.
+
+### iac (Infrastructure-as-Code)
+
+- **Target shape:** Terraform / Pulumi / Terragrunt source under
+  target — `*.tf`, `*.tfvars`, `*.hcl`, `Pulumi.yaml`,
+  `Pulumi.<stack>.yaml`, or `terragrunt.hcl`.
+- **Tools:** `tfsec` (Go binary, Terraform-focused; AWS/GCP/Azure
+  rules with Aqua Vulnerability Database `AVD-*` IDs), `checkov`
+  (Python, multi-IaC; complementary CKV-* policy library, run
+  with `--framework terraform,pulumi`). Both cross-platform;
+  neither requires a live cloud account.
+- **Reference packs:**
+  `references/infra/iac-cloud-resources.md`,
+  `references/infra/iac-secrets-state.md`,
+  `references/iac-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`.
+- **Origin tag:** `"iac"`. Tool whitelist: `tfsec`, `checkov`.
+- **Dep-inventory:** NOT affected — Terraform/Pulumi declarations
+  reference cloud resources and provider versions, not
+  package-manifest dependencies; provider-version CVE enrichment
+  is future work.
+- **Shipped in:** v1.2.0.
 
 ## Ecosystems
 

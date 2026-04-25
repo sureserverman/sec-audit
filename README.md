@@ -643,10 +643,11 @@ stack-e2e.sh` integration test.
 
 `--only=<lanes>` restricts dispatch to the named lanes; `--skip=<lanes>`
 excludes them. The two flags are mutually exclusive. Valid lane
-names: `sec-expert`, `sast`, `dast`, `webext`, `rust`, `android`,
-`ios`, `linux`, `macos`, `windows` — any other value is rejected
-before the skill dispatches. The Review-metadata block surfaces a
-`Lane filter applied: ...` line when either flag is set.
+names (12 total): `sec-expert`, `sast`, `dast`, `webext`, `rust`,
+`android`, `ios`, `linux`, `macos`, `windows`, `k8s`, `iac` — any
+other value is rejected before the skill dispatches. The
+Review-metadata block surfaces a `Lane filter applied: ...` line
+when either flag is set.
 
 **Consolidated per-lane summary in reports.** The final markdown
 report now opens with a `## Per-lane summary` table listing one row
