@@ -21,9 +21,10 @@ code analysis; this skill orchestrates and enriches.
 - `only_lanes` (optional, v1.0.0+) — list of canonical lane names
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
-  `macos`, `windows`. When set, the orchestrator dispatches ONLY
-  the named lanes and records the filter in the Review-metadata
-  block. Mutually exclusive with `skip_lanes`.
+  `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2). When
+  set, the orchestrator dispatches ONLY the named lanes and records
+  the filter in the Review-metadata block. Mutually exclusive with
+  `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
   the caller wants to exclude. Same vocabulary as `only_lanes`.
   When set, the orchestrator dispatches every applicable lane

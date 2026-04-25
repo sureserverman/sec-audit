@@ -18,9 +18,10 @@ Parse `$ARGUMENTS` into:
 3. **`--skip=<lanes>`** (optional) — comma-separated lane names to
    exclude from dispatch.
 
-**Canonical lane names (10 total):** `sec-expert`, `sast`, `dast`,
-`webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`.
-Reject any invocation that names a lane outside this list.
+**Canonical lane names (12 total):** `sec-expert`, `sast`, `dast`,
+`webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
+`k8s`, `iac`. Reject any invocation that names a lane outside this
+list.
 
 **Mutual exclusion:** `--only` and `--skip` MUST NOT both be set. The
 two flags are mutually exclusive. If the caller passed both, refuse
