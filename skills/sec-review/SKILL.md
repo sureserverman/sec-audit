@@ -822,6 +822,46 @@ inventory path is NOT affected by this lane** — K8s image references
 would need a separate image-CVE enrichment path (future work). The
 ecosystems list emitted to cve-enricher does NOT gain a K8s entry.
 
+### 3.16 IaC pass — dispatch iac-runner
+
+When the inventory emitted by §2 contains `iac` (any of: `*.tf`,
+`*.tfvars`, `*.hcl`, `Pulumi.yaml`, `Pulumi.<stack>.yaml`, or
+`terragrunt.hcl` under target), dispatch the `iac-runner` agent
+(`agents/iac-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to `tfsec` (Go binary, Terraform-focused) and
+`checkov` (Python, multi-IaC including Terraform + Pulumi). Both
+tools are cross-platform — no host-OS gate. Neither requires a
+live cloud account; both run as pure source-tree static scanners.
+
+iac-runner runs in parallel with every other pass agent. Collect
+the findings into an `iac_findings` list.
+
+Skill-level invariants:
+
+- **No `iac` in inventory** — skip entirely.
+- **`__iac_status__: "unavailable"`** — neither tool on PATH, or
+  both crashed.
+- **`__iac_status__: "partial"`** — one ran, one failed.
+- **`__iac_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.2 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. Both tfsec and checkov
+  are cross-platform with no host-OS gates and no
+  artifact-absence preconditions beyond IaC source presence under
+  target. The skipped-list schema is the same `{tool, reason}`
+  structure used since v0.8.
+
+IaC findings are code-pattern signal against declarative cloud
+resource definitions. **The dep-inventory path is NOT affected by
+this lane** — Terraform/Pulumi declarations reference cloud
+resources and provider versions, not package-manifest
+dependencies; provider-version CVE enrichment is a separate future
+concern. The ecosystems list emitted to cve-enricher does NOT gain
+an IaC entry. **Origin-tag isolation:** every iac finding carries
+`origin: "iac"` and `tool: "tfsec" | "checkov"`. The
+contract-check rejects any iac finding tagged with another lane's
+tool (semgrep, kube-score, kubesec, etc.) — see
+`tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
