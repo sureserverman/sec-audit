@@ -1,0 +1,37 @@
+# CWE-732: workflow grants full write-all and inherits secrets to test step.
+name: Release
+permissions: write-all
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # CWE-200: secret available to npm test
+    steps:
+      # CWE-829: action pinned by tag, not SHA.
+      - uses: actions/checkout@v4
+        with:
+          # CWE-94: pull_request_target + checkout of PR head.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test          # untrusted PR code runs with NPM_TOKEN visible
+
+      # CWE-94: script injection via github.event.pull_request.title.
+      - name: Comment
+        run: |
+          echo "Title: ${{ github.event.pull_request.title }}"
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Saw: ${{ github.event.pull_request.title }}"
+
+      - name: Publish
+        run: npm publish

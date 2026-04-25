@@ -1,0 +1,64 @@
+{
+  "findings": [
+    {
+      "ident": "excessive-permissions",
+      "desc": "workflow uses permissions: write-all — grants every API surface",
+      "severity": "High",
+      "confidence": "High",
+      "locations": [
+        {
+          "symbolic": {"path": ".github/workflows/release.yml"},
+          "concrete": {"location": {"start_point": {"row": 3, "column": 0}}}
+        }
+      ]
+    },
+    {
+      "ident": "dangerous-triggers",
+      "desc": "pull_request_target combined with checkout of PR head allows arbitrary code execution with base-repo secrets",
+      "severity": "High",
+      "confidence": "High",
+      "locations": [
+        {
+          "symbolic": {"path": ".github/workflows/release.yml"},
+          "concrete": {"location": {"start_point": {"row": 6, "column": 2}}}
+        }
+      ]
+    },
+    {
+      "ident": "unpinned-uses",
+      "desc": "actions/checkout@v4 is pinned by tag, not SHA — supply-chain risk",
+      "severity": "Medium",
+      "confidence": "High",
+      "locations": [
+        {
+          "symbolic": {"path": ".github/workflows/release.yml"},
+          "concrete": {"location": {"start_point": {"row": 17, "column": 8}}}
+        }
+      ]
+    },
+    {
+      "ident": "template-injection",
+      "desc": "github.event.pull_request.title interpolated into a run: block — script-injection vector",
+      "severity": "High",
+      "confidence": "High",
+      "locations": [
+        {
+          "symbolic": {"path": ".github/workflows/release.yml"},
+          "concrete": {"location": {"start_point": {"row": 28, "column": 8}}}
+        }
+      ]
+    },
+    {
+      "ident": "secrets-inherit",
+      "desc": "NPM_TOKEN exposed via job-level env: to every step including npm test",
+      "severity": "Medium",
+      "confidence": "Medium",
+      "locations": [
+        {
+          "symbolic": {"path": ".github/workflows/release.yml"},
+          "concrete": {"location": {"start_point": {"row": 14, "column": 6}}}
+        }
+      ]
+    }
+  ]
+}

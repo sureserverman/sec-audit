@@ -65,7 +65,7 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/android-runner.md:haiku" "agents/ios-runner.md:haiku" \
             "agents/linux-runner.md:haiku" "agents/macos-runner.md:haiku" \
             "agents/windows-runner.md:haiku" "agents/k8s-runner.md:haiku" \
-            "agents/iac-runner.md:haiku"; do
+            "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -304,6 +304,25 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __iac_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the gh-actions status summary line emitted by gh-actions-runner.
+        if "__gh_actions_status__" in obj:
+            status = obj.get("__gh_actions_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __gh_actions_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __gh_actions_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __gh_actions_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __gh_actions_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -440,7 +459,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} k8s tool must be kube-score|kubesec, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: k8s findings must NOT carry other lanes' tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "tfsec", "checkov"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "tfsec", "checkov", "actionlint", "zizmor"}:
                 print(f"CONTRACT FAIL: {path}:{i} k8s finding carries non-k8s tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         # Origin-aware validation: iac findings must carry `tool` and `origin`.
@@ -452,8 +471,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} iac tool must be tfsec|checkov, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "actionlint", "zizmor"}:
                 print(f"CONTRACT FAIL: {path}:{i} iac finding carries non-iac tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: gh-actions findings must carry `tool` and `origin`.
+        if obj.get("origin") == "gh-actions":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} gh-actions finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"actionlint", "zizmor"}:
+                print(f"CONTRACT FAIL: {path}:{i} gh-actions tool must be actionlint|zizmor, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov"}:
+                print(f"CONTRACT FAIL: {path}:{i} gh-actions finding carries non-gh-actions tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -920,6 +951,15 @@ check skills/sec-review/SKILL.md "iac-runner" "SKILL.md §3.16 missing iac-runne
 check skills/sec-review/SKILL.md "__iac_status__" "SKILL.md §3.16 missing iac sentinel"
 check skills/sec-review/SKILL.md "tfsec\|checkov" "SKILL.md §3.16 missing tfsec/checkov"
 echo "iac-orchestrator: SKILL.md §3.16 documents iac-runner wire-up"
+
+# --- gh-actions inventory + §3.17 (v1.3.0):
+check skills/sec-review/SKILL.md "GitHub Actions signals" "SKILL.md §2 missing gh-actions detection"
+check skills/sec-review/SKILL.md "\"gh-actions\"" "SKILL.md §2 missing gh-actions key"
+check skills/sec-review/SKILL.md "### 3.17 GitHub Actions pass" "SKILL.md missing §3.17"
+check skills/sec-review/SKILL.md "gh-actions-runner" "SKILL.md §3.17 missing gh-actions-runner"
+check skills/sec-review/SKILL.md "__gh_actions_status__" "SKILL.md §3.17 missing gh-actions sentinel"
+check skills/sec-review/SKILL.md "actionlint\|zizmor" "SKILL.md §3.17 missing actionlint/zizmor"
+echo "gh-actions-orchestrator: SKILL.md §3.17 documents gh-actions-runner wire-up"
 
 # --- dispatch discipline (v1.0.0 Stage 1 Task 1.2):
 # SKILL.md §3.0 formally documents multi-stack dispatch + lane-filter semantics.

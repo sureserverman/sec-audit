@@ -877,6 +877,48 @@ contract-check rejects any iac finding tagged with another lane's
 tool (semgrep, kube-score, kubesec, etc.) — see
 `tests/contract-check.sh`.
 
+### 3.17 GitHub Actions pass — dispatch gh-actions-runner
+
+When the inventory emitted by §2 contains `gh-actions` (any
+`.github/workflows/*.y(a)ml` file with top-level `on:` + `jobs:`
+keys), dispatch the `gh-actions-runner` agent
+(`agents/gh-actions-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to `actionlint` (Go binary; broad
+workflow lint with bundled shellcheck for script-injection
+detection) and `zizmor` (Python; security-focused auditor for
+pinning, permissions, template-injection, artifact-poisoning).
+Both tools are cross-platform — no host-OS gate. Neither contacts
+the GitHub API; both run as pure source-tree static scanners.
+
+gh-actions-runner runs in parallel with every other pass agent.
+Collect the findings into a `gh_actions_findings` list.
+
+Skill-level invariants:
+
+- **No `gh-actions` in inventory** — skip entirely.
+- **`__gh_actions_status__: "unavailable"`** — neither tool on
+  PATH, or both crashed.
+- **`__gh_actions_status__: "partial"`** — one ran, one failed.
+- **`__gh_actions_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.3 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. Both actionlint and
+  zizmor are cross-platform with no host-OS gates and no
+  artifact-absence preconditions beyond `.github/workflows/`
+  presence under target. The skipped-list schema is the same
+  `{tool, reason}` structure used since v0.8.
+
+GitHub Actions findings are code-pattern signal against workflow
+YAML. **The dep-inventory path is NOT affected by this lane** —
+workflow files reference action versions (`uses: org/repo@SHA`),
+not package-manifest dependencies; SHA-pinning compliance is
+enforced at the code-pattern layer (zizmor's `unpinned-uses`
+audit) rather than via CVE feeds. The ecosystems list emitted to
+cve-enricher does NOT gain a gh-actions entry. **Origin-tag
+isolation:** every gh-actions finding carries
+`origin: "gh-actions"` and `tool: "actionlint" | "zizmor"`. The
+contract-check rejects any gh-actions finding tagged with another
+lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
