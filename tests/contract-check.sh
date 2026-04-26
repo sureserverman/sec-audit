@@ -65,7 +65,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/android-runner.md:haiku" "agents/ios-runner.md:haiku" \
             "agents/linux-runner.md:haiku" "agents/macos-runner.md:haiku" \
             "agents/windows-runner.md:haiku" "agents/k8s-runner.md:haiku" \
-            "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku"; do
+            "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku" \
+            "agents/virt-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -323,6 +324,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __gh_actions_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the virt status summary line emitted by virt-runner.
+        # Skip vocabulary: tool-missing, no-containerfile, no-libvirt-xml.
+        if "__virt_status__" in obj:
+            status = obj.get("__virt_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __virt_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __virt_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __virt_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __virt_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -483,8 +504,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} gh-actions tool must be actionlint|zizmor, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "hadolint", "virt-xml-validate"}:
                 print(f"CONTRACT FAIL: {path}:{i} gh-actions finding carries non-gh-actions tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: virt findings must carry `tool` and `origin`.
+        if obj.get("origin") == "virt":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} virt finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"hadolint", "virt-xml-validate"}:
+                print(f"CONTRACT FAIL: {path}:{i} virt tool must be hadolint|virt-xml-validate, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: virt findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor"}:
+                print(f"CONTRACT FAIL: {path}:{i} virt finding carries non-virt tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1233,6 +1266,92 @@ if ! grep -q '"manifest_version"' "$tmp/manifest.json"; then
     fail=1
 fi
 echo "webext-inventory: synthetic manifest.json fixture matches §2 detection rule"
+
+# --- virt inventory + §3.18 (v1.4.0):
+check skills/sec-review/SKILL.md "Virtualization / alternative-runtime signals" "SKILL.md §2 missing virt detection"
+check skills/sec-review/SKILL.md "\"virt\"" "SKILL.md §2 inventory JSON missing virt key"
+check skills/sec-review/SKILL.md "### 3.18 Virtualization pass" "SKILL.md missing §3.18"
+check skills/sec-review/SKILL.md "virt-runner" "SKILL.md §3.18 missing virt-runner"
+check skills/sec-review/SKILL.md "__virt_status__" "SKILL.md §3.18 missing virt sentinel"
+check skills/sec-review/SKILL.md "hadolint\|virt-xml-validate" "SKILL.md §3.18 missing hadolint/virt-xml-validate"
+check skills/sec-review/SKILL.md "no-containerfile" "SKILL.md §3.18 missing no-containerfile clean-skip reason"
+check skills/sec-review/SKILL.md "no-libvirt-xml" "SKILL.md §3.18 missing no-libvirt-xml clean-skip reason"
+echo "virt-orchestrator: SKILL.md §3.18 documents virt-runner wire-up"
+
+# --- virt fixture-match sanity: synthetic Dockerfile + libvirt domain XML.
+tmp_v=$(mktemp -d); trap 'rm -rf "$tmp_v"' EXIT
+cat > "$tmp_v/Dockerfile" <<'DOCKERFILE'
+FROM alpine:latest
+USER root
+DOCKERFILE
+cat > "$tmp_v/vuln.xml" <<'XML'
+<?xml version="1.0"?>
+<domain type='kvm'>
+  <name>x</name>
+  <memory unit='WHAT'>1</memory>
+</domain>
+XML
+if ! grep -q '^FROM' "$tmp_v/Dockerfile"; then
+    echo "virt-inventory: FAIL — fixture Dockerfile malformed" >&2; fail=1
+fi
+if ! grep -q '<domain' "$tmp_v/vuln.xml"; then
+    echo "virt-inventory: FAIL — fixture libvirt XML malformed" >&2; fail=1
+fi
+echo "virt-inventory: synthetic Dockerfile + libvirt XML fixture matches §2 detection rule"
+
+# --- Negative tests for virt origin: missing tool + cross-tag + malformed skipped.
+bad_virt_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Dockerfile","line":1,"evidence":"e","reference":"virt-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"virt"}'
+if echo "$bad_virt_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "virt" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed virt line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "virt negative-test: malformed virt line (missing tool) correctly rejected"
+
+bad_virt_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"Dockerfile","line":1,"evidence":"e","reference":"virt-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"virt","tool":"semgrep"}'
+if echo "$bad_virt_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "virt" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: virt finding with non-virt tool was accepted" >&2
+    exit 1
+fi
+echo "virt negative-test: origin-tag isolation enforced (virt cannot carry the other 13 lanes' tools)"
+
+bad_virt_skipped='{"__virt_status__":"partial","tools":["hadolint"],"runs":1,"findings":2,"skipped":[{"oops":"shape"}]}'
+if echo "$bad_virt_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__virt_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed virt skipped entry was accepted" >&2
+    exit 1
+fi
+echo "virt negative-test: malformed skipped-list entry correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

@@ -1,0 +1,16 @@
+# Intentionally insecure Podman Quadlet — fixture for sec-expert reading
+# references/virt/podman.md. virt-runner does not lint Quadlet files
+# directly (no first-party tool exists); these findings flow through the
+# code-reasoning lane.
+
+[Unit]
+Description=API service
+
+[Container]
+Image=docker.io/library/postgres:latest
+User=root
+Volume=/run/podman/podman.sock:/var/run/docker.sock
+PodmanArgs=--privileged
+
+[Install]
+WantedBy=default.target

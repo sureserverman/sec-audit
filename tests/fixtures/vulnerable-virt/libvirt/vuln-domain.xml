@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Intentionally invalid libvirt domain XML — fixture for virt-runner
+    virt-xml-validate. Carries a schema violation (invalid <memory unit>
+    enum value) so the validator reports a finding.
+
+    The configuration also intentionally lacks <seclabel> (sVirt
+    confinement) and uses the legacy pc-i440fx machine type — but those
+    are CODE-PATTERN findings handled by sec-expert reading
+    references/virt/libvirt-qemu.md, not by the schema validator.
+-->
+<domain type='kvm'>
+  <name>vuln</name>
+  <memory unit='WHAT'>1024</memory>
+  <vcpu placement='static'>2</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-7.2'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/vuln.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <filesystem type='mount' accessmode='passthrough'>
+      <source dir='/srv/share'/>
+      <target dir='share'/>
+    </filesystem>
+    <interface type='direct'>
+      <source dev='eth0' mode='passthrough'/>
+      <model type='virtio'/>
+    </interface>
+  </devices>
+  <seclabel type='none'/>
+</domain>

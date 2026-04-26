@@ -1,0 +1,23 @@
+# Intentionally insecure Compose file — fixture for sec-expert reading
+# references/virt/docker-runtime.md. virt-runner's hadolint pass does not
+# touch this file (Compose is YAML; hadolint scans Containerfiles).
+
+version: "3.8"
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  api:
+    image: ghcr.io/example/api:stable
+    environment:
+      DB_PASSWORD: hunter2
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    external: true

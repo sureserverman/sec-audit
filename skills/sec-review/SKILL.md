@@ -964,6 +964,69 @@ isolation:** every gh-actions finding carries
 contract-check rejects any gh-actions finding tagged with another
 lane's tool — see `tests/contract-check.sh`.
 
+### 3.18 Virtualization pass — dispatch virt-runner
+
+When the inventory emitted by §2 contains `virt` (any of the five
+signals: Docker runtime config / Compose / Dockerfile, Podman /
+Quadlet, libvirt domain/network/pool/volume XML, Apple Containers
+`container.yaml`, or UTM `*.utm/config.plist`), dispatch the
+`virt-runner` agent (`agents/virt-runner.md`, pinned to haiku,
+tools: Read + Bash). The agent shells out to `hadolint`
+(Haskell binary; Dockerfile / Containerfile static linter with
+`DLxxxx` rule IDs and an embedded shellcheck pass) and
+`virt-xml-validate` (libvirt-clients package; XSD validator that
+checks libvirt domain / network / pool / volume XML against the
+libvirt-shipped Relax-NG schemas). Both tools are cross-platform —
+no host-OS gate. Neither contacts a Docker daemon, a podman
+socket, a libvirtd, or any registry; both run as pure source-tree
+static scanners.
+
+virt-runner runs in parallel with every other pass agent. Collect
+the findings into a `virt_findings` list.
+
+Skill-level invariants:
+
+- **No `virt` in inventory** — skip entirely.
+- **`__virt_status__: "unavailable"`** — neither tool on PATH, or
+  no virt-relevant artefact under target.
+- **`__virt_status__: "partial"`** — one ran, one failed or
+  cleanly-skipped.
+- **`__virt_status__: "ok"`** — every available + applicable tool
+  ran cleanly; `skipped` list may still be populated for
+  cleanly-inapplicable tools.
+- **Three skip reasons (v1.4 adds two NEW):**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-containerfile` — NEW in v1.4; hadolint is on PATH but
+    target has no Dockerfile / Containerfile / `*.dockerfile` /
+    `*.containerfile` files. Target-shape clean-skip; parallel
+    to v0.10's `no-debian-source`/`no-elf`, v0.11's `no-pkg`,
+    and v0.12's `no-pe`.
+  - `no-libvirt-xml` — NEW in v1.4; virt-xml-validate is on PATH
+    but target has no XML files with a libvirt root element
+    (`<domain>` / `<network>` / `<pool>` / `<volume>`).
+    Target-shape clean-skip.
+
+Virt findings are code-pattern signal against
+container-runtime / VMM configuration and Containerfile
+authorship. The hadolint pass overlaps with the existing
+`containers/dockerfile-hardening.md` reference (which sec-expert
+reads): hadolint operationalises the dockerfile-hardening
+patterns with deterministic rule IDs, while sec-expert covers the
+cross-Dockerfile reasoning (multi-stage build hygiene, base-image
+selection rationale) and the four runtime/VMM packs that have no
+first-party scanner (`virt/docker-runtime.md`, `virt/podman.md`,
+`virt/apple-containers.md`, `virt/utm.md`) plus `virt/libvirt-qemu.md`.
+**The dep-inventory path is NOT affected by this lane** — virt
+configurations reference image tags and host devices, not
+package-manifest dependencies; image-tag pinning compliance is
+enforced at the code-pattern layer (hadolint's `DL3007` rule plus
+sec-expert reasoning) rather than via CVE feeds. The ecosystems
+list emitted to cve-enricher does NOT gain a virt entry.
+**Origin-tag isolation:** every virt finding carries
+`origin: "virt"` and `tool: "hadolint" | "virt-xml-validate"`.
+The contract-check rejects any virt finding tagged with another
+lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

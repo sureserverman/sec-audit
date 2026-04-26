@@ -1,0 +1,2 @@
+libvirt/vuln-domain.xml	1	Relax-NG validity error : Element memory failed to validate attributes
+libvirt/vuln-domain.xml	1	libvirt/vuln-domain.xml fails to validate
