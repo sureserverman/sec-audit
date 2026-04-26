@@ -654,6 +654,72 @@ via CVE feeds. **Skip vocabulary unchanged** — only
 `tool-missing` applies, since both tools are cross-platform with
 no host-OS gate.
 
+## Virtualization lane (v1.4.0)
+
+A seventeenth agent, **`virt-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects virtualization or alternative-container-runtime
+configuration — Docker daemon / Compose / Containerfile, Podman
+or Quadlet `.container` units, libvirt domain / network / pool /
+volume XML, Apple's `container.yaml` (the open-sourced
+`apple/container` CLI from June 2025), or UTM `*.utm/config.plist`
+bundles. Cross-platform, no host-OS gate.
+
+The runner dispatches two tools:
+
+- **`hadolint`** (Haskell binary) — Dockerfile / Containerfile
+  static linter with `DLxxxx` rule IDs and a bundled `shellcheck`
+  pass for embedded shell. JSON output keyed by `level` and
+  `code`. Catches the canonical CWE-250 / CWE-829 / CWE-78 classes
+  the existing `containers/dockerfile-hardening.md` reference
+  reasons about — operationalised as deterministic rule fires.
+- **`virt-xml-validate`** (libvirt-clients package) — XSD validator
+  that checks libvirt domain / network / pool / volume XML against
+  the libvirt-shipped Relax-NG schemas. Catches typos, invalid
+  attribute enums, and missing required elements that would
+  prevent libvirtd from accepting the config — operational
+  correctness signal that complements the security reasoning in
+  the libvirt-qemu reference pack.
+
+Output carries `origin: "virt"` and
+`tool: "hadolint" | "virt-xml-validate"`. Reference packs live in
+`references/virt/`:
+
+- `docker-runtime.md` — daemon hardening (`/etc/docker/daemon.json`
+  user-namespace remap, `no-new-privileges`, `live-restore`),
+  socket protection, Compose service patterns, Swarm secrets.
+  Cross-links to `containers/dockerfile-hardening.md` and
+  `containers/docker.md` rather than duplicating.
+- `podman.md` — rootless mode, Quadlet `.container` units, the
+  `containers-policy.json` image-trust schema, socket-proxy
+  patterns.
+- `libvirt-qemu.md` — sVirt confinement, `q35` machine type, UEFI
+  Secure Boot + swtpm, virtiofs vs 9p passthrough, PCI
+  passthrough IOMMU isolation, `<launchSecurity>` for AMD SEV.
+- `apple-containers.md` — Apple's `container` CLI on Apple
+  silicon: image-digest pinning, host-path-share `:ro` policy,
+  Rosetta 2 binary-translation passthrough, `container system`
+  daemon-socket scope.
+- `utm.md` — UTM `*.utm/config.plist` bundles: backend selection
+  (Apple Virtualization vs QEMU+Hypervisor.framework vs TCG-only),
+  host-directory share modes, USB device claims, custom QEMU
+  `Arguments` audit.
+
+Neither tool contacts a Docker daemon, podman socket, libvirtd,
+or any registry — both run as pure source-tree static scanners.
+
+**Dep-inventory NOT affected.** Virt configurations reference
+image tags and host devices, not package-manifest dependencies;
+image-tag pinning compliance is enforced at the code-pattern
+layer (hadolint's `DL3007` rule plus sec-expert reasoning over
+the runtime reference packs) rather than via CVE feeds. **Skip
+vocabulary gains two NEW target-shape reasons:** `no-containerfile`
+(hadolint on PATH, target has no Dockerfile/Containerfile) and
+`no-libvirt-xml` (virt-xml-validate on PATH, target has no XML
+with a libvirt root element). Both parallel the existing
+v0.10–v0.12 target-shape primitives (`no-pe`, `no-elf`, `no-pkg`,
+`no-debian-source`).
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -790,6 +856,7 @@ names from the other 12 lanes).
 | Kubernetes admission      | YAML manifests with `apiVersion:` + `kind:`     | `kube-score`, `kubesec` (both cross-platform) | `references/infra/{k8s-workloads,k8s-api}.md`, `references/k8s-tools.md` | v1.1.0     |
 | Infrastructure-as-Code    | Terraform / Pulumi / Terragrunt source (`*.tf`, `Pulumi.yaml`, `terragrunt.hcl`) | `tfsec`, `checkov` (both cross-platform) | `references/infra/{iac-cloud-resources,iac-secrets-state}.md`, `references/iac-tools.md` | v1.2.0     |
 | GitHub Actions            | `.github/workflows/*.y(a)ml` with `on:` + `jobs:`  | `actionlint`, `zizmor` (both cross-platform) | `references/infra/{gh-actions-permissions,gh-actions-secrets}.md`, `references/gh-actions-tools.md` | v1.3.0     |
+| Virtualization / runtime  | Docker daemon / Compose / Containerfile, Podman / Quadlet, libvirt domain / network / pool / volume XML, Apple Containers `container.yaml`, UTM `*.utm/config.plist` | `hadolint` (Containerfile lint), `virt-xml-validate` (libvirt XSD; both cross-platform) | `references/virt/{docker-runtime,podman,libvirt-qemu,apple-containers,utm}.md`, `references/virt-tools.md` | v1.4.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

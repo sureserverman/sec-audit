@@ -22,7 +22,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -396,7 +396,7 @@ behaviour since v0.7; v1.0 makes it the documented contract.
    summary table at the top of the Review-metadata block with one
    row per dispatched lane. See `agents/report-writer.md` Step 2.5.
 
-The canonical lane list (10 total) is enumerated in
+The canonical lane list (14 total) is enumerated in
 `references/COVERAGE.md` — the single source of truth for which
 inventory keys map to which runners, reference packs, tools, and
 skip reasons.

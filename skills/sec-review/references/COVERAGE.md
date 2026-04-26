@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.3.0. This file is the authoritative "what does
+    plugin as of v1.4.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across twelve tool lanes plus sec-expert code
+software projects across thirteen tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to thirteen review streams in parallel
-(twelve tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to fourteen review streams in parallel
+(thirteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -267,6 +267,45 @@ Dispatch discipline.
   code-pattern layer (zizmor's `unpinned-uses` audit).
 - **Shipped in:** v1.3.0.
 
+### virt (virtualization / alternative-container-runtimes)
+
+- **Target shape:** any of:
+  - Docker runtime config — `docker-compose.y(a)ml`,
+    `compose.y(a)ml`, vendored `daemon.json`, or Dockerfile /
+    Containerfile / `*.dockerfile` / `*.containerfile`.
+  - Podman / Quadlet — `*.container`, `*.volume`, `*.network`,
+    `*.pod`, `*.kube`, `*.image`, `*.build`, or
+    `policy.json` / `containers-policy.json`.
+  - libvirt — `*.xml` with `<domain>` / `<network>` / `<pool>` /
+    `<volume>` root element, or `qemu.conf`.
+  - Apple Containers — `container.yaml`.
+  - UTM — `*.utm/` directory containing `config.plist`.
+- **Tools:** `hadolint` (Dockerfile / Containerfile linter with
+  `DLxxxx` rule IDs + bundled shellcheck), `virt-xml-validate`
+  (libvirt-clients XSD validator). Both cross-platform; neither
+  contacts a Docker daemon, podman socket, libvirtd, or any
+  registry.
+- **Reference packs:** `references/virt/docker-runtime.md`,
+  `virt/podman.md`, `virt/libvirt-qemu.md`,
+  `virt/apple-containers.md`, `virt/utm.md`,
+  `references/virt-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-containerfile` (NEW in
+  v1.4 — target-shape; hadolint applicable), `no-libvirt-xml`
+  (NEW in v1.4 — target-shape; virt-xml-validate applicable).
+- **Origin tag:** `"virt"`. Tool whitelist: `hadolint`,
+  `virt-xml-validate`.
+- **Dep-inventory:** NOT affected — virt configurations
+  reference image tags and host devices, not package-manifest
+  dependencies; image-tag pinning compliance is enforced at the
+  code-pattern layer (hadolint's `DL3007` rule + sec-expert
+  reasoning over the runtime reference packs). The lane
+  cross-links to the existing `containers/dockerfile-hardening.md`
+  and `containers/docker.md` for Dockerfile-authoring patterns;
+  the virt lane covers the runtime / VMM surface those packs do
+  NOT.
+- **Shipped in:** v1.4.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -297,10 +336,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**10 canonical reason values** as of v1.0, grouped by semantic
+**12 canonical reason values** as of v1.4, grouped by semantic
 category:
 
-### Target-shape (7)
+### Target-shape (9)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -311,6 +350,8 @@ category:
 | `no-elf`          | linux                | No ELF binary under target (checksec-specific).                         |
 | `no-systemd-unit` | linux                | No `.service` under target (systemd-analyze-specific).                  |
 | `no-pe`           | windows              | No PE artifact (.exe/.dll/.msi/.msix/.sys) under target.                |
+| `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
+| `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 
 ### Host-OS-gated (3)
 
