@@ -1,0 +1,10 @@
+[
+  {"file":"install.sh","line":17,"endLine":17,"column":1,"endColumn":21,"level":"warning","code":2129,"message":"Consider using { cmd1; cmd2; } >> file instead of individual redirects.","fix":null},
+  {"file":"install.sh","line":20,"endLine":20,"column":6,"endColumn":10,"level":"warning","code":2162,"message":"read without -r will mangle backslashes.","fix":null},
+  {"file":"install.sh","line":24,"endLine":24,"column":9,"endColumn":16,"level":"info","code":2086,"message":"Double quote to prevent globbing and word splitting.","fix":null},
+  {"file":"install.sh","line":24,"endLine":24,"column":1,"endColumn":18,"level":"warning","code":2086,"message":"Double quote to prevent globbing and word splitting.","fix":null},
+  {"file":"install.sh","line":26,"endLine":26,"column":4,"endColumn":34,"level":"warning","code":2046,"message":"Quote this to prevent word splitting.","fix":null},
+  {"file":"install.sh","line":28,"endLine":28,"column":1,"endColumn":31,"level":"warning","code":2038,"message":"Use -print0/-0 or -exec + to allow non-alphanumeric filenames.","fix":null},
+  {"file":"install.sh","line":30,"endLine":30,"column":31,"endColumn":40,"level":"warning","code":2156,"message":"Injecting filenames is fragile and insecure. Use parameters.","fix":null},
+  {"file":"install.sh","line":34,"endLine":34,"column":1,"endColumn":13,"level":"warning","code":2294,"message":"eval negates the benefit of arrays. Drop eval to preserve whitespace/symbols.","fix":null}
+]

@@ -1123,6 +1123,62 @@ finding carries `origin: "go"` and
 any go finding tagged with another lane's tool — see
 `tests/contract-check.sh`.
 
+### 3.20 Shell pass — dispatch shell-runner
+
+When the inventory emitted by §2 contains `shell` (any
+shell-shaped file under target — `*.sh`/`*.bash`/`*.zsh`/
+`*.ksh` or a file with a shell shebang on line 1, with
+vendored-directory exclusions), dispatch the `shell-runner`
+agent (`agents/shell-runner.md`, pinned to haiku, tools:
+Read + Bash). The agent shells out to a single tool —
+`shellcheck` (Haskell binary; canonical static analyzer for
+bash/sh/dash/ksh with `SCxxxx` rule IDs covering quoting,
+command injection, file handling, and control-flow
+correctness) — against the shell-shaped files, parses
+shellcheck's native JSON output, and emits sec-expert-
+compatible JSONL on stdout — every line carrying
+`origin: "shell"` and `tool: "shellcheck"`.
+
+This is the **first single-tool lane in sec-review since
+DAST (v0.5)**. shellcheck is the canonical mature
+shell-script linter — adding a second tool for symmetry
+would be overhead with no signal lift.
+
+shell-runner runs in parallel with every other pass agent.
+Collect the findings into a `shell_findings` list.
+
+Skill-level invariants:
+
+- **No `shell` in inventory** — skip entirely.
+- **`__shell_status__: "unavailable"`** — shellcheck on PATH
+  but no shell-shaped files under target, OR shellcheck
+  absent entirely.
+- **`__shell_status__: "ok"`** — shellcheck ran cleanly.
+- **No `partial` state** — single-tool lane; either ran or
+  did not.
+- **Two skip reasons (v1.6 adds one NEW):**
+  - `tool-missing` — shellcheck absent from PATH.
+  - `no-shell-source` — NEW in v1.6; shellcheck on PATH but
+    target has no shell-shaped files (after vendored-dir
+    exclusions). Target-shape clean-skip; parallel to the
+    v0.10–v1.4 target-shape primitives (`no-pe`, `no-elf`,
+    `no-pkg`, `no-debian-source`, `no-containerfile`,
+    `no-libvirt-xml`).
+
+Shell findings are code-pattern signal against shell-script
+quoting, injection, file-handling, and hardening hygiene.
+**The dep-inventory path is NOT affected by this lane** —
+shell scripts have no package-manifest dependency graph;
+supply-chain risk for sourced remote scripts (the
+`curl | sh` antipattern) is enforced at the code-pattern
+layer via the `shell/file-handling.md` reference's CWE-494
+pattern. The ecosystems list emitted to cve-enricher does
+NOT gain a shell entry. **Origin-tag isolation:** every
+shell finding carries `origin: "shell"` and
+`tool: "shellcheck"`. The contract-check rejects any shell
+finding tagged with another lane's tool — see
+`tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

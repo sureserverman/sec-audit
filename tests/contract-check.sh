@@ -67,7 +67,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/windows-runner.md:haiku" "agents/k8s-runner.md:haiku" \
             "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku" \
             "agents/virt-runner.md:haiku" \
-            "agents/go-runner.md:haiku"; do
+            "agents/go-runner.md:haiku" \
+            "agents/shell-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -366,6 +367,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __go_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the shell status summary line emitted by shell-runner.
+        # Single-tool lane: only ok / unavailable shapes (no partial).
+        # Skip vocabulary: tool-missing, no-shell-source.
+        if "__shell_status__" in obj:
+            status = obj.get("__shell_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __shell_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __shell_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __shell_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __shell_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -550,8 +572,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} go tool must be gosec|staticcheck, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: go findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "shellcheck"}:
                 print(f"CONTRACT FAIL: {path}:{i} go finding carries non-go tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: shell findings must carry `tool` and `origin`.
+        if obj.get("origin") == "shell":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} shell finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] != "shellcheck":
+                print(f"CONTRACT FAIL: {path}:{i} shell tool must be shellcheck, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: shell findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck"}:
+                print(f"CONTRACT FAIL: {path}:{i} shell finding carries non-shell tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1470,6 +1504,81 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "go negative-test: malformed skipped-list entry correctly rejected"
+
+# --- shell inventory + §3.20 (v1.6.0):
+check skills/sec-review/SKILL.md "Shell signals" "SKILL.md §2 missing shell detection"
+check skills/sec-review/SKILL.md "\"shell\"" "SKILL.md §2 inventory JSON missing shell key"
+check skills/sec-review/SKILL.md "### 3.20 Shell pass" "SKILL.md missing §3.20"
+check skills/sec-review/SKILL.md "shell-runner" "SKILL.md §3.20 missing shell-runner"
+check skills/sec-review/SKILL.md "__shell_status__" "SKILL.md §3.20 missing shell sentinel"
+check skills/sec-review/SKILL.md "shellcheck" "SKILL.md §3.20 missing shellcheck"
+check skills/sec-review/SKILL.md "no-shell-source" "SKILL.md §3.20 missing no-shell-source clean-skip reason"
+echo "shell-orchestrator: SKILL.md §3.20 documents shell-runner wire-up"
+
+# --- shell fixture-match sanity: synthetic *.sh
+tmp_sh=$(mktemp -d); trap 'rm -rf "$tmp_sh"' EXIT
+cat > "$tmp_sh/install.sh" <<'BASH'
+#!/bin/bash
+echo $1
+BASH
+if ! head -1 "$tmp_sh/install.sh" | grep -q '^#!'; then
+    echo "shell-inventory: FAIL — fixture install.sh missing shebang" >&2; fail=1
+fi
+echo "shell-inventory: synthetic *.sh fixture matches §2 detection rule"
+
+# --- Negative tests for shell origin: missing tool + cross-tag + malformed skipped.
+bad_shell_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.sh","line":1,"evidence":"e","reference":"shell-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"shell"}'
+if echo "$bad_shell_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "shell" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed shell line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "shell negative-test: malformed shell line (missing tool) correctly rejected"
+
+bad_shell_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.sh","line":1,"evidence":"e","reference":"shell-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"shell","tool":"semgrep"}'
+if echo "$bad_shell_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "shell" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: shell finding with non-shell tool was accepted" >&2
+    exit 1
+fi
+echo "shell negative-test: origin-tag isolation enforced (shell cannot carry the other 15 lanes' tools)"
+
+bad_shell_skipped='{"__shell_status__":"unavailable","tools":[],"skipped":[{"oops":"shape"}]}'
+if echo "$bad_shell_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__shell_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed shell skipped entry was accepted" >&2
+    exit 1
+fi
+echo "shell negative-test: malformed skipped-list entry correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
