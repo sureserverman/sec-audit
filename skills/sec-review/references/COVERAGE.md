@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.4.0. This file is the authoritative "what does
+    plugin as of v1.5.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across thirteen tool lanes plus sec-expert code
+software projects across fourteen tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to fourteen review streams in parallel
-(thirteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to fifteen review streams in parallel
+(fourteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -305,6 +305,35 @@ Dispatch discipline.
   the virt lane covers the runtime / VMM surface those packs do
   NOT.
 - **Shipped in:** v1.4.0.
+
+### go
+
+- **Target shape:** Go module (`go.mod` at any project root with
+  at least one `*.go` file under it). Distinguished by project
+  shape: `["binary"]` if any `*.go` declares `package main`,
+  `["library"]` for exported packages, `["workspace"]` if a
+  `go.work` workspace file is present (with workspace members
+  enumerated from the `use (...)` directive).
+- **Tools:** `gosec` (security-focused linter; `Gxxx` rule IDs
+  with CWE shipped inline via `.cwe.ID`/`.cwe.URL`),
+  `staticcheck` (comprehensive bug-finding + simplifications +
+  style; `SAxxxx`/`Sxxxx`/`STxxxx`/`Uxxxx`/`QFxxxx` rules).
+  Both cross-platform Go binaries; neither contacts a Go module
+  proxy or any registry. Runner sets `GOFLAGS=-mod=readonly` to
+  prevent `go.sum` mutations.
+- **Reference packs:** `references/go/stdlib-security.md`,
+  `go/module-ecosystem.md`, `go/web-frameworks.md`,
+  `references/go-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`. (No host-OS gate, no
+  target-shape skip — the inventory rule guarantees `go.mod` +
+  `*.go` presence before dispatch.)
+- **Origin tag:** `"go"`. Tool whitelist: `gosec`, `staticcheck`.
+- **Dep-inventory:** AFFECTED — `go.sum` (preferred, transitive)
+  or `go.mod` (fallback, direct only) feeds cve-enricher as
+  `{"ecosystem": "Go", "manifest": "go.sum"}`. OSV-native; no
+  adapter change.
+- **Shipped in:** v1.5.0.
 
 ## Ecosystems
 

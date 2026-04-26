@@ -720,6 +720,72 @@ with a libvirt root element). Both parallel the existing
 v0.10–v0.12 target-shape primitives (`no-pe`, `no-elf`, `no-pkg`,
 `no-debian-source`).
 
+## Go lane (v1.5.0)
+
+An eighteenth agent, **`go-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects a Go module — `go.mod` at any project root with at
+least one `*.go` file under it. Cross-platform, no host-OS
+gate, no target-shape preconditions beyond the inventory rule.
+
+The runner dispatches two tools:
+
+- **`gosec`** (Go binary) — security-focused linter with `Gxxx`
+  rule IDs covering hardcoded credentials (G101), SQL string
+  formatting (G201), file-path traversal (G304), TLS
+  InsecureSkipVerify (G402), `math/rand` for security tokens
+  (G404), weak crypto primitives (G501–G505), missing HTTP
+  server timeouts, and unsafe `exec.Command` shell
+  invocations. Ships CWE inline via the `.cwe.ID`/`.cwe.URL`
+  fields, so the runner needs no per-rule CWE table for
+  gosec's output.
+- **`staticcheck`** (Go binary) — comprehensive static
+  analyzer covering bug-finding `SAxxxx` rules, code
+  simplifications `Sxxxx`/`QFxxxx`, style `STxxxx`, and
+  unused-code `Uxxxx`. Catches the canonical Go bugs that
+  gosec doesn't target: deprecated-symbol use (`SA1019` —
+  driven by the Go 1.21+ stdlib deprecation set),
+  goroutine-leak primitives (`SA1015` `time.Tick`,
+  `SA1023` missing `http.Hijacker.Close`), infinite recursive
+  calls (`SA5007`), and `printf`-format mismatches
+  (`SA1000`/`SA1006`).
+
+Output carries `origin: "go"` and
+`tool: "gosec" | "staticcheck"`. Reference packs live in
+`references/go/`:
+
+- `stdlib-security.md` — `crypto/rand` vs `math/rand`,
+  `html/template` auto-escaping, parameterised SQL,
+  `os/exec` argument handling, `filepath.Join`+`os.Open`
+  traversal hygiene, `encoding/xml` Strict mode,
+  `crypto/tls.InsecureSkipVerify`, `http.Server` timeout
+  hardening, `r.Host` header trust.
+- `module-ecosystem.md` — `replace` directives on release
+  branches, `GOSUMDB=off` / `GOFLAGS=-insecure` in build
+  pipelines, missing `go.sum` entries, `+incompatible`
+  versions, `vendor/` consistency, govulncheck advisory
+  consumption.
+- `web-frameworks.md` — Gin / Echo / Fiber / Chi /
+  gorilla/mux / gRPC-Go: CORS allow-origin wildcard with
+  credentials, missing recover middleware, body size
+  unlimited, `X-Forwarded-For` trust without an allow-list,
+  gRPC server without auth interceptor, raw `err.Error()`
+  leakage, CSRF protection on cookie-session handlers.
+
+The runner sets `GOFLAGS=-mod=readonly` on every invocation
+so neither tool mutates `go.sum`, and explicitly forbids
+contacting `proxy.golang.org`, `sum.golang.org`, or any
+module proxy — the lane is source-only.
+
+**Dep-inventory IS affected.** `go.sum` (preferred) or
+`go.mod` (fallback) feeds cve-enricher as
+`{"ecosystem": "Go", "manifest": "go.sum"}` — OSV's
+`querybatch` handles `Go` natively, so no new feed adapter
+is required. **Skip vocabulary unchanged** — only
+`tool-missing` applies, since both tools are cross-platform
+Go binaries with no host-OS gate and no target-shape
+preconditions beyond `go.mod` + `*.go` source presence.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -857,6 +923,7 @@ names from the other 12 lanes).
 | Infrastructure-as-Code    | Terraform / Pulumi / Terragrunt source (`*.tf`, `Pulumi.yaml`, `terragrunt.hcl`) | `tfsec`, `checkov` (both cross-platform) | `references/infra/{iac-cloud-resources,iac-secrets-state}.md`, `references/iac-tools.md` | v1.2.0     |
 | GitHub Actions            | `.github/workflows/*.y(a)ml` with `on:` + `jobs:`  | `actionlint`, `zizmor` (both cross-platform) | `references/infra/{gh-actions-permissions,gh-actions-secrets}.md`, `references/gh-actions-tools.md` | v1.3.0     |
 | Virtualization / runtime  | Docker daemon / Compose / Containerfile, Podman / Quadlet, libvirt domain / network / pool / volume XML, Apple Containers `container.yaml`, UTM `*.utm/config.plist` | `hadolint` (Containerfile lint), `virt-xml-validate` (libvirt XSD; both cross-platform) | `references/virt/{docker-runtime,podman,libvirt-qemu,apple-containers,utm}.md`, `references/virt-tools.md` | v1.4.0     |
+| Go                        | Go module (`go.mod` + `*.go`)                       | `gosec`, `staticcheck` (both cross-platform Go binaries) | `references/go/{stdlib-security,module-ecosystem,web-frameworks}.md`, `references/go-tools.md` | v1.5.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
