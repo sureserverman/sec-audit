@@ -197,6 +197,26 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Shell signals**: at least one shell-shaped file under
+  target — `*.sh`, `*.bash`, `*.zsh`, or `*.ksh` — OR a file
+  whose first line is a shell shebang (`#!/bin/sh`,
+  `#!/bin/bash`, `#!/usr/bin/env bash`, `#!/usr/bin/env sh`,
+  `#!/bin/dash`, `#!/bin/ksh`, `#!/bin/zsh`). Apply the
+  standard §1 Scope `.gitignore` exclusions plus the
+  vendored-directory list (`node_modules/`, `.venv/`,
+  `vendor/`, `dist/`, `build/`, `target/`) — vendored
+  scripts are out of scope for this lane. When detected,
+  add `"shell"` to the inventory with the value `["scripts"]`
+  (the lane has no further sub-shape distinction). Load
+  `references/shell/command-injection.md`,
+  `references/shell/file-handling.md`,
+  `references/shell/script-hardening.md`, and the tool-lane
+  reference `references/shell-tools.md`. No ecosystem entry
+  — shell scripts have no package-manifest dependency
+  graph; supply-chain risk for shell ecosystems (sourced
+  remote scripts) is enforced at the code-pattern layer
+  (the `curl | sh` antipattern in
+  `shell/file-handling.md`).
 - **Go signals**: `go.mod` at project root (or any subdir for
   multi-module monorepos) AND at least one `*.go` file under the
   same module root. Distinguish by project shape:
@@ -332,6 +352,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "gh-actions":  [],
   "virt":        [],
   "go":          [],
+  "shell":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
