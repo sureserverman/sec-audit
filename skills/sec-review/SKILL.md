@@ -197,6 +197,29 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Go signals**: `go.mod` at project root (or any subdir for
+  multi-module monorepos) AND at least one `*.go` file under the
+  same module root. Distinguish by project shape:
+  - `package main` declaration in any `*.go` file under the
+    module root → `"go": ["binary"]` (a Go program).
+  - No `package main` declared, but the module exports types /
+    functions that other modules import → `"go": ["library"]`.
+  - `go.work` workspace file at root → `"go": ["workspace"]`,
+    plus one nested entry per workspace member detected under
+    `use (...)` directives.
+  When detected, add `"go"` to the inventory and load
+  `references/go/stdlib-security.md`,
+  `references/go/module-ecosystem.md`,
+  `references/go/web-frameworks.md`, and the tool-lane
+  reference `references/go-tools.md`. `ecosystems` gains an
+  entry `{"ecosystem": "Go", "manifest": "go.sum"}` (preferred)
+  or `{"ecosystem": "Go", "manifest": "go.mod"}` when go.sum is
+  absent — OSV's `querybatch` handles `Go` natively so
+  cve-enricher needs no adapter change. `go.sum` presence is
+  expected on any module that has been built; its absence is
+  not a detection trigger, only a signal to the runner that
+  cve-enricher will have less precision (only direct
+  dependencies covered, not transitive).
 - **Rust / Cargo signals**: `Cargo.toml` at project root (or any subdir
   for workspaces) AND the file contains `[package]` or `[workspace]`.
   Distinguish by project shape:
@@ -308,6 +331,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "iac":         [],
   "gh-actions":  [],
   "virt":        [],
+  "go":          [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
