@@ -224,6 +224,50 @@ Detect the technology stack. Read only — do not install or execute.
   — workflow files reference action versions, not package-manifest
   dependencies; action SHA-pinning is enforced at the
   code-pattern layer, not via CVE feeds.
+- **Virtualization / alternative-runtime signals**: any of the
+  following triggers the `virt` inventory key:
+  - **Docker runtime config** — `docker-compose.y(a)ml`,
+    `compose.y(a)ml`, `*.compose.y(a)ml`, `*.stack.y(a)ml` files
+    under target, OR a `daemon.json` file (typically under
+    `etc/docker/` in source trees that vendor the daemon config),
+    OR a Dockerfile / Containerfile / `*.dockerfile` /
+    `*.containerfile` (drives hadolint dispatch — distinct from
+    `containers/dockerfile-hardening.md`'s code-pattern reasoning
+    surface).
+  - **Podman / Quadlet** — `*.container`, `*.volume`,
+    `*.network`, `*.pod`, `*.kube`, `*.image`, or `*.build` files
+    under `containers/systemd/` or any subdir, OR a
+    `policy.json` / `containers-policy.json` file, OR a
+    `podman-compose.y(a)ml` file.
+  - **libvirt / QEMU / KVM** — any `*.xml` file under target whose
+    root element is `<domain ...>`, `<network ...>`, `<pool ...>`,
+    or `<volume ...>` (the libvirt domain/network/storage XML
+    schemas). Also triggers on `qemu.conf` files.
+  - **Apple Containers** — `container.yaml` files at project root
+    or under `containers/`, OR install scripts referencing the
+    `apple/container` CLI.
+  - **UTM (macOS)** — `*.utm` directories under target containing
+    a `config.plist` (the canonical UTM bundle shape).
+  When detected, add `"virt"` with values reflecting the
+  technology mix: `"virt": ["docker"]`, `["podman"]`, `["libvirt"]`,
+  `["apple-containers"]`, `["utm"]`, or combinations
+  (`["docker", "libvirt"]` is common on Linux build hosts;
+  `["apple-containers", "utm"]` on Apple-silicon dev machines).
+  Load `references/virt/docker-runtime.md`,
+  `references/virt/podman.md`,
+  `references/virt/libvirt-qemu.md`,
+  `references/virt/apple-containers.md`,
+  `references/virt/utm.md`, and the tool-lane reference
+  `references/virt-tools.md` — load only the per-technology packs
+  matching detected values to keep the sec-expert context tight.
+  No ecosystem entry — virt configurations reference image tags
+  and host devices, not package-manifest dependencies. Image-tag
+  pinning compliance is enforced at the code-pattern layer
+  (sec-expert reasoning + hadolint's `DL3007` rule). Cross-link to
+  the existing `containers/dockerfile-hardening.md` and
+  `containers/docker.md` for Dockerfile-authoring patterns; the
+  `virt` lane covers the runtime-and-VMM surface those packs do
+  NOT.
 - **IaC signals**: any of the following triggers the `iac`
   inventory key:
   - Terraform sources — `*.tf`, `*.tfvars`, `*.hcl` anywhere in the
@@ -263,6 +307,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "k8s":         [],
   "iac":         [],
   "gh-actions":  [],
+  "virt":        [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
