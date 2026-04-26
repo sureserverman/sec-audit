@@ -197,6 +197,33 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Python signals**: any of the following triggers the
+  `python` inventory key:
+  - A Python manifest at any project root: `requirements.txt`,
+    `requirements-*.txt`, `pyproject.toml` with a `[tool.poetry]`
+    or `[project]` or `[build-system]` table, `setup.py`,
+    `Pipfile`, or `poetry.lock` / `Pipfile.lock`.
+  - A package shape: any `*.py` file at a non-trivial depth
+    (more than just a top-level helper script — accompanied by
+    at least one `__init__.py`, `pyproject.toml`, or `setup.py`).
+  When detected, add `"python"` with values reflecting the
+  manifest shape: `"python": ["package"]` for a package /
+  application (Django/Flask/FastAPI service typically),
+  `"python": ["library"]` for a `pyproject.toml` with a
+  package definition exporting a wheel,
+  `"python": ["scripts"]` for a tree of standalone scripts
+  with a `requirements.txt`. Load
+  `references/python/deserialization.md`,
+  `references/python/subprocess-and-async.md`,
+  `references/python/framework-deepening.md`, and the
+  tool-lane reference `references/python-tools.md` — load
+  only the per-topic packs matching detected signals (e.g.
+  load `framework-deepening.md` only when a Django / Flask /
+  FastAPI signal also fires). The existing PyPI ecosystem
+  entry (`{"ecosystem": "PyPI", "manifest": "requirements.txt"}`)
+  remains the cve-enricher feed; the python lane's pip-audit
+  invocation augments cve-enricher with reachability-hint
+  metadata that the bulk OSV pass lacks.
 - **Shell signals**: at least one shell-shaped file under
   target — `*.sh`, `*.bash`, `*.zsh`, or `*.ksh` — OR a file
   whose first line is a shell shebang (`#!/bin/sh`,
@@ -353,6 +380,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "virt":        [],
   "go":          [],
   "shell":       [],
+  "python":      [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
