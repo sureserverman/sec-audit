@@ -480,7 +480,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} k8s tool must be kube-score|kubesec, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: k8s findings must NOT carry other lanes' tool names.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "tfsec", "checkov", "actionlint", "zizmor"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate"}:
                 print(f"CONTRACT FAIL: {path}:{i} k8s finding carries non-k8s tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         # Origin-aware validation: iac findings must carry `tool` and `origin`.
@@ -492,7 +492,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} iac tool must be tfsec|checkov, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "actionlint", "zizmor"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "actionlint", "zizmor", "hadolint", "virt-xml-validate"}:
                 print(f"CONTRACT FAIL: {path}:{i} iac finding carries non-iac tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         # Origin-aware validation: gh-actions findings must carry `tool` and `origin`.
