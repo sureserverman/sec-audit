@@ -66,7 +66,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/linux-runner.md:haiku" "agents/macos-runner.md:haiku" \
             "agents/windows-runner.md:haiku" "agents/k8s-runner.md:haiku" \
             "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku" \
-            "agents/virt-runner.md:haiku"; do
+            "agents/virt-runner.md:haiku" \
+            "agents/go-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -344,6 +345,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __virt_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the go status summary line emitted by go-runner.
+        # Skip vocabulary: tool-missing only (no host-OS gate, no
+        # target-shape preconditions beyond go.mod presence).
+        if "__go_status__" in obj:
+            status = obj.get("__go_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __go_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __go_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __go_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __go_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -516,8 +538,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} virt tool must be hadolint|virt-xml-validate, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: virt findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "gosec", "staticcheck"}:
                 print(f"CONTRACT FAIL: {path}:{i} virt finding carries non-virt tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: go findings must carry `tool` and `origin`.
+        if obj.get("origin") == "go":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} go finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"gosec", "staticcheck"}:
+                print(f"CONTRACT FAIL: {path}:{i} go tool must be gosec|staticcheck, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: go findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate"}:
+                print(f"CONTRACT FAIL: {path}:{i} go finding carries non-go tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1352,6 +1386,90 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "virt negative-test: malformed skipped-list entry correctly rejected"
+
+# --- go inventory + §3.19 (v1.5.0):
+check skills/sec-review/SKILL.md "Go signals" "SKILL.md §2 missing go detection"
+check skills/sec-review/SKILL.md "\"go\"" "SKILL.md §2 inventory JSON missing go key"
+check skills/sec-review/SKILL.md "### 3.19 Go pass" "SKILL.md missing §3.19"
+check skills/sec-review/SKILL.md "go-runner" "SKILL.md §3.19 missing go-runner"
+check skills/sec-review/SKILL.md "__go_status__" "SKILL.md §3.19 missing go sentinel"
+check skills/sec-review/SKILL.md "gosec\|staticcheck" "SKILL.md §3.19 missing gosec/staticcheck"
+check skills/sec-review/SKILL.md "ecosystem.*Go\|\"Go\"" "SKILL.md §2 missing Go ecosystem routing"
+echo "go-orchestrator: SKILL.md §3.19 documents go-runner wire-up"
+
+# --- go fixture-match sanity: synthetic go.mod + main.go.
+tmp_g=$(mktemp -d); trap 'rm -rf "$tmp_g"' EXIT
+cat > "$tmp_g/go.mod" <<'GOMOD'
+module example.com/fixture
+
+go 1.22
+GOMOD
+cat > "$tmp_g/main.go" <<'GOSRC'
+package main
+
+func main() {}
+GOSRC
+if ! grep -q '^module' "$tmp_g/go.mod"; then
+    echo "go-inventory: FAIL — fixture go.mod malformed" >&2; fail=1
+fi
+if ! grep -q '^package' "$tmp_g/main.go"; then
+    echo "go-inventory: FAIL — fixture main.go malformed" >&2; fail=1
+fi
+echo "go-inventory: synthetic go.mod + main.go fixture matches §2 detection rule"
+
+# --- Negative tests for go origin: missing tool + cross-tag + malformed skipped.
+bad_go_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"main.go","line":1,"evidence":"e","reference":"go-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"go"}'
+if echo "$bad_go_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "go" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed go line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "go negative-test: malformed go line (missing tool) correctly rejected"
+
+bad_go_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"main.go","line":1,"evidence":"e","reference":"go-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"go","tool":"semgrep"}'
+if echo "$bad_go_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "go" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: go finding with non-go tool was accepted" >&2
+    exit 1
+fi
+echo "go negative-test: origin-tag isolation enforced (go cannot carry the other 14 lanes' tools)"
+
+bad_go_skipped='{"__go_status__":"partial","tools":["gosec"],"runs":1,"findings":3,"skipped":[{"oops":"shape"}]}'
+if echo "$bad_go_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__go_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed go skipped entry was accepted" >&2
+    exit 1
+fi
+echo "go negative-test: malformed skipped-list entry correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

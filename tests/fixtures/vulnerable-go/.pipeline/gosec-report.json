@@ -1,0 +1,10 @@
+{
+  "Issues": [
+    {"severity":"HIGH","confidence":"LOW","cwe":{"ID":"798","URL":"https://cwe.mitre.org/data/definitions/798.html"},"rule_id":"G101","details":"Potential hardcoded credentials","file":"main.go","line":"24","column":"1","code":"const apiKey = \"sk_live_4242424242424242\""},
+    {"severity":"MEDIUM","confidence":"HIGH","cwe":{"ID":"89","URL":"https://cwe.mitre.org/data/definitions/89.html"},"rule_id":"G201","details":"SQL string formatting","file":"main.go","line":"36","column":"7","code":"q := fmt.Sprintf(\"SELECT * FROM users WHERE id = '%s'\", id)"},
+    {"severity":"MEDIUM","confidence":"HIGH","cwe":{"ID":"22","URL":"https://cwe.mitre.org/data/definitions/22.html"},"rule_id":"G304","details":"Potential file inclusion via variable","file":"main.go","line":"27","column":"7","code":"f, err := os.Open(\"/srv/uploads/\" + name)"},
+    {"severity":"HIGH","confidence":"HIGH","cwe":{"ID":"295","URL":"https://cwe.mitre.org/data/definitions/295.html"},"rule_id":"G402","details":"TLS InsecureSkipVerify set true","file":"main.go","line":"55","column":"21","code":"TLSClientConfig: &tls.Config{InsecureSkipVerify: true}"},
+    {"severity":"HIGH","confidence":"MEDIUM","cwe":{"ID":"338","URL":"https://cwe.mitre.org/data/definitions/338.html"},"rule_id":"G404","details":"Use of weak random number generator (math/rand instead of crypto/rand)","file":"main.go","line":"43","column":"2","code":"rand.Read(b)"},
+    {"severity":"MEDIUM","confidence":"HIGH","cwe":{"ID":"327","URL":"https://cwe.mitre.org/data/definitions/327.html"},"rule_id":"G501","details":"Blocklisted import crypto/md5: weak cryptographic primitive","file":"main.go","line":"17","column":"2","code":"\"crypto/md5\""}
+  ]
+}

@@ -1051,6 +1051,57 @@ list emitted to cve-enricher does NOT gain a virt entry.
 The contract-check rejects any virt finding tagged with another
 lane's tool — see `tests/contract-check.sh`.
 
+### 3.19 Go pass — dispatch go-runner
+
+When the inventory emitted by §2 contains `go` (the `go.mod`
++ at least one `*.go` file detection rule fired), dispatch
+the `go-runner` agent (`agents/go-runner.md`, pinned to
+haiku, tools: Read + Bash). The agent shells out to two Go
+binaries — `gosec` (security-focused linter with mature
+`Gxxx` rule IDs covering hardcoded credentials, SQL
+injection, weak crypto, file permissions, command injection,
+TLS config, HTTP servers without timeouts) and `staticcheck`
+(comprehensive bug-finding + simplifications + style with
+`SAxxxx`/`Sxxxx`/`STxxxx`/`Uxxxx`/`QFxxxx` rules) — against
+the Go module root, parses each tool's native JSON output,
+and emits sec-expert-compatible JSONL on stdout — every line
+carrying `origin: "go"` and `tool: "gosec" | "staticcheck"`.
+
+go-runner runs in parallel with every other pass agent.
+Collect the findings into a `go_findings` list.
+
+Skill-level invariants:
+
+- **No `go` in inventory** — skip entirely. Do NOT probe for
+  gosec or staticcheck on unrelated projects.
+- **`__go_status__: "unavailable"`** — neither tool on PATH,
+  or the target had no `*.go` files, or both tools crashed.
+- **`__go_status__: "partial"`** — one ran, one failed.
+- **`__go_status__: "ok"`** — both ran cleanly.
+- **Skip vocabulary (v1.5 adds no new reasons)** — only
+  `tool-missing` is expected for this lane. Both gosec and
+  staticcheck are cross-platform Go binaries with no
+  host-OS gates and no artifact-absence preconditions
+  beyond `go.mod` + `*.go` source presence under target
+  (which the inventory rule guarantees before dispatch).
+  The skipped-list schema is the same `{tool, reason}`
+  structure used since v0.8.
+
+Go findings combine code-pattern signal (gosec's security
+rule fires plus staticcheck's deprecated-symbol / leaked-
+goroutine / unsafe-printf checks) with deprecation-tracking
+signal (staticcheck SA1019 against the Go 1.21+ stdlib
+deprecation set). The dep-inventory path IS affected:
+`go.sum` (or `go.mod` when go.sum is absent) feeds the
+cve-enricher as an ecosystem entry
+`{"ecosystem": "Go", "manifest": "go.sum"}` — OSV's
+`querybatch` endpoint handles `Go` natively, so no new feed
+adapter is required. **Origin-tag isolation:** every go
+finding carries `origin: "go"` and
+`tool: "gosec" | "staticcheck"`. The contract-check rejects
+any go finding tagged with another lane's tool — see
+`tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
