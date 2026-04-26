@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.5.0. This file is the authoritative "what does
+    plugin as of v1.6.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across fourteen tool lanes plus sec-expert code
+software projects across fifteen tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to fifteen review streams in parallel
-(fourteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to sixteen review streams in parallel
+(fifteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -335,6 +335,37 @@ Dispatch discipline.
   adapter change.
 - **Shipped in:** v1.5.0.
 
+### shell
+
+- **Target shape:** any shell-shaped file under target —
+  `*.sh`, `*.bash`, `*.zsh`, `*.ksh`, OR a file whose first
+  line is a shell shebang (`#!/bin/sh`, `#!/bin/bash`,
+  `#!/usr/bin/env bash`, `#!/usr/bin/env sh`, `#!/bin/dash`,
+  `#!/bin/ksh`, `#!/bin/zsh`). Vendored-directory exclusions
+  apply: `node_modules/`, `.venv/`, `vendor/`, `dist/`,
+  `build/`, `target/`. Inventory value is `["scripts"]` (no
+  further sub-shape distinction).
+- **Tools:** `shellcheck` (Haskell binary; canonical static
+  analyzer for bash/sh/dash/ksh with `SCxxxx` rule IDs).
+  Single-tool lane — first since DAST (v0.5). Cross-platform.
+- **Reference packs:** `references/shell/command-injection.md`,
+  `shell/file-handling.md`, `shell/script-hardening.md`,
+  `references/shell-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-shell-source` (NEW
+  in v1.6 — target-shape; shellcheck applicable but no
+  shell-shaped files under target after vendored-dir
+  exclusions).
+- **Origin tag:** `"shell"`. Tool whitelist: `shellcheck`.
+  Single-tool lane has no `partial` status — only `ok` /
+  `unavailable`.
+- **Dep-inventory:** NOT affected — shell scripts have no
+  package-manifest dependency graph; supply-chain risk for
+  sourced remote scripts (the `curl | sh` antipattern) is
+  enforced at the code-pattern layer via the
+  `shell/file-handling.md` CWE-494 pattern.
+- **Shipped in:** v1.6.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -365,10 +396,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**12 canonical reason values** as of v1.4, grouped by semantic
+**13 canonical reason values** as of v1.6, grouped by semantic
 category:
 
-### Target-shape (9)
+### Target-shape (10)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -381,6 +412,7 @@ category:
 | `no-pe`           | windows              | No PE artifact (.exe/.dll/.msi/.msix/.sys) under target.                |
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
+| `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 
 ### Host-OS-gated (3)
 

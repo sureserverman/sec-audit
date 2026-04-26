@@ -786,6 +786,75 @@ is required. **Skip vocabulary unchanged** — only
 Go binaries with no host-OS gate and no target-shape
 preconditions beyond `go.mod` + `*.go` source presence.
 
+## Shell lane (v1.6.0)
+
+A nineteenth agent, **`shell-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects shell-shaped files under target — `*.sh`, `*.bash`,
+`*.zsh`, `*.ksh`, OR a file with a shell shebang
+(`#!/bin/bash`, `#!/usr/bin/env bash`, `#!/bin/sh`, etc.).
+Vendored-directory exclusions (`node_modules/`, `.venv/`,
+`vendor/`, `dist/`, `build/`, `target/`) keep the lane
+focused on user-authored scripts. Cross-platform, no host-OS
+gate.
+
+This is the **first single-tool lane in sec-review since
+DAST (v0.5)**. The runner dispatches a single tool:
+
+- **`shellcheck`** (Haskell binary) — the canonical static
+  analyzer for bash/sh/dash/ksh shell scripts. Mature
+  `SCxxxx` rule catalogue covering quoting (SC2086 unquoted
+  variables, SC2046 unquoted command substitution),
+  command injection (SC2294 eval-array, SC2156 find-exec
+  sh-c with `{}` interpolation, SC2038 find-pipe-xargs
+  without `-print0`/`-0`), file handling (SC2129
+  predictable temp file via `$$`), control flow (SC2317
+  set-e ineffective in subshell, SC3040 pipefail not
+  POSIX), input safety (SC2162 read without -r), and
+  portability (SC2148 missing/incorrect shebang, SC1090/
+  SC1091 unsourced source).
+
+Adding a second tool for symmetry would be overhead with no
+signal lift — shellcheck has no mature competitor in the
+shell-script-linter space. Single-tool means no `partial`
+status: shellcheck either ran or it didn't.
+
+Output carries `origin: "shell"` and `tool: "shellcheck"`.
+Reference packs live in `references/shell/`:
+
+- `command-injection.md` — unquoted variable expansion in
+  command position, `eval` with attacker-influenced
+  strings, `bash -c "$VAR"` indirection, `find -exec sh -c`
+  with `{}` interpolation, `xargs` without `-0`,
+  `ssh remote "$cmd"` interpolation, `IFS` modification
+  without restoration.
+- `file-handling.md` — predictable `/tmp/foo-$$` temp files
+  (use `mktemp`), `umask`-after-write race, `tar`/`unzip`
+  without path validation (Zip Slip), TOCTOU `[ -f ] && cat`
+  pre-check, `curl | sh` install antipattern, secrets
+  logged to `/tmp` via `set -x`, PID-file race without
+  `flock`.
+- `script-hardening.md` — missing `set -euo pipefail`,
+  missing `trap` for cleanup, relative `PATH` (CWE-426),
+  `sudo` without `-n` in non-interactive context, secrets
+  in command-line argv visible in `ps`, missing or wrong
+  shebang.
+
+The lane is read-only — shell-runner never executes the
+scripts under analysis.
+
+**Dep-inventory NOT affected.** Shell scripts have no
+package-manifest dependency graph; supply-chain risk for
+sourced remote scripts (the `curl | sh` antipattern) is
+enforced at the code-pattern layer via the
+`shell/file-handling.md` reference's CWE-494 pattern.
+**Skip vocabulary gains one NEW target-shape reason:**
+`no-shell-source` (shellcheck on PATH but target has no
+shell-shaped files after vendored-dir exclusions). Parallel
+to the existing v0.10–v1.4 target-shape primitives
+(`no-pe`, `no-elf`, `no-pkg`, `no-debian-source`,
+`no-containerfile`, `no-libvirt-xml`).
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -924,6 +993,7 @@ names from the other 12 lanes).
 | GitHub Actions            | `.github/workflows/*.y(a)ml` with `on:` + `jobs:`  | `actionlint`, `zizmor` (both cross-platform) | `references/infra/{gh-actions-permissions,gh-actions-secrets}.md`, `references/gh-actions-tools.md` | v1.3.0     |
 | Virtualization / runtime  | Docker daemon / Compose / Containerfile, Podman / Quadlet, libvirt domain / network / pool / volume XML, Apple Containers `container.yaml`, UTM `*.utm/config.plist` | `hadolint` (Containerfile lint), `virt-xml-validate` (libvirt XSD; both cross-platform) | `references/virt/{docker-runtime,podman,libvirt-qemu,apple-containers,utm}.md`, `references/virt-tools.md` | v1.4.0     |
 | Go                        | Go module (`go.mod` + `*.go`)                       | `gosec`, `staticcheck` (both cross-platform Go binaries) | `references/go/{stdlib-security,module-ecosystem,web-frameworks}.md`, `references/go-tools.md` | v1.5.0     |
+| Shell                     | Shell scripts (`*.sh`/`*.bash`/`*.zsh`/`*.ksh` or shebang-detected) | `shellcheck` (cross-platform; single-tool lane) | `references/shell/{command-injection,file-handling,script-hardening}.md`, `references/shell-tools.md` | v1.6.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives
