@@ -1,0 +1,25 @@
+{
+  "dependencies": [
+    {
+      "name": "requests",
+      "version": "2.20.0",
+      "vulns": [
+        {"id":"GHSA-x84v-xcm2-53pg","description":"Requests CVE-2018-18074 — uses authentication on cross-origin redirect","aliases":["CVE-2018-18074"],"fix_versions":["2.20.1"]}
+      ]
+    },
+    {
+      "name": "pyyaml",
+      "version": "5.3.0",
+      "vulns": [
+        {"id":"GHSA-8q59-q68h-6hv4","description":"PyYAML CVE-2020-14343 — yaml.full_load arbitrary code execution","aliases":["CVE-2020-14343"],"fix_versions":["5.4.0"]}
+      ]
+    },
+    {
+      "name": "django",
+      "version": "3.2.0",
+      "vulns": [
+        {"id":"GHSA-v6rh-hp5x-86rv","description":"Django CVE-2022-28346 — SQL injection via QuerySet.annotate / aggregate / extra","aliases":["CVE-2022-28346"],"fix_versions":["3.2.13","4.0.4"]}
+      ]
+    }
+  ]
+}

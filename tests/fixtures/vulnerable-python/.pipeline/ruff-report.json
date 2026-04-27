@@ -1,0 +1,12 @@
+[
+  {"code":"S105","message":"Possible hardcoded password assigned to: \"API_KEY\"","filename":"app.py","location":{"row":18,"column":1},"end_location":{"row":18,"column":40},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S105"},
+  {"code":"S105","message":"Possible hardcoded password assigned to: \"DB_PASSWORD\"","filename":"app.py","location":{"row":19,"column":1},"end_location":{"row":19,"column":24},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S105"},
+  {"code":"S301","message":"`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data","filename":"app.py","location":{"row":23,"column":12},"end_location":{"row":23,"column":31},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S301"},
+  {"code":"S307","message":"Use of possibly insecure function `eval`","filename":"app.py","location":{"row":27,"column":12},"end_location":{"row":27,"column":40},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S307"},
+  {"code":"S324","message":"Probable use of insecure hash functions in `hashlib`: `md5`","filename":"app.py","location":{"row":31,"column":12},"end_location":{"row":31,"column":42},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S324"},
+  {"code":"S311","message":"Standard pseudo-random generators are not suitable for cryptographic purposes","filename":"app.py","location":{"row":35,"column":24},"end_location":{"row":35,"column":80},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S311"},
+  {"code":"S501","message":"Probable use of `requests` call with `verify=False`","filename":"app.py","location":{"row":39,"column":12},"end_location":{"row":39,"column":47},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S501"},
+  {"code":"S506","message":"Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects","filename":"app.py","location":{"row":43,"column":12},"end_location":{"row":43,"column":31},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S506"},
+  {"code":"S602","message":"`subprocess` call with `shell=True` identified, security issue","filename":"app.py","location":{"row":47,"column":5},"end_location":{"row":47,"column":48},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S602"},
+  {"code":"S102","message":"Use of `exec` detected","filename":"app.py","location":{"row":51,"column":5},"end_location":{"row":51,"column":15},"fix":null,"url":"https://docs.astral.sh/ruff/rules/S102"}
+]

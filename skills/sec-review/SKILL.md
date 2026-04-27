@@ -1207,6 +1207,69 @@ shell finding carries `origin: "shell"` and
 finding tagged with another lane's tool — see
 `tests/contract-check.sh`.
 
+### 3.21 Python pass — dispatch python-runner
+
+When the inventory emitted by §2 contains `python` (the
+Python manifest + package-shape detection rule fired),
+dispatch the `python-runner` agent
+(`agents/python-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to two Python tools —
+`pip-audit` (PyPA-maintained PyPI vulnerability scanner with
+OSV-backed metadata + reachability-hint annotations) and
+`ruff` (Rust-implemented Python linter; runs the `S`-prefix
+flake8-bandit security ruleset + the `B`-prefix
+flake8-bugbear bug-prone-pattern ruleset, faster than
+running bandit alone) — against the project root, parses
+each tool's native JSON output, and emits sec-expert-
+compatible JSONL on stdout — every line carrying
+`origin: "python"` and `tool: "pip-audit" | "ruff"`.
+
+**Delineation from the SAST lane (§3.6).** The SAST lane
+runs `bandit` and `semgrep` on every project; the python
+lane is additive, not replacement. Three reasons it
+deepens coverage:
+
+1. **`pip-audit`** adds reachability-hint metadata that
+   cve-enricher's bulk OSV pass lacks (cve-enricher matches
+   versions only).
+2. **`ruff`** is faster and ships flake8-bandit rules that
+   postdate the pinned upstream `bandit` version — running
+   both catches the gap.
+3. **Reference packs** deepen sec-expert reasoning over
+   Python-specific surfaces (Pickle/YAML deserialization,
+   asyncio exception swallowing, FastAPI DI bypass, Django
+   ORM `.extra()` injection) beyond bandit's rule set.
+
+python-runner runs in parallel with every other pass agent.
+Collect the findings into a `python_findings` list.
+
+Skill-level invariants:
+
+- **No `python` in inventory** — skip entirely.
+- **`__python_status__: "unavailable"`** — neither tool on
+  PATH, or no Python manifest under target.
+- **`__python_status__: "partial"`** — one ran, one failed
+  or cleanly-skipped.
+- **`__python_status__: "ok"`** — both ran cleanly.
+- **Two skip reasons:**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-requirements` — NEW in v1.7; pip-audit applicable
+    but no requirements.txt / pyproject.toml / setup.py /
+    Pipfile under target, OR ruff applicable but no `*.py`
+    files. Target-shape clean-skip; parallel to
+    v0.10–v1.6 target-shape primitives.
+
+Python findings combine code-pattern signal (ruff's `S`
+and `B` rule fires) with package-version signal
+(pip-audit's OSV-backed CVE matches). The dep-inventory
+path IS already affected by the existing PyPI ecosystem
+entry; the python lane's pip-audit pass augments
+cve-enricher's bulk scan with reachability hints. **Origin-
+tag isolation:** every python finding carries
+`origin: "python"` and `tool: "pip-audit" | "ruff"`. The
+contract-check rejects any python finding tagged with
+another lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

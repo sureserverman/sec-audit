@@ -68,7 +68,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/iac-runner.md:haiku" "agents/gh-actions-runner.md:haiku" \
             "agents/virt-runner.md:haiku" \
             "agents/go-runner.md:haiku" \
-            "agents/shell-runner.md:haiku"; do
+            "agents/shell-runner.md:haiku" \
+            "agents/python-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -388,6 +389,26 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __shell_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the python status summary line emitted by python-runner.
+        # Skip vocabulary: tool-missing, no-requirements.
+        if "__python_status__" in obj:
+            status = obj.get("__python_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __python_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __python_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __python_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __python_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -584,8 +605,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} shell tool must be shellcheck, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: shell findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "pip-audit", "ruff"}:
                 print(f"CONTRACT FAIL: {path}:{i} shell finding carries non-shell tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: python findings must carry `tool` and `origin`.
+        if obj.get("origin") == "python":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} python finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"pip-audit", "ruff"}:
+                print(f"CONTRACT FAIL: {path}:{i} python tool must be pip-audit|ruff, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: python findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck"}:
+                print(f"CONTRACT FAIL: {path}:{i} python finding carries non-python tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1579,6 +1612,83 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "shell negative-test: malformed skipped-list entry correctly rejected"
+
+# --- python inventory + §3.21 (v1.7.0):
+check skills/sec-review/SKILL.md "Python signals" "SKILL.md §2 missing python detection"
+check skills/sec-review/SKILL.md "\"python\"" "SKILL.md §2 inventory JSON missing python key"
+check skills/sec-review/SKILL.md "### 3.21 Python pass" "SKILL.md missing §3.21"
+check skills/sec-review/SKILL.md "python-runner" "SKILL.md §3.21 missing python-runner"
+check skills/sec-review/SKILL.md "__python_status__" "SKILL.md §3.21 missing python sentinel"
+check skills/sec-review/SKILL.md "pip-audit\|ruff" "SKILL.md §3.21 missing pip-audit/ruff"
+check skills/sec-review/SKILL.md "no-requirements" "SKILL.md §3.21 missing no-requirements clean-skip reason"
+echo "python-orchestrator: SKILL.md §3.21 documents python-runner wire-up"
+
+# --- python fixture-match sanity: synthetic requirements.txt + *.py
+tmp_py=$(mktemp -d); trap 'rm -rf "$tmp_py"' EXIT
+cat > "$tmp_py/requirements.txt" <<'REQ'
+django==4.2.0
+REQ
+cat > "$tmp_py/app.py" <<'PY'
+def main(): pass
+PY
+if ! grep -q '==' "$tmp_py/requirements.txt"; then
+    echo "python-inventory: FAIL — fixture requirements.txt malformed" >&2; fail=1
+fi
+echo "python-inventory: synthetic requirements.txt + app.py fixture matches §2 detection rule"
+
+# --- Negative tests for python origin
+bad_py_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"app.py","line":1,"evidence":"e","reference":"python-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"python"}'
+if echo "$bad_py_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "python" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed python line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "python negative-test: malformed python line (missing tool) correctly rejected"
+
+bad_py_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"app.py","line":1,"evidence":"e","reference":"python-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"python","tool":"shellcheck"}'
+if echo "$bad_py_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "python" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: python finding with non-python tool was accepted" >&2
+    exit 1
+fi
+echo "python negative-test: origin-tag isolation enforced (python cannot carry the other 16 lanes' tools)"
+
+bad_py_skipped='{"__python_status__":"partial","tools":["pip-audit"],"runs":1,"findings":2,"skipped":[{"oops":"shape"}]}'
+if echo "$bad_py_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__python_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed python skipped entry was accepted" >&2
+    exit 1
+fi
+echo "python negative-test: malformed skipped-list entry correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
