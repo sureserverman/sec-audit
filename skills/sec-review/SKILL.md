@@ -216,6 +216,36 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Image artifact signals (v1.11.0+)**: any of the following
+  triggers the `image` inventory key:
+  - **Image tarballs** — `*.tar` files containing an OCI / Docker
+    image (identified by the presence of `manifest.json` inside
+    the tarball, OR a sibling `index.json` for OCI archive
+    format). Common naming: `<app>-<version>.tar` under
+    `artifacts/`, `dist/`, `releases/`, `images/`.
+  - **OCI image layout directories** — directories containing an
+    `index.json` + `oci-layout` file at root + `blobs/sha256/`
+    subdirectory. Canonical output of `skopeo copy --format=oci`
+    or `docker buildx build --output=type=oci-layout`.
+  - **SBOMs** — files matching `*.spdx.json` /
+    `*.cyclonedx.json` / `*.cdx.json` / `*.sbom.json` /
+    `bom.json` at any depth. SPDX is identified by the
+    `spdxVersion` top-level field; CycloneDX by `bomFormat:
+    "CycloneDX"`.
+  When detected, add `"image"` with values reflecting the
+  artifact mix: `"image": ["tarball"]`, `["oci-layout"]`,
+  `["sbom-spdx"]`, `["sbom-cyclonedx"]`, or combinations
+  (e.g. `["tarball", "sbom-spdx"]` for a release bundle that
+  ships both). Load `references/image/image-vulnerabilities.md`,
+  `references/image/sbom-and-provenance.md`, and the
+  tool-lane reference `references/image-tools.md`. The
+  ecosystems list emitted to cve-enricher is NOT changed by
+  this lane — image findings ARE CVE matches but already
+  carry the upstream advisory ID inline; cve-enricher's
+  KEV cross-reference still applies post-hoc to the runner-
+  emitted findings. The image lane is the OSS-equivalent of
+  Docker Scout's CVE-scanning surface (without the daemon /
+  registry / Docker Hub login dependencies).
 - **Networking-as-code signals**: any of the following
   triggers the `netcfg` inventory key:
   - **Tor** — `torrc` / `torrc-defaults` / `torrc.d/*.conf`
@@ -519,6 +549,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "python":      [],
   "ansible":     [],
   "netcfg":      [],
+  "image":       [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
