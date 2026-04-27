@@ -1927,6 +1927,47 @@ sys.exit(1 if errs else 0)
 fi
 echo "netcfg negative-test: malformed skipped-list entry correctly rejected"
 
+# --- v1.10 default-cwd UX (commands/sec-review.md):
+check commands/sec-review.md "Default-target behaviour" "commands/sec-review.md missing v1.10 default-target section"
+check commands/sec-review.md "current working directory" "commands/sec-review.md missing default-to-cwd rule"
+check commands/sec-review.md "Reviewing \`\$PWD\`\|Reviewing.*\$PWD" "commands/sec-review.md missing canonical cwd-confirmation line"
+echo "v1.10-default-cwd: commands/sec-review.md documents the default-to-cwd rule"
+
+# --- v1.10 default-cwd UX (skill SKILL.md §1):
+check skills/sec-review/SKILL.md "Default-to-cwd (v1.10.0+)\|Default-to-cwd" "SKILL.md §1 missing v1.10 default-to-cwd bullet"
+check skills/sec-review/SKILL.md "Default behaviour (v1.10.0+)\|when invoked without a positional path argument" "SKILL.md Inputs missing v1.10 default-to-cwd doc"
+echo "v1.10-default-cwd: SKILL.md §1 documents the default-to-cwd contract"
+
+# --- v1.10 uncovered-tech detection registry:
+check skills/sec-review/references/uncovered-tech-fingerprints.md "^## Detection entries" "uncovered-tech-fingerprints.md missing Detection entries section"
+check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`java\`" "uncovered-tech-fingerprints.md missing Java entry"
+check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`cpp\`" "uncovered-tech-fingerprints.md missing C/C++ entry"
+check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`solidity\`" "uncovered-tech-fingerprints.md missing Solidity entry"
+check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`php\`" "uncovered-tech-fingerprints.md missing PHP entry"
+check skills/sec-review/references/uncovered-tech-fingerprints.md "spotbugs\|find-sec-bugs" "uncovered-tech-fingerprints.md missing Java tooling"
+echo "v1.10-uncovered-tech: references/uncovered-tech-fingerprints.md catalogues 16 known-but-uncovered technologies"
+
+# --- v1.10 SKILL.md §2 uncovered-tech subsection:
+check skills/sec-review/SKILL.md "Uncovered-technology detection (v1.10.0+)" "SKILL.md §2 missing uncovered-tech detection subsection"
+check skills/sec-review/SKILL.md "uncovered_tech" "SKILL.md §2 missing uncovered_tech array reference"
+check skills/sec-review/SKILL.md "uncovered-tech-fingerprints.md" "SKILL.md §2 missing fingerprint registry pointer"
+echo "v1.10-uncovered-tech: SKILL.md §2 documents uncovered-technology detection"
+
+# --- v1.10 report-writer Step 5.5 wire-up:
+check agents/report-writer.md "### Step 5.5 — Emit Coverage-gap suggestions" "report-writer missing Step 5.5"
+check agents/report-writer.md "Coverage-gap suggestions" "report-writer missing Coverage-gap section template"
+check agents/report-writer.md "uncovered_tech" "report-writer missing uncovered_tech array reference"
+check agents/report-writer.md "OMIT the entire section" "report-writer missing empty-array omission rule"
+echo "v1.10-report-writer: agents/report-writer.md renders Coverage-gap suggestions section"
+
+# --- v1.10 negative test: empty uncovered_tech array MUST suppress the section.
+# The report-writer rule is "render only when non-empty"; the contract check
+# verifies the agent spec carries that rule.
+if ! grep -q "OMIT the entire section\|omit.*entire section\|do not render an empty" agents/report-writer.md; then
+    echo "contract-check: FAIL — report-writer Step 5.5 missing empty-array omission rule" >&2
+    fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1

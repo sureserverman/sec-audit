@@ -296,6 +296,40 @@ lists every CVE from the advisory; `Fixed in` quotes the advisory's
 `below` field ("Upgrade beyond X.Y.Z"). This makes bundled-library
 risk comparable to manifest-declared-dependency risk in a single table.
 
+### Step 5.5 — Emit Coverage-gap suggestions (v1.10.0+)
+
+Before the Review-metadata block, render a "Coverage-gap
+suggestions" section IF the inventory's `uncovered_tech` array is
+non-empty. When the array is empty (the project's tech stack is
+fully covered by sec-review's lanes), OMIT the entire section — do
+not render an empty heading.
+
+Section template (when at least one entry exists):
+
+```markdown
+## Coverage-gap suggestions
+
+The following technologies were detected in this project but are
+NOT yet covered by any sec-review lane. The list is informational
+— no findings were emitted against these technologies. To deepen
+the review, file a feature request or extend sec-review with a
+new lane following the pattern in `references/COVERAGE.md`.
+
+### <name>
+
+- **Suggested lane:** `<suggested_lane>`
+- **Evidence:** <comma-separated file:line locations from evidence_files>
+- **Suggested tools:** <comma-separated tool names>
+- **Why this matters:** <rationale verbatim from the fingerprint registry>
+```
+
+Render one `### <name>` block per entry in `uncovered_tech`. Use the
+input's verbatim `rationale` text — never paraphrase. Use the
+input's verbatim `suggested_tools` list — never substitute or
+re-order. The `evidence_files` array is rendered as a
+comma-separated list (truncate to the first three entries plus an
+"and N more" suffix if more than three exist).
+
 ### Step 6 — Emit review metadata
 
 ```markdown
