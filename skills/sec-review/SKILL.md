@@ -13,7 +13,13 @@ code analysis; this skill orchestrates and enriches.
 ## Inputs
 
 - `target_path` (required) — absolute path of the project to review.
-  The slash command passes `$ARGUMENTS` here.
+  The slash command passes `$ARGUMENTS` here. **Default behaviour
+  (v1.10.0+):** when invoked without a positional path argument,
+  the slash command resolves `target_path` to the caller's current
+  working directory (`$PWD`) rather than prompting. This skill
+  honours that default — it does not re-prompt for a path when the
+  caller's resolution succeeded. The §1 Scope step still confirms
+  the resolved path out loud so the user can redirect.
 - `target_url` (optional) — HTTP(S) URL of a running instance of the
   same project, for the DAST lane (§3.7). When absent, DAST is
   skipped; static code analysis and CVE enrichment still run. Read
@@ -47,9 +53,22 @@ is internal working state.
 
 Before touching anything, fix the scope and confirm it out loud.
 
+- **Default-to-cwd (v1.10.0+):** if the slash command resolved
+  `target_path` to the current working directory (the user invoked
+  `/sec-review` with no positional arg), echo the resolved path
+  back to the user with the line:
+
+  > Reviewing `<cwd>` (current directory). Pass an explicit path to
+  > review elsewhere.
+
+  Do NOT prompt for an alternative — proceed unless the user
+  redirects within their next turn. Continue with the rest of the
+  Scope checks below.
+
 - Confirm `target_path` is readable and is NOT the `sec-review` plugin
   itself. If the user points at the plugin directory, refuse and ask for
-  the actual target.
+  the actual target. (This is the explicit-failure path the slash
+  command's default-to-cwd rule defers to.)
 - If `target_path` is a monorepo, ask whether to scope to a subdir
   (`services/api/`, `apps/web/`) or review the whole tree.
 - Honor `.gitignore` — skip `node_modules/`, `.venv/`, `dist/`, `build/`,
@@ -417,6 +436,65 @@ Detect the technology stack. Read only — do not install or execute.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
+### Uncovered-technology detection (v1.10.0+)
+
+After the per-lane detection above, run a SECOND pass that scans for
+technologies present in the project but NOT covered by any existing
+lane. The detection registry lives in
+`references/uncovered-tech-fingerprints.md` — a curated catalogue of
+known-but-uncovered technologies (Java non-Spring, C/C++, Solidity,
+PHP, Ruby non-Rails, .NET server-side, Lua/LuCI, Elixir, Helm,
+Jupyter notebooks, GitLab CI / Jenkins / CircleCI, smart-contract
+languages beyond Solidity, eBPF, WebAssembly, build systems beyond
+the covered set) with detection patterns (manifest filenames,
+file-extension globs, content regex) and suggested tooling for a
+future lane.
+
+For each entry in the registry, evaluate the detection conditions
+against `target_path`. Apply the precision filter: high-precision
+matches always emit a suggestion; medium-precision matches emit ONLY
+if the technology is also signalled by a manifest filename
+(reducing false positives from incidental file extensions). Skip
+entries that overlap with an already-detected lane (e.g. Java
+detection is suppressed when `android` is already in the inventory;
+.NET server-side is suppressed when `windows` desktop is detected).
+
+Emit an `uncovered_tech` array on the `inventory.json` record. Each
+entry is a sub-object:
+
+```json
+{
+  "uncovered_tech": [
+    {
+      "name":            "Solidity (smart contracts)",
+      "suggested_lane":  "solidity",
+      "evidence_files":  ["contracts/Token.sol", "hardhat.config.js"],
+      "suggested_tools": ["slither", "mythril"],
+      "rationale":       "Re-entrancy / integer-overflow / unchecked-external-calls class; not in any existing lane."
+    },
+    {
+      "name":            "Java server-side (non-Spring)",
+      "suggested_lane":  "java",
+      "evidence_files":  ["pom.xml", "src/main/java/Api.java"],
+      "suggested_tools": ["spotbugs", "find-sec-bugs"],
+      "rationale":       "Java deserialization / JNDI injection / XXE class; current sec-expert reasoning is Spring-only."
+    }
+  ]
+}
+```
+
+The `uncovered_tech` array is read by the `report-writer` agent in
+its **Coverage-gap suggestions** section (Step 6.5). When the array
+is empty, the section is omitted entirely. When non-empty, each
+entry renders as a one-paragraph suggestion the user can act on
+(file a feature request, extend sec-review with a new lane following
+`COVERAGE.md`'s pattern). The lane is informational only — no
+runner dispatches against detected uncovered tech, and no findings
+are emitted.
+
+The `uncovered_tech` field on the `inventory.json` template is
+shown in the JSON example below.
+
 Emit an `inventory.json` record (in-memory only) like:
 
 ```json
@@ -444,7 +522,8 @@ Emit an `inventory.json` record (in-memory only) like:
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
-  "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}]
+  "ecosystems":  [{"ecosystem": "PyPI", "manifest": "requirements.txt"}],
+  "uncovered_tech": []
 }
 ```
 

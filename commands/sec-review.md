@@ -40,8 +40,34 @@ Example valid invocations:
 /sec-review ~/projects/myapp --only=sec-expert,sast,rust
 ```
 
-If `$ARGUMENTS` is empty, ask the user for the absolute path of the
-project to review before continuing.
+## Default-target behaviour (v1.10.0+)
+
+If `$ARGUMENTS` is empty (no positional path was supplied), default
+`target_path` to the current working directory (`$PWD`). Do NOT
+prompt the user for a path — the natural intent of `/sec-review` with
+no argument is "review the project I'm currently in." Only prompt
+in these explicit failure cases:
+
+1. `$PWD` resolves to the `sec-review` plugin's own directory (per
+   the §1 Scope guard — refusing self-review). In that case, ask
+   the user for the actual target.
+2. `$PWD` is not a readable directory (extremely rare — almost
+   always indicates the shell environment is broken). Surface the
+   error and ask.
+
+Echo the resolved `target_path` back to the user as part of the
+§1 Scope confirmation so the resolved default is visible:
+
+> Reviewing `$PWD` (current directory). Pass an explicit path to
+> review elsewhere.
+
+Only when the user passes `--only=` / `--skip=` flags AND no
+positional path, the same default-to-cwd rule applies — the flags
+filter the lane set; the target is still the cwd.
+
+If `$ARGUMENTS` contains flags but no parseable positional token,
+treat the positional as missing and apply the default-to-cwd rule.
+Do NOT silently treat a flag value as a path.
 
 ## Dispatch
 
