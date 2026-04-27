@@ -197,6 +197,40 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Networking-as-code signals**: any of the following
+  triggers the `netcfg` inventory key:
+  - **Tor** — `torrc` / `torrc-defaults` / `torrc.d/*.conf`
+    files, OR any `*.conf` containing `^HiddenServiceDir`
+    / `^ControlPort` / `^SOCKSPort` directives.
+  - **WireGuard** — `*.conf` file containing `[Interface]`
+    AND (`[Peer]` OR `PrivateKey` OR `ListenPort`) headers
+    in the canonical wg-quick shape.
+  - **sing-box** — `*.json` containing top-level
+    `"inbounds"` AND `"outbounds"` arrays, AND inbound
+    `"type"` values from the sing-box vocabulary
+    (`socks`, `http`, `mixed`, `vless`, `trojan`,
+    `hysteria`, `hysteria2`, `tuic`, `naive`,
+    `shadowsocks`, etc.).
+  - **Xray-core** — `*.json` containing top-level
+    `"inbounds"` AND `"outbounds"` arrays, AND inbound
+    `"protocol"` values from the Xray vocabulary
+    (`vless`, `vmess`, `trojan`, `shadowsocks`,
+    `dokodemo-door`, `freedom`, `blackhole`).
+  When detected, add `"netcfg"` with values reflecting the
+  technology mix: `"netcfg": ["tor"]`, `["wireguard"]`,
+  `["sing-box"]`, `["xray"]`, or combinations
+  (`["tor", "wireguard"]` is common on a Tor-relay host
+  that also runs a management-VPN; `["sing-box", "xray"]`
+  if a host runs both proxy stacks). Load
+  `references/netcfg/tor.md`,
+  `references/netcfg/wireguard.md`,
+  `references/netcfg/sing-box.md`,
+  `references/netcfg/xray.md`, and the tool-lane reference
+  `references/netcfg-tools.md` — load only the
+  per-technology packs matching detected values to keep the
+  sec-expert context tight. No ecosystem entry — these are
+  configuration formats, not package-manifest dependency
+  graphs.
 - **Ansible signals**: any of the following triggers the
   `ansible` inventory key:
   - A `*.yml` / `*.yaml` file with top-level `hosts:` AND
@@ -406,6 +440,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "shell":       [],
   "python":      [],
   "ansible":     [],
+  "netcfg":      [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
