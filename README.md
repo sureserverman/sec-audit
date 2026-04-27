@@ -1074,6 +1074,65 @@ validator subcommands.
 graphs. **Skip vocabulary gains two NEW target-shape
 reasons:** `no-singbox-config` and `no-xray-config`.
 
+## Container image vulnerability lane (v1.11.0)
+
+A twenty-third agent, **`image-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects container image artifacts under target — image
+tarballs (with `manifest.json` / `index.json` inside), OCI
+layout directories (`oci-layout` + `index.json` +
+`blobs/sha256/`), or SBOMs (SPDX / CycloneDX). Cross-platform,
+no host-OS gate.
+
+This is the **OSS-equivalent of Docker Scout's CVE-scanning
+surface** — without Docker daemon, Docker Hub login, or
+registry-pull dependencies (the gating requirements that make
+Docker Scout itself a poor fit for a source-only / no-host-deps
+plugin).
+
+The runner dispatches two cross-platform Go binaries:
+
+- **`trivy image --input <tarball>`** (Aqua Security) — the
+  most-used OSS image scanner. Vulnerability mode only
+  (`--scanners vuln`), DB pre-cached and `--skip-update` at
+  run time, OS-package + language-runtime + application-layer
+  + vendored-binary CVE matching.
+- **`grype <input>`** (Anchore) — the OSS alternative; accepts
+  image tarballs, OCI layout directories, and SBOMs (`grype
+  sbom:<file>`). Pairs with Syft for SBOM-first workflows.
+
+The runner **deduplicates the trivy + grype overlap** by
+`(file, vuln_id, package_name)` tuple before emitting findings;
+trivy wins on collision (broader feed coverage). Both tools'
+results are credited in the status sentinel's `tools` array.
+
+Output carries `origin: "image"` and `tool: "trivy" | "grype"`.
+Reference packs live in `references/image/`:
+
+- `image-vulnerabilities.md` — OS package CVEs in image base
+  layers (CWE-1395), language-runtime CVEs shipping with the
+  base, application-layer dep CVEs installed at build time,
+  vendored-binary CVEs (no package-manager record), KEV-bonus
+  high-severity unpatched-but-fix-available findings.
+  Distroless / scratch / digest-pinning fix recipes.
+- `sbom-and-provenance.md` — image-with-no-SBOM (CWE-1357),
+  non-canonical SBOM format (CWE-1357), unsigned image
+  (CWE-345), missing SLSA build provenance (CWE-1357 SLSA L<1),
+  `NOASSERTION` versions in SBOM (CWE-1395). Cosign +
+  Sigstore + SLSA fix recipes.
+
+The runner is read-only and source-only — never pulls from a
+registry, never contacts a Docker daemon, never auto-updates
+the vulnerability DB at run time (operator pre-bakes the DB).
+
+**Dep-inventory extended post-hoc.** Image findings carry CVE
+IDs inline, but cve-enricher's CISA KEV cross-reference still
+applies — any image finding whose `vuln_id` is in KEV gets the
++20-pt KEV bonus per §5's prioritization rubric. **Skip
+vocabulary gains one NEW target-shape reason:**
+`no-image-artifact` (tool on PATH but target has no image
+tarball / OCI layout / SBOM).
+
 ## UX improvements (v1.10.0)
 
 The v1.10 release adds no new lanes. Two ergonomic improvements
@@ -1284,6 +1343,7 @@ names from the other 12 lanes).
 | Python                    | Python project (`requirements.txt` / `pyproject.toml` / `setup.py` / `Pipfile` + `*.py`) | `pip-audit` (OSV-backed reachability), `ruff` (`S` + `B` rule families; cross-platform) | `references/python/{deserialization,subprocess-and-async,framework-deepening}.md`, `references/python-tools.md` | v1.7.0     |
 | Ansible                   | Playbook YAML (`hosts:` + `tasks:`), `roles/`, `ansible.cfg`, `collections/`, `inventory`, `requirements.yml` | `ansible-lint` (cross-platform; single-tool lane; `--offline` for source-only) | `references/ansible/{playbook-security,role-secrets-and-vault}.md`, `references/ansible-tools.md` | v1.8.0     |
 | Networking-as-code        | Tor `torrc`, WireGuard `[Interface]`+`[Peer]` conf, sing-box JSON (sing-box-vocab inbounds), Xray JSON (Xray-vocab protocols) | `sing-box check`, `xray test -confdir` (structural validators, NOT security scanners; sec-expert reads packs for security patterns + handles Tor/WG entirely) | `references/netcfg/{tor,wireguard,sing-box,xray}.md`, `references/netcfg-tools.md` | v1.9.0     |
+| Container image vuln scan | Image tarball (with `manifest.json` / `index.json` inside), OCI layout dir, SBOM (SPDX/CycloneDX) | `trivy image --input <tarball>` (Aqua), `grype <input>` (Anchore — also accepts SBOMs); deduped by (file, vuln_id, pkg) tuple; OSS-equivalent of Docker Scout | `references/image/{image-vulnerabilities,sbom-and-provenance}.md`, `references/image-tools.md` | v1.11.0    |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

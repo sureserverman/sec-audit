@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.10.0. This file is the authoritative "what does
+    plugin as of v1.11.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across eighteen tool lanes plus sec-expert
+software projects across nineteen tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -50,8 +50,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to nineteen review streams in parallel
-(eighteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty review streams in parallel
+(nineteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -501,6 +501,46 @@ Dispatch discipline.
   from sec-expert reading the reference packs.
 - **Shipped in:** v1.9.0.
 
+### image (container image vulnerability scanning)
+
+- **Target shape:** any of: image tarball (`*.tar` containing
+  `manifest.json` Docker save format OR `index.json` OCI archive
+  format), OCI image layout directory (`oci-layout` +
+  `index.json` + `blobs/sha256/` shape), SPDX SBOM file
+  (`*.spdx.json` with `spdxVersion` field), CycloneDX SBOM file
+  (`*.cyclonedx.json` / `*.cdx.json` / `*.sbom.json` /
+  `bom.json` with `bomFormat: "CycloneDX"`). Inventory values:
+  `["tarball"]`, `["oci-layout"]`, `["sbom-spdx"]`,
+  `["sbom-cyclonedx"]`, or combinations.
+- **Tools:** `trivy image --input <tarball>` (Aqua Security;
+  vulnerability scanner with `--scanners vuln` mode;
+  offline-capable via pre-cached DB; `--skip-update` at run
+  time), `grype <input>` (Anchore; accepts tarballs / OCI
+  layouts / SBOMs). Both cross-platform Go binaries; neither
+  requires Docker daemon, neither pulls from registries.
+  Runner deduplicates trivy+grype overlap by `(file, vuln_id,
+  package_name)` tuple — trivy wins on collision.
+- **Reference packs:** `references/image/image-vulnerabilities.md`,
+  `references/image/sbom-and-provenance.md`,
+  `references/image-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-image-artifact` (NEW
+  in v1.11 — target-shape; tool on PATH but no image
+  tarball / OCI layout / SBOM under target).
+- **Origin tag:** `"image"`. Tool whitelist: `trivy`, `grype`.
+- **Dep-inventory:** AFFECTED post-hoc. Image findings carry
+  CVE IDs inline (no enrichment needed for the match itself),
+  but cve-enricher's CISA KEV cross-reference applies post-hoc:
+  any image finding whose `vuln_id` is in KEV gets the +20-pt
+  KEV bonus per §5's prioritization rubric.
+- **Docker Scout positioning:** the OSS-equivalent of `docker
+  scout cves`. Out of scope: live registry pulls, image-diff
+  between versions, base-image-upgrade recommendations,
+  policy enforcement, license scanning (out of scope per
+  contract; some addressable at orchestration layer in
+  future).
+- **Shipped in:** v1.11.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -531,10 +571,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**17 canonical reason values** as of v1.9, grouped by semantic
+**18 canonical reason values** as of v1.11, grouped by semantic
 category:
 
-### Target-shape (14)
+### Target-shape (15)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -552,6 +592,7 @@ category:
 | `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |
 | `no-singbox-config`| netcfg              | No sing-box-shaped JSON under target (sing-box check applicable).       |
 | `no-xray-config`  | netcfg               | No Xray-shaped JSON under target (xray test applicable).                |
+| `no-image-artifact`| image               | No image tarball / OCI layout / SBOM under target (trivy/grype scope).  |
 
 ### Host-OS-gated (3)
 
