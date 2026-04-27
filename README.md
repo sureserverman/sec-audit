@@ -855,6 +855,92 @@ to the existing v0.10–v1.4 target-shape primitives
 (`no-pe`, `no-elf`, `no-pkg`, `no-debian-source`,
 `no-containerfile`, `no-libvirt-xml`).
 
+## Python lane (v1.7.0)
+
+A twentieth agent, **`python-runner`** (haiku-pinned, `Read` +
+`Bash` tools), joins the pipeline whenever the §2 inventory
+detects a Python project — any of `requirements.txt`,
+`requirements-*.txt`, `pyproject.toml` with a
+`[tool.poetry]` / `[project]` / `[build-system]` table,
+`setup.py`, `Pipfile`, plus a non-trivial Python-source
+shape. Cross-platform, no host-OS gate.
+
+The runner dispatches two tools:
+
+- **`pip-audit`** (PyPA-maintained) — Python-package
+  vulnerability scanner that consumes the project's manifest
+  and queries OSV.dev for known CVEs. Adds reachability-hint
+  metadata that sec-review's bulk cve-enricher OSV pass
+  lacks: when a vulnerable package is installed but the
+  vulnerable function is never imported, pip-audit downgrades
+  severity. Runner mode is requirements-file-only — no
+  virtualenv activation, no `pip install`, no environment
+  mutation.
+- **`ruff`** (Rust-implemented) — fastest mature Python
+  linter; runs the `S`-prefix flake8-bandit security
+  ruleset and the `B`-prefix flake8-bugbear bug-prone
+  pattern ruleset. Faster than running upstream bandit
+  alone, with newer rules (the `S`-rule subset tracks
+  upstream bandit ≥ 1.7.5).
+
+**Why a dedicated Python lane in addition to the SAST
+lane (§3.6)?** The SAST lane already runs `bandit` +
+`semgrep` on every project. The Python lane is additive:
+
+1. **`pip-audit`** adds reachability-hint metadata that
+   cve-enricher's bulk OSV pass lacks (cve-enricher matches
+   versions only).
+2. **`ruff`** ships flake8-bandit rules that postdate the
+   pinned upstream `bandit` — running both catches the gap.
+3. **Reference packs** deepen sec-expert reasoning over
+   Python-specific surfaces (Pickle/YAML deserialization,
+   asyncio task swallowing, FastAPI DI bypass, Django ORM
+   `.extra()` injection) beyond what bandit's rule set
+   covers.
+
+Output carries `origin: "python"` and
+`tool: "pip-audit" | "ruff"`. Reference packs live in
+`references/python/`:
+
+- `deserialization.md` — `pickle.loads` / `pickle.load` on
+  untrusted bytes (CWE-502), `yaml.load` without
+  `SafeLoader` (CWE-502), `xml.etree` / `lxml.etree`
+  without `defusedxml` (CWE-611 XXE), `eval`/`exec` on
+  attacker strings (CWE-95), `numpy.load` with
+  `allow_pickle=True` (CWE-502), `torch.load` with
+  `weights_only=False` (CWE-502), `pandas.read_pickle` and
+  `joblib.load` (CWE-502).
+- `subprocess-and-async.md` — `subprocess.run(..., shell=True)`
+  with interpolation (CWE-78), `os.system`/`os.popen`
+  (CWE-78), `tempfile.mktemp` deprecated TOCTOU (CWE-377),
+  `tarfile`/`zipfile` extractall without `filter='data'`
+  (CWE-22 Zip Slip), `requests`/`httpx` with `verify=False`
+  (CWE-295), SSRF via attacker URL (CWE-918), `random` for
+  security tokens (CWE-338), `asyncio.create_task` without
+  exception handling (CWE-755).
+- `framework-deepening.md` — Django ORM `.extra()` /
+  `.raw()` with f-string interpolation (CWE-89), Django
+  `mark_safe` on user-influenced HTML (CWE-79), Flask
+  `render_template_string` SSTI (CWE-94), Flask debug mode
+  reachable from production (CWE-489), FastAPI Header/Query
+  without `Annotated` validation (CWE-20), CORS allow-origin
+  wildcard with credentials (CWE-942), Django session-cookie
+  hardening defaults (CWE-1004), `SECRET_KEY` hard-coded in
+  `settings.py` (CWE-798).
+
+The runner is read-only with respect to the project's
+environment — it never runs `pip install`, never activates
+a virtualenv, never mutates `go.sum`-equivalent lockfiles.
+pip-audit's only network I/O is OSV vulnerability metadata
+lookup (the same trust boundary cve-enricher uses).
+
+**Dep-inventory IS already affected** by the existing PyPI
+ecosystem entry; the python lane's pip-audit pass augments
+cve-enricher's bulk scan with reachability hints. **Skip
+vocabulary unchanged from v1.6's pattern** — only
+`tool-missing` and `no-requirements` apply (the latter is a
+target-shape clean-skip when no Python manifest is present).
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -994,6 +1080,7 @@ names from the other 12 lanes).
 | Virtualization / runtime  | Docker daemon / Compose / Containerfile, Podman / Quadlet, libvirt domain / network / pool / volume XML, Apple Containers `container.yaml`, UTM `*.utm/config.plist` | `hadolint` (Containerfile lint), `virt-xml-validate` (libvirt XSD; both cross-platform) | `references/virt/{docker-runtime,podman,libvirt-qemu,apple-containers,utm}.md`, `references/virt-tools.md` | v1.4.0     |
 | Go                        | Go module (`go.mod` + `*.go`)                       | `gosec`, `staticcheck` (both cross-platform Go binaries) | `references/go/{stdlib-security,module-ecosystem,web-frameworks}.md`, `references/go-tools.md` | v1.5.0     |
 | Shell                     | Shell scripts (`*.sh`/`*.bash`/`*.zsh`/`*.ksh` or shebang-detected) | `shellcheck` (cross-platform; single-tool lane) | `references/shell/{command-injection,file-handling,script-hardening}.md`, `references/shell-tools.md` | v1.6.0     |
+| Python                    | Python project (`requirements.txt` / `pyproject.toml` / `setup.py` / `Pipfile` + `*.py`) | `pip-audit` (OSV-backed reachability), `ruff` (`S` + `B` rule families; cross-platform) | `references/python/{deserialization,subprocess-and-async,framework-deepening}.md`, `references/python-tools.md` | v1.7.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

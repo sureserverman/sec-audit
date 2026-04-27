@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.6.0. This file is the authoritative "what does
+    plugin as of v1.7.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across fifteen tool lanes plus sec-expert code
+software projects across sixteen tool lanes plus sec-expert code
 reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to sixteen review streams in parallel
-(fifteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to seventeen review streams in parallel
+(sixteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -366,6 +366,48 @@ Dispatch discipline.
   `shell/file-handling.md` CWE-494 pattern.
 - **Shipped in:** v1.6.0.
 
+### python
+
+- **Target shape:** Python project with manifest:
+  `requirements.txt`, `requirements-*.txt`, `pyproject.toml`
+  with `[tool.poetry]` / `[project]` / `[build-system]`,
+  `setup.py`, `Pipfile`, OR a Python package shape (any
+  `*.py` accompanied by `__init__.py` / `pyproject.toml` /
+  `setup.py`). Inventory values: `["package"]` for an
+  application, `["library"]` for a wheel-exporting package,
+  `["scripts"]` for a tree of standalone scripts.
+- **Tools:** `pip-audit` (PyPA-maintained PyPI vulnerability
+  scanner with OSV-backed metadata + reachability-hint
+  annotations), `ruff` (Rust-implemented Python linter
+  running `S`-prefix flake8-bandit + `B`-prefix flake8-bugbear
+  rule families). Both cross-platform; runner is read-only
+  with respect to the environment (no `pip install`).
+- **Reference packs:**
+  `references/python/deserialization.md`,
+  `references/python/subprocess-and-async.md`,
+  `references/python/framework-deepening.md`,
+  `references/python-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-requirements` (NEW
+  in v1.7 — target-shape; pip-audit applicable but no
+  manifest under target, OR ruff applicable but no `*.py`
+  files).
+- **Origin tag:** `"python"`. Tool whitelist: `pip-audit`,
+  `ruff`.
+- **Dep-inventory:** AFFECTED — the existing PyPI ecosystem
+  entry (`{"ecosystem": "PyPI", "manifest": "requirements.txt"}`)
+  feeds cve-enricher; the python lane's pip-audit pass
+  augments cve-enricher's bulk scan with reachability-hint
+  metadata.
+- **Delineation from SAST lane (§3.6):** The SAST lane runs
+  `bandit` + `semgrep` on every project. The python lane is
+  additive — pip-audit adds reachability hints,
+  ruff ships newer flake8-bandit rules, and the reference
+  packs deepen sec-expert reasoning over Python-specific
+  surfaces (Pickle/YAML deserialization, asyncio task
+  swallowing, FastAPI DI bypass, Django ORM `.extra()`).
+- **Shipped in:** v1.7.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -396,10 +438,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**13 canonical reason values** as of v1.6, grouped by semantic
+**14 canonical reason values** as of v1.7, grouped by semantic
 category:
 
-### Target-shape (10)
+### Target-shape (11)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -413,6 +455,7 @@ category:
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
+| `no-requirements` | python               | No Python manifest (requirements.txt/pyproject.toml/setup.py/Pipfile) or `*.py` files under target. |
 
 ### Host-OS-gated (3)
 
