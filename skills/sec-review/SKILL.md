@@ -197,6 +197,30 @@ Detect the technology stack. Read only — do not install or execute.
   `{"ecosystem": "Debian", "manifest": "debian/control"}` entry when
   Debian packaging is detected (OSV partial via the Debian Security
   Tracker — best-effort coverage; document as a known limit).
+- **Ansible signals**: any of the following triggers the
+  `ansible` inventory key:
+  - A `*.yml` / `*.yaml` file with top-level `hosts:` AND
+    `tasks:` keys (the canonical playbook shape).
+  - A `roles/` directory containing role subdirectories with
+    the canonical `tasks/`, `handlers/`, `defaults/`, `vars/`,
+    or `meta/main.yml` shape.
+  - An `ansible.cfg` file at project root.
+  - A `collections/` directory with subdirectories matching
+    `<namespace>/<collection>/`.
+  - An `inventory` file or `inventory/` directory (INI or YAML).
+  - A `requirements.yml` with role / collection entries
+    (presence of `roles:` or `collections:` keys at top level).
+  When detected, add `"ansible"` with values reflecting the
+  shape: `"ansible": ["playbook"]`, `["role"]`,
+  `["collection"]`, `["inventory"]`, or combinations
+  (`["playbook", "role"]` is common). Load
+  `references/ansible/playbook-security.md`,
+  `references/ansible/role-secrets-and-vault.md`, and the
+  tool-lane reference `references/ansible-tools.md`. No
+  ecosystem entry — Ansible role / collection dependencies
+  are NOT in OSV's coverage; supply-chain risk for Galaxy
+  collections is a future concern (separate runner that
+  verifies SHA256 fingerprints against the Galaxy registry).
 - **Python signals**: any of the following triggers the
   `python` inventory key:
   - A Python manifest at any project root: `requirements.txt`,
@@ -381,6 +405,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "go":          [],
   "shell":       [],
   "python":      [],
+  "ansible":     [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
