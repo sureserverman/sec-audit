@@ -1,0 +1,36 @@
+{
+  "log": { "loglevel": "warning" },
+
+  "inbounds": [
+    {
+      "tag": "api",
+      "port": 10085,
+      "listen": "0.0.0.0",
+      "protocol": "dokodemo-door",
+      "settings": { "address": "127.0.0.1" }
+    },
+    {
+      "port": 8388,
+      "protocol": "shadowsocks",
+      "settings": {
+        "method": "aes-256-cfb",
+        "password": "weak-cipher"
+      }
+    },
+    {
+      "port": 1080,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          { "id": "00000000-0000-0000-0000-000000000000", "alterId": 64 }
+        ]
+      }
+    }
+  ],
+
+  "outbounds": [
+    { "tag": "direct", "protocol": "freedom" }
+  ],
+
+  "INVALID_TOP_LEVEL": "triggers xray test failure"
+}

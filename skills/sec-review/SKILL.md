@@ -1386,6 +1386,71 @@ every ansible finding carries `origin: "ansible"` and
 ansible finding tagged with another lane's tool — see
 `tests/contract-check.sh`.
 
+### 3.23 Networking-as-code pass — dispatch netcfg-runner
+
+When the inventory emitted by §2 contains `netcfg` (any of:
+`torrc` / hidden-service config, WireGuard `[Interface]` +
+`[Peer]` conf files, sing-box JSON with sing-box-vocabulary
+inbounds, Xray JSON with Xray-vocabulary protocols),
+dispatch the `netcfg-runner` agent
+(`agents/netcfg-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to two self-validation tools —
+`sing-box check` (sing-box's structural-validator
+subcommand) and `xray test -confdir` (Xray-core's
+structural-validator subcommand) — against netcfg-shaped
+files, parses their stderr text into findings, and emits
+sec-expert-compatible JSONL on stdout — every line
+carrying `origin: "netcfg"` and `tool: "sing-box" | "xray"`.
+
+**Important shape distinction from other lanes.** The
+sing-box / xray tools are STRUCTURAL validators (catch
+typos, schema violations, cross-field impossibilities), NOT
+security scanners. Security-pattern detection for sing-box
+and Xray is handled by sec-expert reading the
+`netcfg/sing-box.md` and `netcfg/xray.md` reference packs.
+Tor (`torrc`) and WireGuard (`*.conf`) have NO
+runner-invoked validator at all — sec-expert handles them
+entirely via the `netcfg/tor.md` and `netcfg/wireguard.md`
+reference packs (mature source-only / network-free
+validators do not exist for those formats). The runner's
+job is to add structural-correctness signal on top of
+sec-expert's security-pattern signal.
+
+netcfg-runner runs in parallel with every other pass agent.
+Collect the findings into a `netcfg_findings` list.
+
+Skill-level invariants:
+
+- **No `netcfg` in inventory** — skip entirely.
+- **`__netcfg_status__: "unavailable"`** — no tool on PATH
+  or no sing-box / Xray JSON under target.
+- **`__netcfg_status__: "partial"`** — one ran, one
+  cleanly-skipped or failed.
+- **`__netcfg_status__: "ok"`** — every available +
+  applicable tool ran cleanly.
+- **Three skip reasons (v1.9 adds two NEW):**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-singbox-config` — NEW in v1.9; sing-box on PATH
+    but no sing-box-shaped JSON files under target
+    (target-shape clean-skip).
+  - `no-xray-config` — NEW in v1.9; xray on PATH but no
+    Xray-shaped JSON files under target (target-shape
+    clean-skip).
+- **No `sing-box run` / `xray run` invocations.** The
+  runner uses only the structural-validator subcommands
+  (`sing-box check`, `xray test`). Source-only contract.
+
+netcfg findings are structural-correctness signal against
+proxy-stack JSON configs. **The dep-inventory path is NOT
+affected by this lane** — Tor / WireGuard / sing-box / Xray
+configurations are not package-manifest dependency graphs.
+The ecosystems list emitted to cve-enricher does NOT gain a
+netcfg entry. **Origin-tag isolation:** every netcfg
+finding carries `origin: "netcfg"` and
+`tool: "sing-box" | "xray"`. The contract-check rejects any
+netcfg finding tagged with another lane's tool — see
+`tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

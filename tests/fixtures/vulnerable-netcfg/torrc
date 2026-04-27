@@ -1,0 +1,21 @@
+# Intentionally insecure torrc — fixture for sec-expert reading
+# references/netcfg/tor.md. netcfg-runner does NOT lint torrc directly.
+#
+# Carries multiple findings:
+#   ControlPort bound to public + no auth
+#   HiddenServiceDir under world-readable parent
+#   v2 onion address (16-char) — deprecated
+#   ExitRelay with no explicit ExitPolicy
+#   SOCKSPort without isolation flags
+
+ControlPort 0.0.0.0:9051
+
+DataDirectory /home/me/tor-data
+
+SOCKSPort 9050
+
+HiddenServiceDir /srv/onion/old-v2-service
+HiddenServicePort 80 127.0.0.1:8080
+# Old reference to a v2 onion: facebookcorewwwi.onion (16 chars)
+
+ExitRelay 1
