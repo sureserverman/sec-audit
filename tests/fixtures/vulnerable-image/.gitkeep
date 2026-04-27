@@ -1,0 +1,4 @@
+# Placeholder — the image lane fixtures are JSON tool-output reports
+# and the merged image.jsonl. No actual image tarballs are committed
+# (binary blobs are unsuitable for git); the fixture exercises the
+# runner's output-mapping path via pre-canned JSON.

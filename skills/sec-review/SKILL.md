@@ -1561,6 +1561,76 @@ finding carries `origin: "netcfg"` and
 netcfg finding tagged with another lane's tool — see
 `tests/contract-check.sh`.
 
+### 3.24 Image vulnerability pass — dispatch image-runner
+
+When the inventory emitted by §2 contains `image` (any image
+tarball, OCI layout directory, or SBOM file under target),
+dispatch the `image-runner` agent
+(`agents/image-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to two cross-platform Go binaries —
+`trivy image --input <tarball>` (Aqua Security; offline-capable
+vulnerability scanner; `--scanners vuln` mode) and `grype
+<input>` (Anchore; accepts image tarballs, OCI layouts, and
+SPDX/CycloneDX SBOMs) — against image-shaped artifacts, parses
+each tool's native JSON output, **deduplicates the trivy+grype
+overlap by (file, vuln_id, package_name) tuple** (trivy wins on
+collision), and emits sec-expert-compatible JSONL on stdout —
+every line carrying `origin: "image"` and
+`tool: "trivy" | "grype"`.
+
+This is the **OSS-equivalent of Docker Scout's CVE-scanning
+surface** — without Docker daemon, Docker Hub login, or
+registry-pull dependencies (Docker Scout's gating
+requirements). The runner is strictly source-only: NEVER pulls
+from a registry, NEVER contacts a Docker daemon, ALWAYS uses
+local artifacts (tarballs / OCI layouts / SBOMs) found under
+target_path. Out of scope: live registry pulls, image-diff
+between versions, base-image upgrade recommendations (require
+registry access), policy enforcement, license scanning.
+
+image-runner runs in parallel with every other pass agent.
+Collect the findings into an `image_findings` list.
+
+Skill-level invariants:
+
+- **No `image` in inventory** — skip entirely.
+- **`__image_status__: "unavailable"`** — no tool on PATH or
+  no image artifact under target.
+- **`__image_status__: "partial"`** — one ran, one failed or
+  cleanly-skipped.
+- **`__image_status__: "ok"`** — every available tool ran
+  cleanly.
+- **Two skip reasons (v1.11 adds one NEW):**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-image-artifact` — NEW in v1.11; tool on PATH but
+    target has no image-shaped artifact. Target-shape
+    clean-skip; parallel to v0.10–v1.9 target-shape
+    primitives.
+- **DB is operator-managed.** The runner passes
+  `--skip-update` to trivy and does not call `grype db
+  update` at run time. Operator pre-bakes the vulnerability
+  DB; if missing, the scan produces degraded output that the
+  status sentinel surfaces.
+- **Deduplication.** trivy + grype overlap heavily. The
+  runner deduplicates by `(file, vuln_id, package_name)`
+  tuple before emitting; trivy wins on collision.
+
+Image findings combine OS-package CVE signal (base-image
+apt/yum/apk packages), language-runtime CVE signal (e.g.
+`python:3.9` shipping vulnerable openssl), application-layer
+dep CVE signal (packages installed inside the image at build
+time), and vendored-binary CVE signal (binaries copied in via
+`RUN curl | install` patterns that no manifest captures).
+**The dep-inventory path is extended post-hoc.** Image
+findings carry their CVE IDs inline (no enrichment needed for
+the match itself), but cve-enricher's CISA KEV cross-reference
+applies post-hoc: any image finding whose `vuln_id` is in KEV
+gets the +20-pt KEV bonus per §5's prioritization rubric.
+**Origin-tag isolation:** every image finding carries
+`origin: "image"` and `tool: "trivy" | "grype"`. The
+contract-check rejects any image finding tagged with another
+lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to

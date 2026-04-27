@@ -1,0 +1,20 @@
+{
+  "Results": [
+    {
+      "Target": "vulnerable-app.tar (alpine 3.14.0)",
+      "Type": "alpine",
+      "Vulnerabilities": [
+        {"VulnerabilityID":"CVE-2022-37434","PkgName":"zlib","InstalledVersion":"1.2.11-r3","FixedVersion":"1.2.12-r2","Severity":"CRITICAL","Title":"zlib heap buffer overflow","Description":"zlib through 1.2.12 has a heap-based buffer over-read or buffer overflow in inflate in inflate.c via a large gzip header extra field.","CweIDs":["CWE-787"],"References":["https://nvd.nist.gov/vuln/detail/CVE-2022-37434"]},
+        {"VulnerabilityID":"CVE-2023-0286","PkgName":"libssl1.1","InstalledVersion":"1.1.1k-r0","FixedVersion":"1.1.1t-r0","Severity":"HIGH","Title":"OpenSSL X.400 address type confusion","Description":"There is a type confusion vulnerability relating to X.400 address processing inside an X.509 GeneralName in OpenSSL.","CweIDs":["CWE-843"],"References":["https://nvd.nist.gov/vuln/detail/CVE-2023-0286"]},
+        {"VulnerabilityID":"CVE-2022-1271","PkgName":"xz-libs","InstalledVersion":"5.2.5-r0","FixedVersion":"5.2.5-r1","Severity":"MEDIUM","Title":"xz-utils unsafe race during xzgrep","Description":"An arbitrary file write vulnerability was found in GNU gzip's zgrep utility.","CweIDs":["CWE-22"],"References":["https://nvd.nist.gov/vuln/detail/CVE-2022-1271"]}
+      ]
+    },
+    {
+      "Target": "vulnerable-app.tar (Python)",
+      "Type": "python-pkg",
+      "Vulnerabilities": [
+        {"VulnerabilityID":"CVE-2018-18074","PkgName":"requests","InstalledVersion":"2.20.0","FixedVersion":"2.20.1","Severity":"MEDIUM","Title":"requests cross-origin authentication redirect","Description":"The requests library sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect.","CweIDs":["CWE-200"],"References":["https://nvd.nist.gov/vuln/detail/CVE-2018-18074"]}
+      ]
+    }
+  ]
+}

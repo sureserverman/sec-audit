@@ -1,0 +1,24 @@
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "CVE-2022-37434",
+        "severity": "Critical",
+        "description": "zlib through 1.2.12 has a heap-based buffer over-read or buffer overflow in inflate in inflate.c via a large gzip header extra field.",
+        "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2022-37434",
+        "fix": { "versions": ["1.2.12-r2"] }
+      },
+      "artifact": { "name": "zlib", "version": "1.2.11-r3", "type": "apk" }
+    },
+    {
+      "vulnerability": {
+        "id": "GHSA-fghv-69vj-qj49",
+        "severity": "Medium",
+        "description": "Werkzeug debugger PIN enumeration weakness in earlier versions allowed local attackers to brute-force the debug PIN.",
+        "dataSource": "https://github.com/advisories/GHSA-fghv-69vj-qj49",
+        "fix": { "versions": ["2.2.3"] }
+      },
+      "artifact": { "name": "werkzeug", "version": "2.0.0", "type": "python" }
+    }
+  ]
+}

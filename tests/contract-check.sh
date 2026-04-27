@@ -71,7 +71,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/shell-runner.md:haiku" \
             "agents/python-runner.md:haiku" \
             "agents/ansible-runner.md:haiku" \
-            "agents/netcfg-runner.md:haiku"; do
+            "agents/netcfg-runner.md:haiku" \
+            "agents/image-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -452,6 +453,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __netcfg_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the image status summary line emitted by image-runner.
+        # Skip vocabulary: tool-missing, no-image-artifact.
+        # Optional `deduplicated` field carries dedup count when both tools ran.
+        if "__image_status__" in obj:
+            status = obj.get("__image_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __image_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __image_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __image_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __image_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -684,8 +706,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} netcfg tool must be sing-box|xray, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: netcfg findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "trivy", "grype"}:
                 print(f"CONTRACT FAIL: {path}:{i} netcfg finding carries non-netcfg tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: image findings must carry `tool` and `origin`.
+        if obj.get("origin") == "image":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} image finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"trivy", "grype"}:
+                print(f"CONTRACT FAIL: {path}:{i} image tool must be trivy|grype, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: image findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray"}:
+                print(f"CONTRACT FAIL: {path}:{i} image finding carries non-image tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1926,6 +1960,81 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "netcfg negative-test: malformed skipped-list entry correctly rejected"
+
+# --- image inventory + §3.24 (v1.11.0):
+check skills/sec-review/SKILL.md "Image artifact signals" "SKILL.md §2 missing image detection"
+check skills/sec-review/SKILL.md "\"image\"" "SKILL.md §2 inventory JSON missing image key"
+check skills/sec-review/SKILL.md "### 3.24 Image vulnerability pass" "SKILL.md missing §3.24"
+check skills/sec-review/SKILL.md "image-runner" "SKILL.md §3.24 missing image-runner"
+check skills/sec-review/SKILL.md "__image_status__" "SKILL.md §3.24 missing image sentinel"
+check skills/sec-review/SKILL.md "trivy\|grype" "SKILL.md §3.24 missing trivy/grype"
+check skills/sec-review/SKILL.md "no-image-artifact" "SKILL.md §3.24 missing no-image-artifact clean-skip reason"
+check skills/sec-review/SKILL.md "Docker Scout" "SKILL.md §3.24 missing Docker Scout positioning"
+echo "image-orchestrator: SKILL.md §3.24 documents image-runner wire-up"
+
+# --- image fixture-match sanity: synthetic SBOM + image tarball reference
+tmp_im=$(mktemp -d); trap 'rm -rf "$tmp_im"' EXIT
+cat > "$tmp_im/myapp.spdx.json" <<'JSON'
+{"spdxVersion":"SPDX-2.3","name":"myapp","packages":[{"name":"requests","versionInfo":"2.20.0"}]}
+JSON
+if ! grep -q '"spdxVersion"' "$tmp_im/myapp.spdx.json"; then
+    echo "image-inventory: FAIL — fixture SBOM malformed" >&2; fail=1
+fi
+echo "image-inventory: synthetic SPDX SBOM fixture matches §2 detection rule"
+
+# --- Negative tests for image origin
+bad_im_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.tar","line":0,"evidence":"e","reference":"image-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"image"}'
+if echo "$bad_im_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "image" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed image line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "image negative-test: malformed image line (missing tool) correctly rejected"
+
+bad_im_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"a.tar","line":0,"evidence":"e","reference":"image-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"image","tool":"shellcheck"}'
+if echo "$bad_im_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "image" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: image finding with non-image tool was accepted" >&2
+    exit 1
+fi
+echo "image negative-test: origin-tag isolation enforced (image cannot carry the other 19 lanes' tools)"
+
+bad_im_skipped='{"__image_status__":"unavailable","tools":[],"skipped":[{"oops":"shape"}]}'
+if echo "$bad_im_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__image_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed image skipped entry was accepted" >&2
+    exit 1
+fi
+echo "image negative-test: malformed skipped-list entry correctly rejected"
 
 # --- v1.10 default-cwd UX (commands/sec-review.md):
 check commands/sec-review.md "Default-target behaviour" "commands/sec-review.md missing v1.10 default-target section"
