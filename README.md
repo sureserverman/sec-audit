@@ -1074,6 +1074,74 @@ validator subcommands.
 graphs. **Skip vocabulary gains two NEW target-shape
 reasons:** `no-singbox-config` and `no-xray-config`.
 
+## UX improvements (v1.10.0)
+
+The v1.10 release adds no new lanes. Two ergonomic improvements
+land in the orchestrator skill instead.
+
+**1. Default-to-cwd invocation.** Running `/sec-review` with no
+path argument no longer prompts the user for a path — the
+slash command resolves `target_path` to the caller's current
+working directory (`$PWD`) and proceeds. The §1 Scope step
+echoes the resolved path back so the user can redirect:
+
+> Reviewing `<cwd>` (current directory). Pass an explicit path to
+> review elsewhere.
+
+The only prompts that remain are the existing structural guards:
+when `$PWD` resolves to the sec-review plugin's own directory
+(refusing self-review), and when `$PWD` is unreadable (rare,
+indicates a broken shell environment). The natural intent of
+`/sec-review` invoked inside a project directory — review THIS
+project — is now the default.
+
+**2. Coverage-gap suggestions in the report.** A new SECOND pass
+during §2 Inventory scans for technologies present in the project
+but NOT covered by any sec-review lane. The detection registry
+lives in `references/uncovered-tech-fingerprints.md` — a curated
+catalogue of sixteen known-but-uncovered technologies with
+detection patterns (manifest filenames, file-extension globs,
+content regex) and suggested tooling for a future lane:
+
+- **Java server-side (non-Spring)** — `spotbugs` + `find-sec-bugs` + `pmd`
+- **C / C++ source** — `cppcheck` + `clang-tidy` + `flawfinder`
+- **Solidity (smart contracts)** — `slither` + `mythril` + `solhint`
+- **PHP** (Laravel / Symfony / WordPress) — `psalm` + `phpstan` + `progpilot`
+- **Ruby (non-Rails)** — `brakeman` + `bundler-audit` + `rubocop`
+- **.NET server-side** (ASP.NET Core / Blazor) — `security-code-scan` + `devskim`
+- **Lua / LuCI** — `luacheck` + custom LuCI ACL audit
+- **Elixir / Phoenix** — `sobelow` + `credo`
+- **Helm charts** — `kubeaudit` + `polaris`
+- **Jupyter notebooks** — `nbqa bandit` + `nbqa ruff`
+- **CI systems beyond GitHub Actions** (GitLab CI / Jenkins / CircleCI / Azure / Drone) — `kics`
+- **Smart-contract languages beyond Solidity** (Move / Cairo / Vyper / Anchor) — `caracal` + `move-lint`
+- **eBPF programs** — `bpftool prog dump`
+- **WebAssembly modules** — `wasm-opt --check` + `wabt`
+- **Build systems** (CMake / Meson / Bazel / Buck / SBT) — pattern-based review
+
+When the inventory pass detects any of these technologies in the
+target, the report's new "## Coverage-gap suggestions" section
+(rendered by `report-writer` Step 5.5) lists each detected
+uncovered technology with: the suggested lane name, evidence
+files, suggested tooling, and a one-paragraph rationale. The
+section is **omitted entirely** when the project's tech stack is
+fully covered — no empty-heading noise.
+
+The lane-suggestion is informational only — no runner dispatches
+against detected uncovered tech, no findings are emitted. The
+user acts on the suggestions by filing a feature request or
+extending sec-review with a new lane following the pattern in
+`references/COVERAGE.md`.
+
+Detection precision is tuned to favour HIGH-precision matches
+(manifest presence) over file-extension globs alone — `*.java`
+alone is too broad; `pom.xml` plus a non-trivial `src/main/java/`
+layout is more specific. Each fingerprint registry entry
+documents the precision tier and FP risks. Overlap suppression
+prevents redundant suggestions: Java detection is suppressed
+when `android` is already in the inventory; .NET server-side is
+suppressed when `windows` desktop is detected.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.

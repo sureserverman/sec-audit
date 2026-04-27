@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.9.0. This file is the authoritative "what does
+    plugin as of v1.10.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -28,6 +28,25 @@ and produces a prioritized markdown report. All fix recipes are
 quoted verbatim from primary-source reference packs (vendor docs +
 IETF RFCs + OWASP + CIS + NIST + Mozilla + OpenID + SLSA/Sigstore/
 CISA).
+
+## v1.10 UX improvements (no new lanes)
+
+v1.10 adds no new lanes. Two ergonomic improvements:
+
+1. **Default-to-cwd invocation.** `/sec-review` with no positional
+   path argument resolves `target_path` to `$PWD` and proceeds —
+   no longer prompts the user. Existing structural guards (refuse
+   self-review when cwd is the plugin directory; surface error
+   when cwd is unreadable) are preserved.
+2. **Coverage-gap suggestions.** A new second pass during §2
+   Inventory scans for technologies present in the project but
+   NOT covered by any sec-review lane (using
+   `references/uncovered-tech-fingerprints.md`'s curated catalogue
+   of sixteen known-but-uncovered technologies). Detected
+   technologies are emitted as an `uncovered_tech` array on the
+   `inventory.json` record and rendered by `report-writer`'s new
+   Step 5.5 in a "Coverage-gap suggestions" section. The section
+   is omitted when the array is empty.
 
 ## Lanes
 
