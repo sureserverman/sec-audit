@@ -1,6 +1,6 @@
 # IIS test fixture
 
-Intentionally vulnerable IIS configuration used by sec-review tests.
+Intentionally vulnerable IIS configuration used by sec-audit tests.
 
 Intentional misconfigurations:
 

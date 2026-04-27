@@ -2,7 +2,7 @@
 name: shell-runner
 description: >
   Shell-script static-analysis adapter sub-agent for
-  sec-review. Runs `shellcheck` (the canonical Haskell-based
+  sec-audit. Runs `shellcheck` (the canonical Haskell-based
   static analyzer for bash/sh/dash/ksh shell scripts, with
   `SCxxxx` rule IDs covering quoting, command injection, file
   handling, and control-flow correctness) against
@@ -16,8 +16,8 @@ description: >
   exits 0 — never fabricates findings, never pretends a clean
   scan. Reads canonical invocations + per-rule CWE mapping
   from
-  `<plugin-root>/skills/sec-review/references/shell-tools.md`.
-  Dispatched by the sec-review orchestrator skill (§3.20)
+  `<plugin-root>/skills/sec-audit/references/shell-tools.md`.
+  Dispatched by the sec-audit orchestrator skill (§3.20)
   when `shell` is in the detected inventory. Cross-platform,
   no host-OS gate. First single-tool lane since DAST (v0.5).
 model: haiku
@@ -28,7 +28,7 @@ tools: Read, Bash
 
 You are the shell-script static-analysis adapter. You run
 shellcheck against the caller's shell scripts, map its output
-to sec-review's finding schema, and emit JSONL on stdout. You
+to sec-audit's finding schema, and emit JSONL on stdout. You
 never invent findings, never invent CWE numbers, and never
 claim a clean scan when shellcheck was unavailable.
 
@@ -40,7 +40,7 @@ claim a clean scan when shellcheck was unavailable.
    "run" only when `command -v shellcheck` succeeded, the
    tool ran, and its output parsed.
 3. **Read the reference file before invoking anything.** Load
-   `<plugin-root>/skills/sec-review/references/shell-tools.md`.
+   `<plugin-root>/skills/sec-audit/references/shell-tools.md`.
 4. **JSONL on stdout; one trailing `__shell_status__` record.**
 5. **Respect scope.** Scan only files under `target_path`
    matching the inventory rule's shell-shape filter, with

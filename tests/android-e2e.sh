@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# android-e2e.sh — end-to-end contract test for the sec-review Android
+# android-e2e.sh — end-to-end contract test for the sec-audit Android
 # lane. Validates the fixture pipeline output at
 # tests/fixtures/vulnerable-android/.pipeline/android.jsonl against the
 # Stage 2 Task 2.3 assertions:

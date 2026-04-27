@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macos-e2e.sh — end-to-end contract test for the sec-review macOS
+# macos-e2e.sh — end-to-end contract test for the sec-audit macOS
 # desktop lane. Validates tests/fixtures/vulnerable-macos/.pipeline/
 # macos.jsonl against:
 #

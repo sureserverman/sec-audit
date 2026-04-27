@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# windows-drill.sh — proves the sec-review Windows desktop adapter
+# windows-drill.sh — proves the sec-audit Windows desktop adapter
 # degrades cleanly when none of its tools is available.
 
 set -euo pipefail

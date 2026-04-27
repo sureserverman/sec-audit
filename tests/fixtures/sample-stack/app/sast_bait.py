@@ -1,4 +1,4 @@
-# sast_bait.py — deliberate SAST bait for the sec-review Stage 4 drill.
+# sast_bait.py — deliberate SAST bait for the sec-audit Stage 4 drill.
 #
 # This file exists ONLY to give semgrep (p/owasp-top-ten) and bandit rules
 # something deterministic to flag on the sample-stack fixture. Do NOT

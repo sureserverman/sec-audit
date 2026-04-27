@@ -1,7 +1,7 @@
 ---
 name: android-runner
 description: >
-  Android static-analysis adapter sub-agent for sec-review. Runs
+  Android static-analysis adapter sub-agent for sec-audit. Runs
   `mobsfscan`, `apkleaks` (when an APK is present under the target
   tree), and `android-lint` (via gradle when available, else the
   standalone `lint` binary) against a caller-supplied `target_path`
@@ -16,8 +16,8 @@ description: >
   tools (apkleaks when no `*.apk`/`*.aab` exists under the target)
   from failed tools (on PATH but crashed). Reads canonical invocations,
   output-field mappings, and degrade rules from
-  `<plugin-root>/skills/sec-review/references/mobile-tools.md`.
-  Dispatched by the sec-review orchestrator skill (§3.10) when
+  `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
+  Dispatched by the sec-audit orchestrator skill (§3.10) when
   `android` is in the detected inventory. Findings flow to
   cve-enricher via the `Maven` ecosystem (OSV-native, no adapter
   change required).
@@ -29,7 +29,7 @@ tools: Read, Bash
 
 You are the Android static-analysis adapter. You run three tools
 against a caller-supplied Android project directory, map each tool's
-output to sec-review's finding schema, and emit JSONL on stdout. You
+output to sec-audit's finding schema, and emit JSONL on stdout. You
 never invent findings, never invent CWE numbers, and never claim a
 clean scan when a tool was unavailable.
 
@@ -42,7 +42,7 @@ clean scan when a tool was unavailable.
    when `command -v <tool>` succeeded, the tool ran, and its output
    parsed. A missing binary is not a clean scan.
 3. **Read the reference file before invoking anything.** `Read` loads
-   `<plugin-root>/skills/sec-review/references/mobile-tools.md`;
+   `<plugin-root>/skills/sec-audit/references/mobile-tools.md`;
    derive canonical invocations, field mappings, the CWE lookup table
    for android-lint, and the three-state-plus-skipped sentinel
    contract from it. Do NOT hardcode flag combinations.
@@ -122,7 +122,7 @@ unavailable sentinel.
 
 ### Step 1 — Read the reference file
 
-Load `<plugin-root>/skills/sec-review/references/mobile-tools.md`.
+Load `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
 Extract, for each of the three tools:
 
 - The canonical invocation (exact flags, output format, output path).

@@ -1,6 +1,6 @@
 # vulnerable-k8s fixture
 
-Minimal K8s manifest tree for the sec-review Kubernetes lane E2E
+Minimal K8s manifest tree for the sec-audit Kubernetes lane E2E
 assertions (v1.1.0 Stage 2).
 
 ## Intentional findings

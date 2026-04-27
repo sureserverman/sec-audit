@@ -1,6 +1,6 @@
 # vulnerable-macos fixture
 
-Minimal source-tree macOS app used by the sec-review macOS lane's
+Minimal source-tree macOS app used by the sec-audit macOS lane's
 E2E assertions (Stage 2 Task 2.3 of v0.11.0).
 
 ## Intentional findings

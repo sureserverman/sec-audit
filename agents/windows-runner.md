@@ -1,7 +1,7 @@
 ---
 name: windows-runner
 description: >
-  Desktop Windows static-analysis adapter sub-agent for sec-review.
+  Desktop Windows static-analysis adapter sub-agent for sec-audit.
   Runs `binskim` (Microsoft PE static-analysis scanner, cross-
   platform via dotnet), `osslsigncode` (cross-platform Authenticode
   verifier), and `sigcheck` (Sysinternals; Windows-host-only)
@@ -17,8 +17,8 @@ description: >
   none of the tools is available OR no PE artifact exists under
   the target, emits `{"__windows_status__": "unavailable", "tools":
   []}` and exits 0. Reads canonical invocations from
-  `<plugin-root>/skills/sec-review/references/windows-tools.md`.
-  Dispatched by the sec-review orchestrator skill (§3.14) when
+  `<plugin-root>/skills/sec-audit/references/windows-tools.md`.
+  Dispatched by the sec-audit orchestrator skill (§3.14) when
   `windows` is in the inventory.
 model: haiku
 tools: Read, Bash
@@ -46,7 +46,7 @@ when a tool was unavailable.
    other host clean-skips with `reason: "requires-windows-host"`.
    binskim and osslsigncode are cross-platform — no host-OS gate.
 4. **Read the reference file before invoking anything.** `Read`
-   loads `<plugin-root>/skills/sec-review/references/windows-tools.md`.
+   loads `<plugin-root>/skills/sec-audit/references/windows-tools.md`.
 5. **JSONL, not prose.** One trailing `__windows_status__` record.
 6. **Respect scope.** Run tools only against `target_path`. Never
    build or compile — no `dotnet build`, no `msbuild`, no
@@ -94,7 +94,7 @@ sentinel and exit 0.
 
 ### Step 1 — Read the reference file
 
-Load `<plugin-root>/skills/sec-review/references/windows-tools.md`.
+Load `<plugin-root>/skills/sec-audit/references/windows-tools.md`.
 Extract binskim SARIF-parsing rules + BA-series CWE mapping,
 osslsigncode stderr-signal rules, sigcheck CSV-row rules, the three-
 state sentinel contract.

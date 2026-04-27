@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# webext-e2e.sh — end-to-end contract test for the sec-review webext lane.
+# webext-e2e.sh — end-to-end contract test for the sec-audit webext lane.
 # Validates the fixture pipeline output at
 # tests/fixtures/vulnerable-webext/.pipeline/webext.jsonl against the
 # three assertions required by Stage 2 Task 2.4:

@@ -1,7 +1,7 @@
 # Security Review — tiny-django
 
 **Date (UTC):** 2026-04-21 11:01
-**Scope:** `/home/user/dev/sec-review/tests/fixtures/tiny-django/` (entire tree; single-app Django fixture)
+**Scope:** `/home/user/dev/sec-audit/tests/fixtures/tiny-django/` (entire tree; single-app Django fixture)
 **Excluded:** none (no vendored deps, no `node_modules/`, no `.venv/`)
 **Inventory:** Django 2.2.0 web app (single view + single template), `requests` 2.19.0 declared, PyPI ecosystem, no Dockerfile, no webserver config, no auth code.
 **CVE feeds:** OSV (ok), NVD (not queried — OSV covered PyPI), GHSA (not queried — OSV surfaced GHSA IDs)
@@ -170,7 +170,7 @@
 
 ## Review metadata
 
-- Plugin version: `sec-review 0.1.0`
+- Plugin version: `sec-audit 0.1.0`
 - Reference packs loaded: `frameworks/django.md`
 - sec-expert runs: 1 (inline, single stack)
 - Total CVE lookups: 2 (OSV.dev PyPI: django, requests)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rust-e2e.sh — end-to-end contract test for the sec-review Rust lane.
+# rust-e2e.sh — end-to-end contract test for the sec-audit Rust lane.
 # Validates the fixture pipeline output at
 # tests/fixtures/vulnerable-rust/.pipeline/rust.jsonl against the
 # Stage 2 Task 2.3 assertions:

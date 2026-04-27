@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Vulnerable WebExt Fixture",
   "version": "0.0.1",
-  "description": "Intentionally-vulnerable MV3 extension for sec-review webext lane E2E testing. NOT for distribution.",
+  "description": "Intentionally-vulnerable MV3 extension for sec-audit webext lane E2E testing. NOT for distribution.",
   "host_permissions": ["*://*/*"],
   "permissions": ["tabs", "cookies", "webRequest", "webRequestBlocking"],
   "content_security_policy": {

@@ -1,7 +1,7 @@
 # Security Review — sample-stack
 
 **Date (UTC):** 2026-04-21 11:05
-**Scope:** `/home/user/dev/sec-review/tests/fixtures/sample-stack/` (app/, nginx/, Dockerfile, requirements.txt)
+**Scope:** `/home/user/dev/sec-audit/tests/fixtures/sample-stack/` (app/, nginx/, Dockerfile, requirements.txt)
 **Excluded:** `k8s/` (empty), no `.venv/` or vendored deps present
 **Inventory:** Django (Python), nginx reverse proxy, Docker container, PyPI ecosystem (django 2.2.0, requests 2.19.0, pyyaml 5.3)
 **CVE feeds:** OSV (ok), NVD (not queried — OSV sufficient), GHSA (ok via OSV aliases)
@@ -419,7 +419,7 @@ All three pinned deps are end-of-life and should be upgraded to current supporte
 
 ## Review metadata
 
-- Plugin version: `sec-review 0.1.0`
+- Plugin version: `sec-audit 0.1.0`
 - Reference packs loaded: `frameworks/django.md`, `webservers/nginx.md`, `containers/dockerfile-hardening.md`
 - sec-expert runs: 1 (single Django + nginx + Docker stack)
 - Total CVE lookups: 3 (OSV.dev; 1 POST per pinned package)

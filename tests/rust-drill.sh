@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rust-drill.sh — proves the sec-review Rust adapter degrades cleanly
+# rust-drill.sh — proves the sec-audit Rust adapter degrades cleanly
 # when cargo is not on PATH.
 #
 # Strategy mirrors sast-drill.sh / dast-drill.sh / webext-drill.sh:

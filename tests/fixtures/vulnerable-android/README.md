@@ -1,6 +1,6 @@
 # vulnerable-android fixture
 
-Minimal source-tree Android project used by the sec-review Android
+Minimal source-tree Android project used by the sec-audit Android
 lane's E2E assertions (Stage 2 Task 2.3 of v0.8.0).
 
 ## Intentional findings

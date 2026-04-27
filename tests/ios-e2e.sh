@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ios-e2e.sh — end-to-end contract test for the sec-review iOS lane.
+# ios-e2e.sh — end-to-end contract test for the sec-audit iOS lane.
 # Validates tests/fixtures/vulnerable-ios/.pipeline/ios.jsonl against:
 #
 #   (a) >=1 finding with origin=ios and tool=mobsfscan

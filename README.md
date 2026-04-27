@@ -1,4 +1,4 @@
-# sec-review
+# sec-audit
 
 A Claude Code plugin that performs **citation-grounded cybersecurity reviews** of web services and servers. It pairs a **four-agent pipeline** (domain-expert + triager + CVE enricher + report-writer, each model-pinned for cost efficiency) with **live CVE feeds** (NVD 2.0, OSV.dev, GitHub GHSA) to produce a prioritized markdown report of reliable, primary-source-cited fixes.
 
@@ -11,21 +11,21 @@ The plugin is arranged as its own single-plugin marketplace — one `/plugin mar
 From a Claude Code session:
 
 ```text
-/plugin marketplace add https://github.com/<you>/sec-review.git
-/plugin install sec-review
+/plugin marketplace add https://github.com/<you>/sec-audit.git
+/plugin install sec-audit
 ```
 
 Or for a local clone:
 
 ```text
-/plugin marketplace add /home/user/dev/sec-review
-/plugin install sec-review
+/plugin marketplace add /home/user/dev/sec-audit
+/plugin install sec-audit
 ```
 
 After install, two things become available:
 
-- `/sec-review <path-to-project>` — slash command, the primary entry point.
-- `Skill sec-review` — the same behavior as a skill invocation (natural-language triggers: "do a security review", "CVE scan this repo", "audit dependencies", "harden this service").
+- `/sec-audit <path-to-project>` — slash command, the primary entry point.
+- `Skill sec-audit` — the same behavior as a skill invocation (natural-language triggers: "do a security review", "CVE scan this repo", "audit dependencies", "harden this service").
 
 Optional env vars (not required):
 
@@ -35,10 +35,10 @@ Optional env vars (not required):
 ## Quick start
 
 ```text
-/sec-review /abs/path/to/my-web-app
+/sec-audit /abs/path/to/my-web-app
 ```
 
-The review writes its report to `<target>/sec-review-report-YYYYMMDD-HHMM.md` (UTC timestamp). Open it when the run finishes — it's the only user-facing deliverable.
+The review writes its report to `<target>/sec-audit-report-YYYYMMDD-HHMM.md` (UTC timestamp). Open it when the run finishes — it's the only user-facing deliverable.
 
 A CRITICAL finding block from a real run against the sample fixture looks like:
 
@@ -55,7 +55,7 @@ A CRITICAL finding block from a real run against the sample fixture looks like:
 
 ## What it checks
 
-Static analysis plus live CVE enrichment across ten security domains. Each reference pack in `skills/sec-review/references/` carries dangerous-pattern regexes, secure-pattern snippets, and verbatim fix recipes — all cited to primary sources (OWASP, RFC, CIS, vendor docs, NIST):
+Static analysis plus live CVE enrichment across ten security domains. Each reference pack in `skills/sec-audit/references/` carries dangerous-pattern regexes, secure-pattern snippets, and verbatim fix recipes — all cited to primary sources (OWASP, RFC, CIS, vendor docs, NIST):
 
 | Domain | Covered |
 |---|---|
@@ -70,11 +70,11 @@ Static analysis plus live CVE enrichment across ten security domains. Each refer
 | Secrets | Secret sprawl, Vault patterns, env-var leaks |
 | Supply chain | Dep pinning, SLSA, Sigstore, SBOM |
 
-The full reference list is in `skills/sec-review/references/` — 43 files, each citation-grounded.
+The full reference list is in `skills/sec-audit/references/` — 43 files, each citation-grounded.
 
 ## CVE feeds & privacy
 
-Reviews query live CVE data from three sources (documented in `skills/sec-review/references/cve-feeds.md`):
+Reviews query live CVE data from three sources (documented in `skills/sec-audit/references/cve-feeds.md`):
 
 1. **OSV.dev** — primary feed (covers ~15 ecosystems). No auth, no data sent beyond `{ecosystem, package, version}` tuples.
 2. **NVD 2.0** — fallback by CPE or keyword. No auth required; API key optional for higher rate limit.
@@ -94,8 +94,8 @@ Three quality-of-review improvements landed in v0.3.0 without architectural chan
 
 ## Windows/IIS coverage (v0.4.0)
 
-A new reference pack `skills/sec-review/references/webservers/iis.md`
-extends sec-review to **Microsoft IIS 10** configuration audits. The
+A new reference pack `skills/sec-audit/references/webservers/iis.md`
+extends sec-audit to **Microsoft IIS 10** configuration audits. The
 pack covers eight hardening patterns grounded in primary sources:
 
 - **TLS policy** — TLS 1.0 / 1.1 enablement on `sslProtocols`; `ssl3`
@@ -142,14 +142,14 @@ on `PATH`:
 
 Output is sec-expert-compatible JSONL: every finding carries
 `origin: "sast"` and `tool: "semgrep" | "bandit"`, mapped per the
-field-mapping recipes in `skills/sec-review/references/sast-tools.md`.
+field-mapping recipes in `skills/sec-audit/references/sast-tools.md`.
 The `finding-triager` agent is origin-aware — SAST findings consult
 the SAST pack's `## Common false positives` in addition to the matched
 domain pack and are never dropped.
 
 **Fixes still come from the regex packs, not from the SAST tools.**
 Semgrep and bandit surface a signal and a rule ID — they don't ship
-quoted, verbatim fix recipes in the sec-review sense, so every SAST
+quoted, verbatim fix recipes in the sec-audit sense, so every SAST
 finding lands with `fix_recipe: null`. The regex-based domain packs
 remain the single source of truth for the `> Recommended fix` block in
 the final report.
@@ -186,7 +186,7 @@ request method live in `notes`). ZAP's `riskcode` ("0"–"3") maps to
 INFO/LOW/MEDIUM/HIGH. Baseline never emits CRITICAL — it is a
 passive scan, not exploitation. `cweid` maps to `CWE-<n>` when
 present. Field-mapping recipes live in
-`skills/sec-review/references/dast-tools.md`.
+`skills/sec-audit/references/dast-tools.md`.
 
 **Fixes still come from the regex packs and reference files, not
 from ZAP.** DAST findings land with `fix_recipe: null`; the
@@ -234,9 +234,9 @@ relative path inside the extension (e.g. `manifest.json`,
 `background/sw.js`, `lib/jquery-1.12.4.min.js`); `line` is the integer
 line number the tool supplied, or `0` when it did not (retire.js has
 no line; addons-linter `notice` type often omits it). Field-mapping
-recipes live in `skills/sec-review/references/webext-tools.md`; the
+recipes live in `skills/sec-audit/references/webext-tools.md`; the
 code-pattern reference packs (MV3, AMO, shared) live in
-`skills/sec-review/references/frontend/webext-*.md`.
+`skills/sec-audit/references/frontend/webext-*.md`.
 
 **Fixes for code-pattern findings come from the `frontend/webext-*`
 packs**, not from addons-linter's one-liner messages; the triager's
@@ -297,9 +297,9 @@ Output is sec-expert-compatible JSONL: every finding carries
 `tool: "cargo-audit" | "cargo-deny" | "cargo-geiger" | "cargo-vet"`.
 `file` is `Cargo.toml` / `Cargo.lock` / a crate name; `line` is an
 integer span when the tool supplies one, otherwise `0`. Field-mapping
-recipes live in `skills/sec-review/references/rust-tools.md`; the
+recipes live in `skills/sec-audit/references/rust-tools.md`; the
 code-pattern reference packs (Cargo ecosystem, unsafe surface) live
-in `skills/sec-review/references/rust/`.
+in `skills/sec-audit/references/rust/`.
 
 **Fixes for advisory findings come from the advisory** (patched-
 versions range); fixes for ecosystem findings come from
@@ -363,9 +363,9 @@ relative path under the target root (e.g.
 `app/src/main/AndroidManifest.xml`, `app/src/main/java/com/example/MainActivity.java`)
 or the APK basename for apkleaks findings. Field-mapping recipes and
 the lint-rule → CWE lookup table live in
-`skills/sec-review/references/mobile-tools.md`; the code-pattern
+`skills/sec-audit/references/mobile-tools.md`; the code-pattern
 reference packs (manifest, data, runtime) live in
-`skills/sec-review/references/mobile/`.
+`skills/sec-audit/references/mobile/`.
 
 **Dependencies feed cve-enricher** via the `Maven` OSV-native
 ecosystem entry; transitive coverage depends on whether a
@@ -411,9 +411,9 @@ with every other pass agent. It shells out to up to four tools:
 Output is sec-expert-compatible JSONL: every finding carries
 `origin: "ios"` and one of
 `tool: "mobsfscan" | "codesign" | "spctl" | "notarytool"`. Field-
-mapping recipes live in `skills/sec-review/references/mobile-tools.md`
+mapping recipes live in `skills/sec-audit/references/mobile-tools.md`
 (iOS subsection); code-pattern reference packs live in
-`skills/sec-review/references/mobile/ios-*.md`.
+`skills/sec-audit/references/mobile/ios-*.md`.
 
 **Dependencies feed cve-enricher** via CocoaPods and SwiftPM ecosystem
 entries (OSV best-effort — CocoaPods through GHSA fallback, SwiftPM
@@ -468,9 +468,9 @@ The runner dispatches up to three tools:
 Output is sec-expert-compatible JSONL: every finding carries
 `origin: "linux"` and one of
 `tool: "systemd-analyze" | "lintian" | "checksec"`. Field-mapping
-recipes live in `skills/sec-review/references/linux-tools.md`; the
+recipes live in `skills/sec-audit/references/linux-tools.md`; the
 three code-pattern reference packs (systemd directives, sandboxing,
-packaging) live in `skills/sec-review/references/desktop/linux-*.md`.
+packaging) live in `skills/sec-audit/references/desktop/linux-*.md`.
 
 **Dependencies feed cve-enricher** via the `Debian` ecosystem
 (best-effort via the Debian Security Tracker — OSV partial; same
@@ -520,9 +520,9 @@ Output is sec-expert-compatible JSONL: every finding carries
 `origin: "macos"` and one of
 `tool: "mobsfscan" | "codesign" | "spctl" | "pkgutil" | "stapler"`.
 Field-mapping recipes live in
-`skills/sec-review/references/mobile-tools.md` (iOS + macOS
+`skills/sec-audit/references/mobile-tools.md` (iOS + macOS
 subsections); code-pattern reference packs live in
-`skills/sec-review/references/desktop/macos-*.md`.
+`skills/sec-audit/references/desktop/macos-*.md`.
 
 Three desktop-macOS-specific reference packs cover concerns iOS
 doesn't share: **hardened runtime** flags on GUI apps
@@ -798,7 +798,7 @@ Vendored-directory exclusions (`node_modules/`, `.venv/`,
 focused on user-authored scripts. Cross-platform, no host-OS
 gate.
 
-This is the **first single-tool lane in sec-review since
+This is the **first single-tool lane in sec-audit since
 DAST (v0.5)**. The runner dispatches a single tool:
 
 - **`shellcheck`** (Haskell binary) — the canonical static
@@ -870,7 +870,7 @@ The runner dispatches two tools:
 - **`pip-audit`** (PyPA-maintained) — Python-package
   vulnerability scanner that consumes the project's manifest
   and queries OSV.dev for known CVEs. Adds reachability-hint
-  metadata that sec-review's bulk cve-enricher OSV pass
+  metadata that sec-audit's bulk cve-enricher OSV pass
   lacks: when a vulnerable package is installed but the
   vulnerable function is never imported, pip-audit downgrades
   severity. Runner mode is requirements-file-only — no
@@ -963,7 +963,7 @@ The runner dispatches a single tool:
   (`no-changed-when`, `command-instead-of-module`,
   `package-latest`), syntax/style (`yaml`, `key-order`),
   and deprecation tracking. Always invoked with `--offline`
-  to suppress Galaxy collection lookups — sec-review is
+  to suppress Galaxy collection lookups — sec-audit is
   source-only.
 
 Output carries `origin: "ansible"` and
@@ -1138,7 +1138,7 @@ tarball / OCI layout / SBOM).
 The v1.10 release adds no new lanes. Two ergonomic improvements
 land in the orchestrator skill instead.
 
-**1. Default-to-cwd invocation.** Running `/sec-review` with no
+**1. Default-to-cwd invocation.** Running `/sec-audit` with no
 path argument no longer prompts the user for a path — the
 slash command resolves `target_path` to the caller's current
 working directory (`$PWD`) and proceeds. The §1 Scope step
@@ -1148,15 +1148,15 @@ echoes the resolved path back so the user can redirect:
 > review elsewhere.
 
 The only prompts that remain are the existing structural guards:
-when `$PWD` resolves to the sec-review plugin's own directory
+when `$PWD` resolves to the sec-audit plugin's own directory
 (refusing self-review), and when `$PWD` is unreadable (rare,
 indicates a broken shell environment). The natural intent of
-`/sec-review` invoked inside a project directory — review THIS
+`/sec-audit` invoked inside a project directory — review THIS
 project — is now the default.
 
 **2. Coverage-gap suggestions in the report.** A new SECOND pass
 during §2 Inventory scans for technologies present in the project
-but NOT covered by any sec-review lane. The detection registry
+but NOT covered by any sec-audit lane. The detection registry
 lives in `references/uncovered-tech-fingerprints.md` — a curated
 catalogue of sixteen known-but-uncovered technologies with
 detection patterns (manifest filenames, file-extension globs,
@@ -1189,7 +1189,7 @@ fully covered — no empty-heading noise.
 The lane-suggestion is informational only — no runner dispatches
 against detected uncovered tech, no findings are emitted. The
 user acts on the suggestions by filing a feature request or
-extending sec-review with a new lane following the pattern in
+extending sec-audit with a new lane following the pattern in
 `references/COVERAGE.md`.
 
 Detection precision is tuned to favour HIGH-precision matches
@@ -1205,7 +1205,7 @@ suppressed when `windows` desktop is detected.
 
 The v1.0 release adds no new reference packs and no new runners.
 Instead it formalises multi-stack dispatch as a first-class contract,
-adds lane-selection flags to the `/sec-review` slash command, and
+adds lane-selection flags to the `/sec-audit` slash command, and
 ships a single-source-of-truth coverage enumeration.
 
 **Multi-stack dispatch (formalised in §3.0).** When the inventory
@@ -1222,12 +1222,12 @@ This has been the de-facto behaviour since v0.7; v1.0 makes it the
 documented contract with §3.0 invariants and a new `tests/multi-
 stack-e2e.sh` integration test.
 
-**Lane-selection flags.** The `/sec-review` command now accepts:
+**Lane-selection flags.** The `/sec-audit` command now accepts:
 
 ```
-/sec-review /path/to/repo
-/sec-review /path/to/repo --only=webext,rust
-/sec-review /path/to/repo --skip=dast,windows
+/sec-audit /path/to/repo
+/sec-audit /path/to/repo --only=webext,rust
+/sec-audit /path/to/repo --skip=dast,windows
 ```
 
 `--only=<lanes>` restricts dispatch to the named lanes; `--skip=<lanes>`
@@ -1290,9 +1290,9 @@ cross-platform:
 Output is sec-expert-compatible JSONL: every finding carries
 `origin: "windows"` and one of
 `tool: "binskim" | "osslsigncode" | "sigcheck"`. Field-mapping
-recipes live in `skills/sec-review/references/windows-tools.md`;
+recipes live in `skills/sec-audit/references/windows-tools.md`;
 code-pattern reference packs live in
-`skills/sec-review/references/desktop/windows-*.md` and cover
+`skills/sec-audit/references/desktop/windows-*.md` and cover
 Authenticode signing hygiene, AppLocker/WDAC policy hygiene, and
 MSI/MSIX/WiX packaging concerns (MSI `CustomAction Type=3426`
 SDL violations, MSIX `rescap:Capability` runFullTrust/allowElevation,
@@ -1357,11 +1357,11 @@ names from the other 12 lanes).
 
 ## Updating the reference packs
 
-When a primary source changes shape (OWASP cheat-sheet URLs, RFC revisions, feed schema updates), reference files under `skills/sec-review/references/` are the single point of update. The orchestrator skill reads URLs from `cve-feeds.md` — no endpoint strings are inlined in `SKILL.md`.
+When a primary source changes shape (OWASP cheat-sheet URLs, RFC revisions, feed schema updates), reference files under `skills/sec-audit/references/` are the single point of update. The orchestrator skill reads URLs from `cve-feeds.md` — no endpoint strings are inlined in `SKILL.md`.
 
 To contribute a new reference pack:
 
-1. Copy `skills/sec-review/references/_TEMPLATE.md` to a new file.
+1. Copy `skills/sec-audit/references/_TEMPLATE.md` to a new file.
 2. Fill in `## Source` with primary-source URLs only (no blogs, no StackOverflow).
 3. Add 3–6 `### <Pattern> — CWE-XXX` entries and 2–4 `### Recipe:` entries.
 4. Run the header-presence check from the plan document.
@@ -1369,14 +1369,14 @@ To contribute a new reference pack:
 ## Architecture
 
 v0.2.0 splits the review into four specialist agents, each pinned to the
-right model class, glued together by the `sec-review` orchestrator skill:
+right model class, glued together by the `sec-audit` orchestrator skill:
 
 ```
-   /sec-review <path>
+   /sec-audit <path>
           │
           ▼
   ┌───────────────────────┐
-  │  skills/sec-review    │    orchestrator: scope, inventory,
+  │  skills/sec-audit    │    orchestrator: scope, inventory,
   │     SKILL.md          │    rubric, dispatch — stays lean
   └───┬────────┬──────┬───┘
       │        │      │
@@ -1404,7 +1404,7 @@ right model class, glued together by the `sec-review` orchestrator skill:
        │   (sonnet)        │             from triaged + enriched
        └───────┬───────────┘
                ▼
-      sec-review-report-YYYYMMDD-HHMM.md
+      sec-audit-report-YYYYMMDD-HHMM.md
 ```
 
 | Agent             | Model (pinned) | Role                                                 |
@@ -1415,7 +1415,7 @@ right model class, glued together by the `sec-review` orchestrator skill:
 | `report-writer`   | `sonnet`       | Composes final markdown from all upstream outputs.  |
 
 Model pinning makes sub-agent cost independent of caller model — invoking
-`/sec-review` from an Opus session does not upgrade any sub-agent to Opus.
+`/sec-audit` from an Opus session does not upgrade any sub-agent to Opus.
 
 ## Layout
 
@@ -1429,7 +1429,7 @@ agents/
   cve-enricher.md          — OSV querybatch + NVD/GHSA fallback (haiku)
   report-writer.md         — final markdown composition (sonnet)
 skills/
-  sec-review/
+  sec-audit/
     SKILL.md               — orchestrator
     references/
       _TEMPLATE.md
@@ -1445,7 +1445,7 @@ skills/
       supply-chain/        — pinning, SLSA, Sigstore, SBOM
       cve-feeds.md         — NVD 2.0 / OSV / GHSA adapter spec
 commands/
-  sec-review.md            — /sec-review slash command
+  sec-audit.md            — /sec-audit slash command
 tests/fixtures/
   tiny-django/             — minimal Django SQLi+XSS fixture
   sample-stack/            — Django + nginx + Docker + vulnerable deps

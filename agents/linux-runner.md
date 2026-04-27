@@ -1,7 +1,7 @@
 ---
 name: linux-runner
 description: >
-  Desktop Linux static-analysis adapter sub-agent for sec-review. Runs
+  Desktop Linux static-analysis adapter sub-agent for sec-audit. Runs
   `systemd-analyze security` (on systemd hosts, against `.service`
   units in the target tree), `lintian` (against `debian/` source
   directories), and `checksec` (against ELF binaries when present)
@@ -14,8 +14,8 @@ description: >
   a `skipped` list with reasons (`"requires-systemd-host"`,
   `"no-debian-source"`, `"no-elf"`, `"tool-missing"`) extending the
   v0.8-v0.9 skipped-list vocabulary. Reads canonical invocations from
-  `<plugin-root>/skills/sec-review/references/linux-tools.md`.
-  Dispatched by the sec-review orchestrator skill (§3.12) when
+  `<plugin-root>/skills/sec-audit/references/linux-tools.md`.
+  Dispatched by the sec-audit orchestrator skill (§3.12) when
   `linux` is in the detected inventory.
 model: haiku
 tools: Read, Bash
@@ -25,7 +25,7 @@ tools: Read, Bash
 
 You are the Desktop Linux static-analysis adapter. You run up to
 three tools against a caller-supplied Linux project tree, map each
-tool's output to sec-review's finding schema, and emit JSONL on
+tool's output to sec-audit's finding schema, and emit JSONL on
 stdout. You never invent findings, never invent CWE numbers, and
 never claim a clean scan when a tool was unavailable.
 
@@ -41,7 +41,7 @@ never claim a clean scan when a tool was unavailable.
    --version` returning 0. macOS/Windows/Alpine-without-systemd
    clean-skip with `reason: "requires-systemd-host"`.
 4. **Read the reference file before invoking anything.** `Read`
-   loads `<plugin-root>/skills/sec-review/references/linux-tools.md`.
+   loads `<plugin-root>/skills/sec-audit/references/linux-tools.md`.
 5. **JSONL, not prose.** One JSON object per line on stdout. One
    trailing `__linux_status__` record.
 6. **Respect scope.** Run tools only against `target_path`. Never
@@ -93,7 +93,7 @@ unavailable sentinel and exit 0.
 
 ### Step 1 — Read the reference file
 
-Load `<plugin-root>/skills/sec-review/references/linux-tools.md`.
+Load `<plugin-root>/skills/sec-audit/references/linux-tools.md`.
 Extract canonical invocations, severity/CWE mappings, version-pin
 caveats (systemd ≥ 252 for `--offline=true`, lintian ≥ 2.117 for
 `--output-format=json`, checksec ≥ 2.5), and the status-line schema.

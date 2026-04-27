@@ -1,6 +1,6 @@
 # vulnerable-windows fixture
 
-Minimal Windows desktop project used by the sec-review Windows lane's
+Minimal Windows desktop project used by the sec-audit Windows lane's
 E2E assertions (Stage 2 Task 2.3 of v0.12.0).
 
 ## Intentional findings

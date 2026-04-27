@@ -9,5 +9,5 @@ Package: vulnerableapp
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Intentionally vulnerable fixture package
- Exists solely to exercise the sec-review Linux lane E2E assertions.
+ Exists solely to exercise the sec-audit Linux lane E2E assertions.
  Intentionally missing Homepage: and Vcs-Git: fields (Lintian tags).

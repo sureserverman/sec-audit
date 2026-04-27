@@ -1,6 +1,6 @@
 # vulnerable-webext fixture
 
-Minimal Manifest V3 browser extension used by the sec-review webext lane's
+Minimal Manifest V3 browser extension used by the sec-audit webext lane's
 E2E assertions (Stage 2 Task 2.4 of v0.6.0).
 
 ## Intentional findings

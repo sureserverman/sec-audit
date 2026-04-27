@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# linux-e2e.sh — end-to-end contract test for the sec-review Linux
+# linux-e2e.sh — end-to-end contract test for the sec-audit Linux
 # desktop lane. Validates tests/fixtures/vulnerable-linux/.pipeline/
 # linux.jsonl against:
 #

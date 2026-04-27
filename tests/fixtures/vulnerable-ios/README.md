@@ -1,6 +1,6 @@
 # vulnerable-ios fixture
 
-Minimal source-tree iOS project used by the sec-review iOS lane's
+Minimal source-tree iOS project used by the sec-audit iOS lane's
 E2E assertions (Stage 2 Task 2.3 of v0.9.0).
 
 ## Intentional findings

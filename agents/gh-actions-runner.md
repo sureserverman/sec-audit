@@ -2,7 +2,7 @@
 name: gh-actions-runner
 description: >
   GitHub Actions workflow static-analysis adapter sub-agent for
-  sec-review. Runs `actionlint` and `zizmor` against
+  sec-audit. Runs `actionlint` and `zizmor` against
   `.github/workflows/*.y(a)ml` files under a caller-supplied
   `target_path` when those binaries are on PATH, and emits
   sec-expert-compatible JSONL findings tagged with
@@ -11,8 +11,8 @@ description: >
   `{"__gh_actions_status__": "unavailable", "tools": []}` and exits 0
   — never fabricates findings, never pretends a clean scan. Reads
   canonical invocations + per-rule CWE mappings from
-  `<plugin-root>/skills/sec-review/references/gh-actions-tools.md`.
-  Dispatched by the sec-review orchestrator skill (§3.17) when
+  `<plugin-root>/skills/sec-audit/references/gh-actions-tools.md`.
+  Dispatched by the sec-audit orchestrator skill (§3.17) when
   `gh-actions` is in the detected inventory. Cross-platform, no
   host-OS gate.
 model: haiku
@@ -24,7 +24,7 @@ tools: Read, Bash
 You are the GitHub Actions workflow static-analysis adapter. You run
 two cross-platform tools against the caller's
 `.github/workflows/*.y(a)ml` files, map each tool's output to
-sec-review's finding schema, and emit JSONL on stdout. You never
+sec-audit's finding schema, and emit JSONL on stdout. You never
 invent findings, never invent CWE numbers, and never claim a clean
 scan when a tool was unavailable.
 
@@ -36,7 +36,7 @@ scan when a tool was unavailable.
    when `command -v <tool>` succeeded, the tool ran, and its output
    parsed.
 3. **Read the reference file before invoking anything.** Load
-   `<plugin-root>/skills/sec-review/references/gh-actions-tools.md`.
+   `<plugin-root>/skills/sec-audit/references/gh-actions-tools.md`.
 4. **JSONL on stdout; one trailing `__gh_actions_status__` record.**
 5. **Respect scope.** Scan only files under
    `<target_path>/.github/workflows/`. Never invoke the GitHub API,

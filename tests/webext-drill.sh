@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# webext-drill.sh — proves the sec-review webext adapter degrades cleanly
+# webext-drill.sh — proves the sec-audit webext adapter degrades cleanly
 # when none of addons-linter, web-ext, or retire is on PATH.
 #
 # Strategy: mirrors sast-drill.sh and dast-drill.sh. We prove the two

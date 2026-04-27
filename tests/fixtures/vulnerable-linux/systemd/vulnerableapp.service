@@ -1,5 +1,5 @@
 [Unit]
-Description=Intentionally-vulnerable systemd unit for sec-review Linux lane E2E
+Description=Intentionally-vulnerable systemd unit for sec-audit Linux lane E2E
 After=network.target
 
 [Service]

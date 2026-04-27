@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# windows-e2e.sh — end-to-end contract test for the sec-review
+# windows-e2e.sh — end-to-end contract test for the sec-audit
 # Windows desktop lane. Validates tests/fixtures/vulnerable-windows/
 # .pipeline/windows.jsonl against:
 #

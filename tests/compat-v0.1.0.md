@@ -1,12 +1,12 @@
-# sec-review v0.1.0 → v0.2.0 backward-compat contract
+# sec-audit v0.1.0 → v0.2.0 backward-compat contract
 
-This doc freezes the shape of the v0.1.0 `/sec-review` output that v0.2.0 must
+This doc freezes the shape of the v0.1.0 `/sec-audit` output that v0.2.0 must
 continue to produce. Any v0.2.0 run against `tests/fixtures/sample-stack/` must
 still satisfy every assertion below; Stage 4 enforces this.
 
 ## Required report-file properties
 
-- Filename pattern: `<target>/sec-review-report-YYYYMMDD-HHMM.md` (UTC).
+- Filename pattern: `<target>/sec-audit-report-YYYYMMDD-HHMM.md` (UTC).
 - Non-empty markdown file.
 
 ## Required header block fields
@@ -57,7 +57,7 @@ The report must contain the section headings from SKILL.md section 6, notably:
 The Stage 4 gate runs:
 
 ```sh
-report=$(ls -t tests/fixtures/sample-stack/sec-review-report-*.md | head -1)
+report=$(ls -t tests/fixtures/sample-stack/sec-audit-report-*.md | head -1)
 grep -qE "CRITICAL|HIGH"  "$report"  || { echo "FAIL: no CRITICAL/HIGH"; exit 1; }
 grep -qE "CVE-[0-9]{4}-[0-9]{4,}" "$report" \
   || grep -q "CVE enrichment offline" "$report" \

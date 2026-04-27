@@ -1,6 +1,6 @@
 # vulnerable-linux fixture
 
-Minimal Linux-desktop source tree used by the sec-review Linux lane's
+Minimal Linux-desktop source tree used by the sec-audit Linux lane's
 E2E assertions (Stage 2 Task 2.3 of v0.10.0).
 
 ## Intentional findings

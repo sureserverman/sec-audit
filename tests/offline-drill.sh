@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# offline-drill.sh — proves the sec-review pipeline degrades cleanly when
+# offline-drill.sh — proves the sec-audit pipeline degrades cleanly when
 # every CVE feed is unreachable.
 #
 # Strategy: rather than burn a full LLM run per CI invocation, we test the

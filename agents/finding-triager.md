@@ -1,6 +1,6 @@
 ---
 name: finding-triager
-description: Context-aware false-positive reduction for sec-review findings. Reads each finding's surrounding code/config context, applies the `## Common false positives` guidance from the matched reference pack, and annotates with confidence + fp_suspected flags. Never drops or alters findings — only adds triage metadata.
+description: Context-aware false-positive reduction for sec-audit findings. Reads each finding's surrounding code/config context, applies the `## Common false positives` guidance from the matched reference pack, and annotates with confidence + fp_suspected flags. Never drops or alters findings — only adds triage metadata.
 model: sonnet
 tools: Read, Grep, Glob
 ---
@@ -64,7 +64,7 @@ You produce JSONL on stdout. You never drop findings. You never alter findings.
 - For `origin: "sast"` findings: in ADDITION to (not instead of) the
   per-reference `## Common false positives` lookup, the triager MUST also
   consult the `## Common false positives` section of
-  `<plugin-root>/skills/sec-review/references/sast-tools.md` when deciding
+  `<plugin-root>/skills/sec-audit/references/sast-tools.md` when deciding
   `fp_suspected` and `confidence`. Bullets from that file describe
   tool-level false-positive patterns (e.g. known noisy Bandit rules,
   semgrep rule edge cases) that apply across reference packs.
@@ -90,7 +90,7 @@ Typical concerns to evaluate:
 ### Step 2 — Read Common false positives
 
 Use the `Read` tool to open
-`<plugin-root>/skills/sec-review/references/<finding.reference>` and extract
+`<plugin-root>/skills/sec-audit/references/<finding.reference>` and extract
 the `## Common false positives` section. Check every bullet in that section
 against the context you read in Step 1. A bullet "applies" when the observed
 context matches the scenario the bullet describes.

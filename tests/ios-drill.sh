@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ios-drill.sh — proves the sec-review iOS adapter degrades cleanly
+# ios-drill.sh — proves the sec-audit iOS adapter degrades cleanly
 # when none of its tools is available.
 #
 # Extends the SAST/DAST/webext/rust/android drill pattern with a new

@@ -1,6 +1,6 @@
 # DAST target test fixture
 
-Synthetic OWASP ZAP baseline scan output used by sec-review DAST lane tests. This is NOT a captured real scan — the alerts were hand-authored to exercise the `dast-runner` contract without waiting on a multi-minute live scan against a running target.
+Synthetic OWASP ZAP baseline scan output used by sec-audit DAST lane tests. This is NOT a captured real scan — the alerts were hand-authored to exercise the `dast-runner` contract without waiting on a multi-minute live scan against a running target.
 
 Shape conforms to the OWASP ZAP JSON report schema (`@version`, `@generated`, `site[].alerts[]` with `pluginid`, `alertRef`, `riskcode`, `confidence`, `instances`, `cweid`, `wascid`, etc.).
 

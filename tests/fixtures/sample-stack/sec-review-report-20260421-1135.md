@@ -2,7 +2,7 @@
 
 **Date (UTC):** 2026-04-21 11:35
 **Scope:** tests/fixtures/sample-stack/ (Dockerfile, nginx/nginx.conf, requirements.txt, app/)
-**Excluded:** .pipeline/, prior sec-review-report-*.md
+**Excluded:** .pipeline/, prior sec-audit-report-*.md
 **Inventory:** Django 2.2.0 web app (PyPI: django 2.2.0, requests 2.19.0, pyyaml 5.3), nginx TLS terminator, Docker container image (python:3.11 base), no k8s manifests present.
 **CVE feeds:** OSV (ok, fetched 2026-04-21T11:35Z), NVD (not queried — OSV sufficient), GHSA (aliased via OSV)
 **Findings:** 2 CRITICAL, 6 HIGH, 4 MEDIUM, 0 LOW
@@ -252,7 +252,7 @@ Notable CVE IDs (all from OSV, fetched 2026-04-21T11:35Z):
 
 ## Review metadata
 
-- Plugin version: `sec-review 0.2.0`
+- Plugin version: `sec-audit 0.2.0`
 - Reference packs loaded: `frameworks/django.md`, `webservers/nginx.md`, `containers/docker.md`, `containers/dockerfile-hardening.md`, `frontend/xss.md`, `tls/tls-bcp.md`
 - sec-expert runs: 1
 - finding-triager runs: 1

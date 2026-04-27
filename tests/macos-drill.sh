@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macos-drill.sh — proves the sec-review macOS desktop adapter
+# macos-drill.sh — proves the sec-audit macOS desktop adapter
 # degrades cleanly when none of its tools is available.
 
 set -euo pipefail

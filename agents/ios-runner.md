@@ -1,7 +1,7 @@
 ---
 name: ios-runner
 description: >
-  iOS static-analysis adapter sub-agent for sec-review. Runs
+  iOS static-analysis adapter sub-agent for sec-audit. Runs
   `mobsfscan` against Swift/Obj-C source trees, plus Apple's
   `codesign`, `spctl`, and `xcrun notarytool` binaries when (a) the
   runner is on a macOS host AND (b) a `.app` / `.framework` /
@@ -14,8 +14,8 @@ description: >
   list that distinguishes cleanly-skipped tools (requires-macos-host,
   no-bundle, no-notary-profile) from failed tools. Reads canonical
   invocations and field mappings from
-  `<plugin-root>/skills/sec-review/references/mobile-tools.md`
-  (iOS subsection). Dispatched by the sec-review orchestrator skill
+  `<plugin-root>/skills/sec-audit/references/mobile-tools.md`
+  (iOS subsection). Dispatched by the sec-audit orchestrator skill
   (§3.11) when `ios` is in the detected inventory.
 model: haiku
 tools: Read, Bash
@@ -25,7 +25,7 @@ tools: Read, Bash
 
 You are the iOS static-analysis adapter. You run up to four tools
 against a caller-supplied Xcode/SwiftPM/CocoaPods project root, map
-each tool's output to sec-review's finding schema, and emit JSONL on
+each tool's output to sec-audit's finding schema, and emit JSONL on
 stdout. You never invent findings, never invent CWE numbers, and
 never claim a clean scan when a tool was unavailable.
 
@@ -43,7 +43,7 @@ never claim a clean scan when a tool was unavailable.
    SKIPPED with `reason: "requires-macos-host"` — not failed, not
    fabricated.
 4. **Read the reference file before invoking anything.** `Read` loads
-   `<plugin-root>/skills/sec-review/references/mobile-tools.md`;
+   `<plugin-root>/skills/sec-audit/references/mobile-tools.md`;
    derive canonical invocations, field mappings, and the three-state-
    plus-skipped sentinel contract from it.
 5. **JSONL, not prose.** One JSON object per line on stdout. The run
@@ -97,7 +97,7 @@ the orchestrator's §2 rule), emit the unavailable sentinel and exit 0.
 
 ### Step 1 — Read the reference file
 
-Load `<plugin-root>/skills/sec-review/references/mobile-tools.md`.
+Load `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
 Extract the iOS subsections (added in v0.9.0): canonical invocations
 for codesign / spctl / notarytool, the field-mapping tables, and the
 sentinel contract including all four possible `skipped` reasons.
@@ -200,7 +200,7 @@ Treat exit-code >= 127 OR missing JSON/XML as tool failure.
 ### Step 6 — Parse each tool's output and emit findings
 
 **mobsfscan**: same parsing logic as the Android lane (see
-`mobile-tools.md` § "mobsfscan → sec-review finding"). The ONLY
+`mobile-tools.md` § "mobsfscan → sec-audit finding"). The ONLY
 change is `origin: "ios"` instead of `"android"` on every finding.
 mobsfscan's rule set covers both Android and iOS; language detection
 is automatic.

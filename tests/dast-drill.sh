@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dast-drill.sh — proves the sec-review DAST adapter degrades cleanly when
+# dast-drill.sh — proves the sec-audit DAST adapter degrades cleanly when
 # neither docker nor zap-baseline.py is on PATH.
 #
 # Strategy: mirrors sast-drill.sh. We prove the two properties that define

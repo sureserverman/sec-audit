@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sast-drill.sh — proves the sec-review SAST adapter degrades cleanly when
+# sast-drill.sh — proves the sec-audit SAST adapter degrades cleanly when
 # neither semgrep nor bandit is on PATH.
 #
 # Strategy: like offline-drill.sh, we prove the two properties that define

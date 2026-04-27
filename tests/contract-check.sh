@@ -1147,15 +1147,15 @@ echo "dast negative-test: malformed DAST line (missing tool) correctly rejected"
 # --- webext inventory rule (v0.6.0 Stage 1 Task 1.4):
 # SKILL.md §2 must document the browser-extension detection rule
 # (manifest.json + manifest_version) and emit a `webext` inventory key.
-check skills/sec-review/SKILL.md "Browser-extension signals" "SKILL.md §2 missing webext detection rule"
-check skills/sec-review/SKILL.md "manifest_version" "SKILL.md §2 webext rule missing manifest_version trigger"
-check skills/sec-review/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
+check skills/sec-audit/SKILL.md "Browser-extension signals" "SKILL.md §2 missing webext detection rule"
+check skills/sec-audit/SKILL.md "manifest_version" "SKILL.md §2 webext rule missing manifest_version trigger"
+check skills/sec-audit/SKILL.md "\"webext\"" "SKILL.md §2 inventory JSON missing webext key"
 echo "webext-inventory: SKILL.md §2 documents webext stack detection"
 
 # --- k8s inventory rule (v1.1.0 Stage 1):
-check skills/sec-review/SKILL.md "Kubernetes signals" "SKILL.md §2 missing K8s detection rule"
-check skills/sec-review/SKILL.md "apiVersion" "SKILL.md §2 k8s rule missing apiVersion trigger"
-check skills/sec-review/SKILL.md "\"k8s\"" "SKILL.md §2 inventory JSON missing k8s key"
+check skills/sec-audit/SKILL.md "Kubernetes signals" "SKILL.md §2 missing K8s detection rule"
+check skills/sec-audit/SKILL.md "apiVersion" "SKILL.md §2 k8s rule missing apiVersion trigger"
+check skills/sec-audit/SKILL.md "\"k8s\"" "SKILL.md §2 inventory JSON missing k8s key"
 echo "k8s-inventory: SKILL.md §2 documents k8s stack detection"
 
 # --- k8s fixture-match sanity
@@ -1172,45 +1172,45 @@ fi
 echo "k8s-inventory: synthetic Deployment fixture matches §2 detection rule"
 
 # --- orchestrator §3.15 wire-up (v1.1.0 Stage 2):
-check skills/sec-review/SKILL.md "### 3.15 Kubernetes admission pass" "SKILL.md missing §3.15"
-check skills/sec-review/SKILL.md "k8s-runner" "SKILL.md §3.15 missing k8s-runner reference"
-check skills/sec-review/SKILL.md "__k8s_status__" "SKILL.md §3.15 missing k8s sentinel"
-check skills/sec-review/SKILL.md "kube-score\|kubesec" "SKILL.md §3.15 missing kube-score/kubesec"
+check skills/sec-audit/SKILL.md "### 3.15 Kubernetes admission pass" "SKILL.md missing §3.15"
+check skills/sec-audit/SKILL.md "k8s-runner" "SKILL.md §3.15 missing k8s-runner reference"
+check skills/sec-audit/SKILL.md "__k8s_status__" "SKILL.md §3.15 missing k8s sentinel"
+check skills/sec-audit/SKILL.md "kube-score\|kubesec" "SKILL.md §3.15 missing kube-score/kubesec"
 echo "k8s-orchestrator: SKILL.md §3.15 documents k8s-runner wire-up"
 
 # --- iac inventory + §3.16 (v1.2.0):
-check skills/sec-review/SKILL.md "IaC signals" "SKILL.md §2 missing IaC detection"
-check skills/sec-review/SKILL.md "\"iac\"" "SKILL.md §2 missing iac key"
-check skills/sec-review/SKILL.md "### 3.16 IaC pass" "SKILL.md missing §3.16"
-check skills/sec-review/SKILL.md "iac-runner" "SKILL.md §3.16 missing iac-runner"
-check skills/sec-review/SKILL.md "__iac_status__" "SKILL.md §3.16 missing iac sentinel"
-check skills/sec-review/SKILL.md "tfsec\|checkov" "SKILL.md §3.16 missing tfsec/checkov"
+check skills/sec-audit/SKILL.md "IaC signals" "SKILL.md §2 missing IaC detection"
+check skills/sec-audit/SKILL.md "\"iac\"" "SKILL.md §2 missing iac key"
+check skills/sec-audit/SKILL.md "### 3.16 IaC pass" "SKILL.md missing §3.16"
+check skills/sec-audit/SKILL.md "iac-runner" "SKILL.md §3.16 missing iac-runner"
+check skills/sec-audit/SKILL.md "__iac_status__" "SKILL.md §3.16 missing iac sentinel"
+check skills/sec-audit/SKILL.md "tfsec\|checkov" "SKILL.md §3.16 missing tfsec/checkov"
 echo "iac-orchestrator: SKILL.md §3.16 documents iac-runner wire-up"
 
 # --- gh-actions inventory + §3.17 (v1.3.0):
-check skills/sec-review/SKILL.md "GitHub Actions signals" "SKILL.md §2 missing gh-actions detection"
-check skills/sec-review/SKILL.md "\"gh-actions\"" "SKILL.md §2 missing gh-actions key"
-check skills/sec-review/SKILL.md "### 3.17 GitHub Actions pass" "SKILL.md missing §3.17"
-check skills/sec-review/SKILL.md "gh-actions-runner" "SKILL.md §3.17 missing gh-actions-runner"
-check skills/sec-review/SKILL.md "__gh_actions_status__" "SKILL.md §3.17 missing gh-actions sentinel"
-check skills/sec-review/SKILL.md "actionlint\|zizmor" "SKILL.md §3.17 missing actionlint/zizmor"
+check skills/sec-audit/SKILL.md "GitHub Actions signals" "SKILL.md §2 missing gh-actions detection"
+check skills/sec-audit/SKILL.md "\"gh-actions\"" "SKILL.md §2 missing gh-actions key"
+check skills/sec-audit/SKILL.md "### 3.17 GitHub Actions pass" "SKILL.md missing §3.17"
+check skills/sec-audit/SKILL.md "gh-actions-runner" "SKILL.md §3.17 missing gh-actions-runner"
+check skills/sec-audit/SKILL.md "__gh_actions_status__" "SKILL.md §3.17 missing gh-actions sentinel"
+check skills/sec-audit/SKILL.md "actionlint\|zizmor" "SKILL.md §3.17 missing actionlint/zizmor"
 echo "gh-actions-orchestrator: SKILL.md §3.17 documents gh-actions-runner wire-up"
 
 # --- dispatch discipline (v1.0.0 Stage 1 Task 1.2):
 # SKILL.md §3.0 formally documents multi-stack dispatch + lane-filter semantics.
-check skills/sec-review/SKILL.md "### 3.0 Dispatch discipline" "SKILL.md missing §3.0 Dispatch discipline"
-check skills/sec-review/SKILL.md "Multi-stack dispatch" "SKILL.md §3.0 missing multi-stack documentation"
-check skills/sec-review/SKILL.md "only_lanes\|skip_lanes" "SKILL.md §3.0 missing lane-filter references"
-check skills/sec-review/SKILL.md "COVERAGE.md" "SKILL.md §3.0 missing COVERAGE.md pointer"
+check skills/sec-audit/SKILL.md "### 3.0 Dispatch discipline" "SKILL.md missing §3.0 Dispatch discipline"
+check skills/sec-audit/SKILL.md "Multi-stack dispatch" "SKILL.md §3.0 missing multi-stack documentation"
+check skills/sec-audit/SKILL.md "only_lanes\|skip_lanes" "SKILL.md §3.0 missing lane-filter references"
+check skills/sec-audit/SKILL.md "COVERAGE.md" "SKILL.md §3.0 missing COVERAGE.md pointer"
 echo "dispatch-discipline: SKILL.md §3.0 formalises multi-stack dispatch"
 
 # --- COVERAGE.md presence (v1.0.0 Stage 1 Task 1.1):
-check skills/sec-review/references/COVERAGE.md "^## Lanes" "COVERAGE.md missing Lanes section"
-check skills/sec-review/references/COVERAGE.md "^## Ecosystems" "COVERAGE.md missing Ecosystems section"
-check skills/sec-review/references/COVERAGE.md "^## Skip-reason vocabulary" "COVERAGE.md missing skip-reason vocabulary"
-check skills/sec-review/references/COVERAGE.md "requires-macos-host" "COVERAGE.md missing requires-macos-host"
-check skills/sec-review/references/COVERAGE.md "requires-systemd-host" "COVERAGE.md missing requires-systemd-host"
-check skills/sec-review/references/COVERAGE.md "requires-windows-host" "COVERAGE.md missing requires-windows-host"
+check skills/sec-audit/references/COVERAGE.md "^## Lanes" "COVERAGE.md missing Lanes section"
+check skills/sec-audit/references/COVERAGE.md "^## Ecosystems" "COVERAGE.md missing Ecosystems section"
+check skills/sec-audit/references/COVERAGE.md "^## Skip-reason vocabulary" "COVERAGE.md missing skip-reason vocabulary"
+check skills/sec-audit/references/COVERAGE.md "requires-macos-host" "COVERAGE.md missing requires-macos-host"
+check skills/sec-audit/references/COVERAGE.md "requires-systemd-host" "COVERAGE.md missing requires-systemd-host"
+check skills/sec-audit/references/COVERAGE.md "requires-windows-host" "COVERAGE.md missing requires-windows-host"
 echo "coverage-md: references/COVERAGE.md enumerates all lanes + skip vocabulary"
 
 # --- report-writer per-lane summary (v1.0.0 Stage 1 Task 1.3):
@@ -1221,56 +1221,56 @@ check agents/report-writer.md "Lane filter applied" "report-writer missing Lane-
 echo "per-lane-summary: report-writer renders per-lane summary table + filter metadata"
 
 # --- CLI --only/--skip flags (v1.0.0 Stage 2 Task 2.1):
-check commands/sec-review.md "\-\-only=" "commands/sec-review.md missing --only flag"
-check commands/sec-review.md "\-\-skip=" "commands/sec-review.md missing --skip flag"
-check commands/sec-review.md "mutually exclusive" "commands/sec-review.md missing --only/--skip mutual-exclusion rule"
-check commands/sec-review.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-review.md missing canonical lane list"
-echo "cli-flags: commands/sec-review.md documents --only/--skip with mutual-exclusion"
+check commands/sec-audit.md "\-\-only=" "commands/sec-audit.md missing --only flag"
+check commands/sec-audit.md "\-\-skip=" "commands/sec-audit.md missing --skip flag"
+check commands/sec-audit.md "mutually exclusive" "commands/sec-audit.md missing --only/--skip mutual-exclusion rule"
+check commands/sec-audit.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-audit.md missing canonical lane list"
+echo "cli-flags: commands/sec-audit.md documents --only/--skip with mutual-exclusion"
 
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
 # §3.6 SAST and §3.7 DAST.
-check skills/sec-review/SKILL.md "### 3.8 Browser-extension pass" "SKILL.md missing §3.8"
-check skills/sec-review/SKILL.md "webext-runner" "SKILL.md §3.8 missing webext-runner reference"
-check skills/sec-review/SKILL.md "__webext_status__" "SKILL.md §3.8 missing webext sentinel"
-check skills/sec-review/SKILL.md '__webext_status__.*"unavailable"\|"unavailable".*__webext_status__\|`__webext_status__: "unavailable"`' "SKILL.md §3.8 missing unavailable state (documented)"
-check skills/sec-review/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
+check skills/sec-audit/SKILL.md "### 3.8 Browser-extension pass" "SKILL.md missing §3.8"
+check skills/sec-audit/SKILL.md "webext-runner" "SKILL.md §3.8 missing webext-runner reference"
+check skills/sec-audit/SKILL.md "__webext_status__" "SKILL.md §3.8 missing webext sentinel"
+check skills/sec-audit/SKILL.md '__webext_status__.*"unavailable"\|"unavailable".*__webext_status__\|`__webext_status__: "unavailable"`' "SKILL.md §3.8 missing unavailable state (documented)"
+check skills/sec-audit/SKILL.md '"partial"' "SKILL.md §3.8 missing partial state"
 echo "webext-orchestrator: SKILL.md §3.8 documents webext-runner wire-up"
 
 # --- rust inventory rule (v0.7.0 Stage 1 Task 1.4):
 # SKILL.md §2 must document the Rust detection rule (Cargo.toml +
 # [package] or [workspace]) and emit a `rust` inventory key.
-check skills/sec-review/SKILL.md "Rust / Cargo signals" "SKILL.md §2 missing Rust detection rule"
-check skills/sec-review/SKILL.md "Cargo.toml" "SKILL.md §2 rust rule missing Cargo.toml trigger"
-check skills/sec-review/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing rust key"
-check skills/sec-review/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
+check skills/sec-audit/SKILL.md "Rust / Cargo signals" "SKILL.md §2 missing Rust detection rule"
+check skills/sec-audit/SKILL.md "Cargo.toml" "SKILL.md §2 rust rule missing Cargo.toml trigger"
+check skills/sec-audit/SKILL.md "\"rust\"" "SKILL.md §2 inventory JSON missing rust key"
+check skills/sec-audit/SKILL.md "crates.io" "SKILL.md §2 missing crates.io ecosystem routing"
 echo "rust-inventory: SKILL.md §2 documents rust stack detection"
 
 # --- android inventory rule (v0.8.0 Stage 1 Task 1.5):
 # SKILL.md §2 must document the Android detection rule (AndroidManifest.xml
 # OR com.android.application/library plugin) and emit an `android` key.
-check skills/sec-review/SKILL.md "Android signals" "SKILL.md §2 missing Android detection rule"
-check skills/sec-review/SKILL.md "AndroidManifest.xml" "SKILL.md §2 android rule missing AndroidManifest.xml trigger"
-check skills/sec-review/SKILL.md "\"android\"" "SKILL.md §2 inventory JSON missing android key"
-check skills/sec-review/SKILL.md "com.android.application\|com.android.library" "SKILL.md §2 missing gradle Android plugin trigger"
-check skills/sec-review/SKILL.md "Maven" "SKILL.md §2 missing Maven ecosystem routing"
+check skills/sec-audit/SKILL.md "Android signals" "SKILL.md §2 missing Android detection rule"
+check skills/sec-audit/SKILL.md "AndroidManifest.xml" "SKILL.md §2 android rule missing AndroidManifest.xml trigger"
+check skills/sec-audit/SKILL.md "\"android\"" "SKILL.md §2 inventory JSON missing android key"
+check skills/sec-audit/SKILL.md "com.android.application\|com.android.library" "SKILL.md §2 missing gradle Android plugin trigger"
+check skills/sec-audit/SKILL.md "Maven" "SKILL.md §2 missing Maven ecosystem routing"
 echo "android-inventory: SKILL.md §2 documents android stack detection"
 
 # --- ios inventory rule (v0.9.0 Stage 1 Task 1.5):
-check skills/sec-review/SKILL.md "iOS / Apple-platform signals" "SKILL.md §2 missing iOS detection rule"
-check skills/sec-review/SKILL.md "Info.plist" "SKILL.md §2 ios rule missing Info.plist trigger"
-check skills/sec-review/SKILL.md "xcodeproj\|Package.swift\|Podfile" "SKILL.md §2 missing Xcode/SwiftPM/CocoaPods trigger"
-check skills/sec-review/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing ios key"
-check skills/sec-review/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
+check skills/sec-audit/SKILL.md "iOS / Apple-platform signals" "SKILL.md §2 missing iOS detection rule"
+check skills/sec-audit/SKILL.md "Info.plist" "SKILL.md §2 ios rule missing Info.plist trigger"
+check skills/sec-audit/SKILL.md "xcodeproj\|Package.swift\|Podfile" "SKILL.md §2 missing Xcode/SwiftPM/CocoaPods trigger"
+check skills/sec-audit/SKILL.md "\"ios\"" "SKILL.md §2 inventory JSON missing ios key"
+check skills/sec-audit/SKILL.md "CocoaPods\|SwiftPM" "SKILL.md §2 missing iOS ecosystem routing"
 echo "ios-inventory: SKILL.md §2 documents ios stack detection"
 
 # --- macos inventory rule (v0.11.0 Stage 1 Task 1.5):
-check skills/sec-review/SKILL.md "macOS desktop signals" "SKILL.md §2 missing macOS detection rule"
-check skills/sec-review/SKILL.md "LSMinimumSystemVersion" "SKILL.md §2 macos rule missing LSMinimumSystemVersion trigger"
-check skills/sec-review/SKILL.md "\"macos\"" "SKILL.md §2 inventory JSON missing macos key"
-check skills/sec-review/SKILL.md "Sparkle\|SUFeedURL" "SKILL.md §2 missing Sparkle trigger"
-check skills/sec-review/SKILL.md "\.pkg\|\.dmg" "SKILL.md §2 missing pkg/dmg trigger"
+check skills/sec-audit/SKILL.md "macOS desktop signals" "SKILL.md §2 missing macOS detection rule"
+check skills/sec-audit/SKILL.md "LSMinimumSystemVersion" "SKILL.md §2 macos rule missing LSMinimumSystemVersion trigger"
+check skills/sec-audit/SKILL.md "\"macos\"" "SKILL.md §2 inventory JSON missing macos key"
+check skills/sec-audit/SKILL.md "Sparkle\|SUFeedURL" "SKILL.md §2 missing Sparkle trigger"
+check skills/sec-audit/SKILL.md "\.pkg\|\.dmg" "SKILL.md §2 missing pkg/dmg trigger"
 echo "macos-inventory: SKILL.md §2 documents macos stack detection"
 
 # --- macos fixture-match sanity: synthetic Info.plist with LSMinimumSystemVersion
@@ -1289,11 +1289,11 @@ fi
 echo "macos-inventory: synthetic macOS Info.plist fixture matches §2 detection rule"
 
 # --- windows inventory rule (v0.12.0 Stage 1 Task 1.5):
-check skills/sec-review/SKILL.md "Windows-desktop signals" "SKILL.md §2 missing Windows detection rule"
-check skills/sec-review/SKILL.md "\.csproj\|\.vcxproj\|\.sln" "SKILL.md §2 windows rule missing .NET/C++ project trigger"
-check skills/sec-review/SKILL.md "\.wxs\|AppxManifest\|Package.appxmanifest" "SKILL.md §2 missing WiX/MSIX trigger"
-check skills/sec-review/SKILL.md "\"windows\"" "SKILL.md §2 inventory JSON missing windows key"
-check skills/sec-review/SKILL.md "NuGet" "SKILL.md §2 missing NuGet ecosystem routing"
+check skills/sec-audit/SKILL.md "Windows-desktop signals" "SKILL.md §2 missing Windows detection rule"
+check skills/sec-audit/SKILL.md "\.csproj\|\.vcxproj\|\.sln" "SKILL.md §2 windows rule missing .NET/C++ project trigger"
+check skills/sec-audit/SKILL.md "\.wxs\|AppxManifest\|Package.appxmanifest" "SKILL.md §2 missing WiX/MSIX trigger"
+check skills/sec-audit/SKILL.md "\"windows\"" "SKILL.md §2 inventory JSON missing windows key"
+check skills/sec-audit/SKILL.md "NuGet" "SKILL.md §2 missing NuGet ecosystem routing"
 echo "windows-inventory: SKILL.md §2 documents windows stack detection"
 
 # --- windows fixture-match sanity: synthetic .csproj with PackageReference
@@ -1315,12 +1315,12 @@ fi
 echo "windows-inventory: synthetic .csproj fixture matches §2 detection rule"
 
 # --- linux inventory rule (v0.10.0 Stage 1 Task 1.5):
-check skills/sec-review/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
-check skills/sec-review/SKILL.md "\.service\|\.socket\|\.timer" "SKILL.md §2 linux rule missing systemd unit trigger"
-check skills/sec-review/SKILL.md "debian/control\|debian/rules" "SKILL.md §2 missing Debian packaging trigger"
-check skills/sec-review/SKILL.md "snapcraft.yaml\|flatpak" "SKILL.md §2 missing Snap/Flatpak trigger"
-check skills/sec-review/SKILL.md "\"linux\"" "SKILL.md §2 inventory JSON missing linux key"
-check skills/sec-review/SKILL.md "\"Debian\"\|ecosystem.*Debian" "SKILL.md §2 missing Debian ecosystem routing"
+check skills/sec-audit/SKILL.md "Linux-desktop signals" "SKILL.md §2 missing Linux detection rule"
+check skills/sec-audit/SKILL.md "\.service\|\.socket\|\.timer" "SKILL.md §2 linux rule missing systemd unit trigger"
+check skills/sec-audit/SKILL.md "debian/control\|debian/rules" "SKILL.md §2 missing Debian packaging trigger"
+check skills/sec-audit/SKILL.md "snapcraft.yaml\|flatpak" "SKILL.md §2 missing Snap/Flatpak trigger"
+check skills/sec-audit/SKILL.md "\"linux\"" "SKILL.md §2 inventory JSON missing linux key"
+check skills/sec-audit/SKILL.md "\"Debian\"\|ecosystem.*Debian" "SKILL.md §2 missing Debian ecosystem routing"
 echo "linux-inventory: SKILL.md §2 documents linux stack detection"
 
 # --- linux fixture-match sanity: synthetic .service
@@ -1382,58 +1382,58 @@ echo "android-inventory: synthetic AndroidManifest.xml + build.gradle fixture ma
 # SKILL.md must declare §3.9, reference rust-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
 # §3.6 / §3.7 / §3.8.
-check skills/sec-review/SKILL.md "### 3.9 Rust toolchain pass" "SKILL.md missing §3.9"
-check skills/sec-review/SKILL.md "rust-runner" "SKILL.md §3.9 missing rust-runner reference"
-check skills/sec-review/SKILL.md "__rust_status__" "SKILL.md §3.9 missing rust sentinel"
-check skills/sec-review/SKILL.md "cargo-audit\|cargo audit" "SKILL.md §3.9 missing cargo-audit"
-check skills/sec-review/SKILL.md "cargo-geiger\|cargo geiger" "SKILL.md §3.9 missing cargo-geiger"
+check skills/sec-audit/SKILL.md "### 3.9 Rust toolchain pass" "SKILL.md missing §3.9"
+check skills/sec-audit/SKILL.md "rust-runner" "SKILL.md §3.9 missing rust-runner reference"
+check skills/sec-audit/SKILL.md "__rust_status__" "SKILL.md §3.9 missing rust sentinel"
+check skills/sec-audit/SKILL.md "cargo-audit\|cargo audit" "SKILL.md §3.9 missing cargo-audit"
+check skills/sec-audit/SKILL.md "cargo-geiger\|cargo geiger" "SKILL.md §3.9 missing cargo-geiger"
 echo "rust-orchestrator: SKILL.md §3.9 documents rust-runner wire-up"
 
 # --- orchestrator §3.10 wire-up (v0.8.0 Stage 2 Task 2.2):
-check skills/sec-review/SKILL.md "### 3.10 Android pass" "SKILL.md missing §3.10"
-check skills/sec-review/SKILL.md "android-runner" "SKILL.md §3.10 missing android-runner reference"
-check skills/sec-review/SKILL.md "__android_status__" "SKILL.md §3.10 missing android sentinel"
-check skills/sec-review/SKILL.md "mobsfscan" "SKILL.md §3.10 missing mobsfscan"
-check skills/sec-review/SKILL.md "apkleaks" "SKILL.md §3.10 missing apkleaks"
-check skills/sec-review/SKILL.md "no-apk\|Clean-skip" "SKILL.md §3.10 missing clean-skip documentation"
+check skills/sec-audit/SKILL.md "### 3.10 Android pass" "SKILL.md missing §3.10"
+check skills/sec-audit/SKILL.md "android-runner" "SKILL.md §3.10 missing android-runner reference"
+check skills/sec-audit/SKILL.md "__android_status__" "SKILL.md §3.10 missing android sentinel"
+check skills/sec-audit/SKILL.md "mobsfscan" "SKILL.md §3.10 missing mobsfscan"
+check skills/sec-audit/SKILL.md "apkleaks" "SKILL.md §3.10 missing apkleaks"
+check skills/sec-audit/SKILL.md "no-apk\|Clean-skip" "SKILL.md §3.10 missing clean-skip documentation"
 echo "android-orchestrator: SKILL.md §3.10 documents android-runner wire-up"
 
 # --- orchestrator §3.11 wire-up (v0.9.0 Stage 2 Task 2.2):
-check skills/sec-review/SKILL.md "### 3.11 iOS pass" "SKILL.md missing §3.11"
-check skills/sec-review/SKILL.md "ios-runner" "SKILL.md §3.11 missing ios-runner reference"
-check skills/sec-review/SKILL.md "__ios_status__" "SKILL.md §3.11 missing ios sentinel"
-check skills/sec-review/SKILL.md "requires-macos-host" "SKILL.md §3.11 missing macOS-host clean-skip reason"
-check skills/sec-review/SKILL.md "codesign" "SKILL.md §3.11 missing codesign"
-check skills/sec-review/SKILL.md "notarytool" "SKILL.md §3.11 missing notarytool"
+check skills/sec-audit/SKILL.md "### 3.11 iOS pass" "SKILL.md missing §3.11"
+check skills/sec-audit/SKILL.md "ios-runner" "SKILL.md §3.11 missing ios-runner reference"
+check skills/sec-audit/SKILL.md "__ios_status__" "SKILL.md §3.11 missing ios sentinel"
+check skills/sec-audit/SKILL.md "requires-macos-host" "SKILL.md §3.11 missing macOS-host clean-skip reason"
+check skills/sec-audit/SKILL.md "codesign" "SKILL.md §3.11 missing codesign"
+check skills/sec-audit/SKILL.md "notarytool" "SKILL.md §3.11 missing notarytool"
 echo "ios-orchestrator: SKILL.md §3.11 documents ios-runner wire-up"
 
 # --- orchestrator §3.12 wire-up (v0.10.0 Stage 2 Task 2.2):
-check skills/sec-review/SKILL.md "### 3.12 Desktop Linux pass" "SKILL.md missing §3.12"
-check skills/sec-review/SKILL.md "linux-runner" "SKILL.md §3.12 missing linux-runner reference"
-check skills/sec-review/SKILL.md "__linux_status__" "SKILL.md §3.12 missing linux sentinel"
-check skills/sec-review/SKILL.md "requires-systemd-host" "SKILL.md §3.12 missing systemd-host clean-skip reason"
-check skills/sec-review/SKILL.md "systemd-analyze" "SKILL.md §3.12 missing systemd-analyze"
-check skills/sec-review/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
-check skills/sec-review/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
+check skills/sec-audit/SKILL.md "### 3.12 Desktop Linux pass" "SKILL.md missing §3.12"
+check skills/sec-audit/SKILL.md "linux-runner" "SKILL.md §3.12 missing linux-runner reference"
+check skills/sec-audit/SKILL.md "__linux_status__" "SKILL.md §3.12 missing linux sentinel"
+check skills/sec-audit/SKILL.md "requires-systemd-host" "SKILL.md §3.12 missing systemd-host clean-skip reason"
+check skills/sec-audit/SKILL.md "systemd-analyze" "SKILL.md §3.12 missing systemd-analyze"
+check skills/sec-audit/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
+check skills/sec-audit/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
 echo "linux-orchestrator: SKILL.md §3.12 documents linux-runner wire-up"
 
 # --- orchestrator §3.13 wire-up (v0.11.0 Stage 2 Task 2.2):
-check skills/sec-review/SKILL.md "### 3.13 Desktop macOS pass" "SKILL.md missing §3.13"
-check skills/sec-review/SKILL.md "macos-runner" "SKILL.md §3.13 missing macos-runner reference"
-check skills/sec-review/SKILL.md "__macos_status__" "SKILL.md §3.13 missing macos sentinel"
-check skills/sec-review/SKILL.md "pkgutil" "SKILL.md §3.13 missing pkgutil"
-check skills/sec-review/SKILL.md "stapler" "SKILL.md §3.13 missing stapler"
-check skills/sec-review/SKILL.md "no-pkg" "SKILL.md §3.13 missing no-pkg clean-skip reason"
+check skills/sec-audit/SKILL.md "### 3.13 Desktop macOS pass" "SKILL.md missing §3.13"
+check skills/sec-audit/SKILL.md "macos-runner" "SKILL.md §3.13 missing macos-runner reference"
+check skills/sec-audit/SKILL.md "__macos_status__" "SKILL.md §3.13 missing macos sentinel"
+check skills/sec-audit/SKILL.md "pkgutil" "SKILL.md §3.13 missing pkgutil"
+check skills/sec-audit/SKILL.md "stapler" "SKILL.md §3.13 missing stapler"
+check skills/sec-audit/SKILL.md "no-pkg" "SKILL.md §3.13 missing no-pkg clean-skip reason"
 echo "macos-orchestrator: SKILL.md §3.13 documents macos-runner wire-up"
 
 # --- orchestrator §3.14 wire-up (v0.12.0 Stage 2 Task 2.2):
-check skills/sec-review/SKILL.md "### 3.14 Desktop Windows pass" "SKILL.md missing §3.14"
-check skills/sec-review/SKILL.md "windows-runner" "SKILL.md §3.14 missing windows-runner reference"
-check skills/sec-review/SKILL.md "__windows_status__" "SKILL.md §3.14 missing windows sentinel"
-check skills/sec-review/SKILL.md "requires-windows-host" "SKILL.md §3.14 missing Windows-host clean-skip reason"
-check skills/sec-review/SKILL.md "binskim" "SKILL.md §3.14 missing binskim"
-check skills/sec-review/SKILL.md "osslsigncode\|sigcheck" "SKILL.md §3.14 missing osslsigncode/sigcheck"
-check skills/sec-review/SKILL.md "no-pe" "SKILL.md §3.14 missing no-pe clean-skip reason"
+check skills/sec-audit/SKILL.md "### 3.14 Desktop Windows pass" "SKILL.md missing §3.14"
+check skills/sec-audit/SKILL.md "windows-runner" "SKILL.md §3.14 missing windows-runner reference"
+check skills/sec-audit/SKILL.md "__windows_status__" "SKILL.md §3.14 missing windows sentinel"
+check skills/sec-audit/SKILL.md "requires-windows-host" "SKILL.md §3.14 missing Windows-host clean-skip reason"
+check skills/sec-audit/SKILL.md "binskim" "SKILL.md §3.14 missing binskim"
+check skills/sec-audit/SKILL.md "osslsigncode\|sigcheck" "SKILL.md §3.14 missing osslsigncode/sigcheck"
+check skills/sec-audit/SKILL.md "no-pe" "SKILL.md §3.14 missing no-pe clean-skip reason"
 echo "windows-orchestrator: SKILL.md §3.14 documents windows-runner wire-up"
 
 # --- rust fixture-match sanity: synthetic Cargo.toml must match rule
@@ -1470,14 +1470,14 @@ fi
 echo "webext-inventory: synthetic manifest.json fixture matches §2 detection rule"
 
 # --- virt inventory + §3.18 (v1.4.0):
-check skills/sec-review/SKILL.md "Virtualization / alternative-runtime signals" "SKILL.md §2 missing virt detection"
-check skills/sec-review/SKILL.md "\"virt\"" "SKILL.md §2 inventory JSON missing virt key"
-check skills/sec-review/SKILL.md "### 3.18 Virtualization pass" "SKILL.md missing §3.18"
-check skills/sec-review/SKILL.md "virt-runner" "SKILL.md §3.18 missing virt-runner"
-check skills/sec-review/SKILL.md "__virt_status__" "SKILL.md §3.18 missing virt sentinel"
-check skills/sec-review/SKILL.md "hadolint\|virt-xml-validate" "SKILL.md §3.18 missing hadolint/virt-xml-validate"
-check skills/sec-review/SKILL.md "no-containerfile" "SKILL.md §3.18 missing no-containerfile clean-skip reason"
-check skills/sec-review/SKILL.md "no-libvirt-xml" "SKILL.md §3.18 missing no-libvirt-xml clean-skip reason"
+check skills/sec-audit/SKILL.md "Virtualization / alternative-runtime signals" "SKILL.md §2 missing virt detection"
+check skills/sec-audit/SKILL.md "\"virt\"" "SKILL.md §2 inventory JSON missing virt key"
+check skills/sec-audit/SKILL.md "### 3.18 Virtualization pass" "SKILL.md missing §3.18"
+check skills/sec-audit/SKILL.md "virt-runner" "SKILL.md §3.18 missing virt-runner"
+check skills/sec-audit/SKILL.md "__virt_status__" "SKILL.md §3.18 missing virt sentinel"
+check skills/sec-audit/SKILL.md "hadolint\|virt-xml-validate" "SKILL.md §3.18 missing hadolint/virt-xml-validate"
+check skills/sec-audit/SKILL.md "no-containerfile" "SKILL.md §3.18 missing no-containerfile clean-skip reason"
+check skills/sec-audit/SKILL.md "no-libvirt-xml" "SKILL.md §3.18 missing no-libvirt-xml clean-skip reason"
 echo "virt-orchestrator: SKILL.md §3.18 documents virt-runner wire-up"
 
 # --- virt fixture-match sanity: synthetic Dockerfile + libvirt domain XML.
@@ -1556,13 +1556,13 @@ fi
 echo "virt negative-test: malformed skipped-list entry correctly rejected"
 
 # --- go inventory + §3.19 (v1.5.0):
-check skills/sec-review/SKILL.md "Go signals" "SKILL.md §2 missing go detection"
-check skills/sec-review/SKILL.md "\"go\"" "SKILL.md §2 inventory JSON missing go key"
-check skills/sec-review/SKILL.md "### 3.19 Go pass" "SKILL.md missing §3.19"
-check skills/sec-review/SKILL.md "go-runner" "SKILL.md §3.19 missing go-runner"
-check skills/sec-review/SKILL.md "__go_status__" "SKILL.md §3.19 missing go sentinel"
-check skills/sec-review/SKILL.md "gosec\|staticcheck" "SKILL.md §3.19 missing gosec/staticcheck"
-check skills/sec-review/SKILL.md "ecosystem.*Go\|\"Go\"" "SKILL.md §2 missing Go ecosystem routing"
+check skills/sec-audit/SKILL.md "Go signals" "SKILL.md §2 missing go detection"
+check skills/sec-audit/SKILL.md "\"go\"" "SKILL.md §2 inventory JSON missing go key"
+check skills/sec-audit/SKILL.md "### 3.19 Go pass" "SKILL.md missing §3.19"
+check skills/sec-audit/SKILL.md "go-runner" "SKILL.md §3.19 missing go-runner"
+check skills/sec-audit/SKILL.md "__go_status__" "SKILL.md §3.19 missing go sentinel"
+check skills/sec-audit/SKILL.md "gosec\|staticcheck" "SKILL.md §3.19 missing gosec/staticcheck"
+check skills/sec-audit/SKILL.md "ecosystem.*Go\|\"Go\"" "SKILL.md §2 missing Go ecosystem routing"
 echo "go-orchestrator: SKILL.md §3.19 documents go-runner wire-up"
 
 # --- go fixture-match sanity: synthetic go.mod + main.go.
@@ -1640,13 +1640,13 @@ fi
 echo "go negative-test: malformed skipped-list entry correctly rejected"
 
 # --- shell inventory + §3.20 (v1.6.0):
-check skills/sec-review/SKILL.md "Shell signals" "SKILL.md §2 missing shell detection"
-check skills/sec-review/SKILL.md "\"shell\"" "SKILL.md §2 inventory JSON missing shell key"
-check skills/sec-review/SKILL.md "### 3.20 Shell pass" "SKILL.md missing §3.20"
-check skills/sec-review/SKILL.md "shell-runner" "SKILL.md §3.20 missing shell-runner"
-check skills/sec-review/SKILL.md "__shell_status__" "SKILL.md §3.20 missing shell sentinel"
-check skills/sec-review/SKILL.md "shellcheck" "SKILL.md §3.20 missing shellcheck"
-check skills/sec-review/SKILL.md "no-shell-source" "SKILL.md §3.20 missing no-shell-source clean-skip reason"
+check skills/sec-audit/SKILL.md "Shell signals" "SKILL.md §2 missing shell detection"
+check skills/sec-audit/SKILL.md "\"shell\"" "SKILL.md §2 inventory JSON missing shell key"
+check skills/sec-audit/SKILL.md "### 3.20 Shell pass" "SKILL.md missing §3.20"
+check skills/sec-audit/SKILL.md "shell-runner" "SKILL.md §3.20 missing shell-runner"
+check skills/sec-audit/SKILL.md "__shell_status__" "SKILL.md §3.20 missing shell sentinel"
+check skills/sec-audit/SKILL.md "shellcheck" "SKILL.md §3.20 missing shellcheck"
+check skills/sec-audit/SKILL.md "no-shell-source" "SKILL.md §3.20 missing no-shell-source clean-skip reason"
 echo "shell-orchestrator: SKILL.md §3.20 documents shell-runner wire-up"
 
 # --- shell fixture-match sanity: synthetic *.sh
@@ -1715,13 +1715,13 @@ fi
 echo "shell negative-test: malformed skipped-list entry correctly rejected"
 
 # --- python inventory + §3.21 (v1.7.0):
-check skills/sec-review/SKILL.md "Python signals" "SKILL.md §2 missing python detection"
-check skills/sec-review/SKILL.md "\"python\"" "SKILL.md §2 inventory JSON missing python key"
-check skills/sec-review/SKILL.md "### 3.21 Python pass" "SKILL.md missing §3.21"
-check skills/sec-review/SKILL.md "python-runner" "SKILL.md §3.21 missing python-runner"
-check skills/sec-review/SKILL.md "__python_status__" "SKILL.md §3.21 missing python sentinel"
-check skills/sec-review/SKILL.md "pip-audit\|ruff" "SKILL.md §3.21 missing pip-audit/ruff"
-check skills/sec-review/SKILL.md "no-requirements" "SKILL.md §3.21 missing no-requirements clean-skip reason"
+check skills/sec-audit/SKILL.md "Python signals" "SKILL.md §2 missing python detection"
+check skills/sec-audit/SKILL.md "\"python\"" "SKILL.md §2 inventory JSON missing python key"
+check skills/sec-audit/SKILL.md "### 3.21 Python pass" "SKILL.md missing §3.21"
+check skills/sec-audit/SKILL.md "python-runner" "SKILL.md §3.21 missing python-runner"
+check skills/sec-audit/SKILL.md "__python_status__" "SKILL.md §3.21 missing python sentinel"
+check skills/sec-audit/SKILL.md "pip-audit\|ruff" "SKILL.md §3.21 missing pip-audit/ruff"
+check skills/sec-audit/SKILL.md "no-requirements" "SKILL.md §3.21 missing no-requirements clean-skip reason"
 echo "python-orchestrator: SKILL.md §3.21 documents python-runner wire-up"
 
 # --- python fixture-match sanity: synthetic requirements.txt + *.py
@@ -1792,13 +1792,13 @@ fi
 echo "python negative-test: malformed skipped-list entry correctly rejected"
 
 # --- ansible inventory + §3.22 (v1.8.0):
-check skills/sec-review/SKILL.md "Ansible signals" "SKILL.md §2 missing ansible detection"
-check skills/sec-review/SKILL.md "\"ansible\"" "SKILL.md §2 inventory JSON missing ansible key"
-check skills/sec-review/SKILL.md "### 3.22 Ansible pass" "SKILL.md missing §3.22"
-check skills/sec-review/SKILL.md "ansible-runner" "SKILL.md §3.22 missing ansible-runner"
-check skills/sec-review/SKILL.md "__ansible_status__" "SKILL.md §3.22 missing ansible sentinel"
-check skills/sec-review/SKILL.md "ansible-lint" "SKILL.md §3.22 missing ansible-lint"
-check skills/sec-review/SKILL.md "no-playbook" "SKILL.md §3.22 missing no-playbook clean-skip reason"
+check skills/sec-audit/SKILL.md "Ansible signals" "SKILL.md §2 missing ansible detection"
+check skills/sec-audit/SKILL.md "\"ansible\"" "SKILL.md §2 inventory JSON missing ansible key"
+check skills/sec-audit/SKILL.md "### 3.22 Ansible pass" "SKILL.md missing §3.22"
+check skills/sec-audit/SKILL.md "ansible-runner" "SKILL.md §3.22 missing ansible-runner"
+check skills/sec-audit/SKILL.md "__ansible_status__" "SKILL.md §3.22 missing ansible sentinel"
+check skills/sec-audit/SKILL.md "ansible-lint" "SKILL.md §3.22 missing ansible-lint"
+check skills/sec-audit/SKILL.md "no-playbook" "SKILL.md §3.22 missing no-playbook clean-skip reason"
 echo "ansible-orchestrator: SKILL.md §3.22 documents ansible-runner wire-up"
 
 # --- ansible fixture-match sanity: synthetic playbook YAML
@@ -1870,13 +1870,13 @@ fi
 echo "ansible negative-test: malformed skipped-list entry correctly rejected"
 
 # --- netcfg inventory + §3.23 (v1.9.0):
-check skills/sec-review/SKILL.md "Networking-as-code signals" "SKILL.md §2 missing netcfg detection"
-check skills/sec-review/SKILL.md "\"netcfg\"" "SKILL.md §2 inventory JSON missing netcfg key"
-check skills/sec-review/SKILL.md "### 3.23 Networking-as-code pass" "SKILL.md missing §3.23"
-check skills/sec-review/SKILL.md "netcfg-runner" "SKILL.md §3.23 missing netcfg-runner"
-check skills/sec-review/SKILL.md "__netcfg_status__" "SKILL.md §3.23 missing netcfg sentinel"
-check skills/sec-review/SKILL.md "sing-box check\|xray test" "SKILL.md §3.23 missing sing-box check / xray test"
-check skills/sec-review/SKILL.md "no-singbox-config\|no-xray-config" "SKILL.md §3.23 missing target-shape skip reasons"
+check skills/sec-audit/SKILL.md "Networking-as-code signals" "SKILL.md §2 missing netcfg detection"
+check skills/sec-audit/SKILL.md "\"netcfg\"" "SKILL.md §2 inventory JSON missing netcfg key"
+check skills/sec-audit/SKILL.md "### 3.23 Networking-as-code pass" "SKILL.md missing §3.23"
+check skills/sec-audit/SKILL.md "netcfg-runner" "SKILL.md §3.23 missing netcfg-runner"
+check skills/sec-audit/SKILL.md "__netcfg_status__" "SKILL.md §3.23 missing netcfg sentinel"
+check skills/sec-audit/SKILL.md "sing-box check\|xray test" "SKILL.md §3.23 missing sing-box check / xray test"
+check skills/sec-audit/SKILL.md "no-singbox-config\|no-xray-config" "SKILL.md §3.23 missing target-shape skip reasons"
 echo "netcfg-orchestrator: SKILL.md §3.23 documents netcfg-runner wire-up"
 
 # --- netcfg fixture-match sanity: synthetic torrc + WG conf + sing-box JSON + xray JSON
@@ -1962,14 +1962,14 @@ fi
 echo "netcfg negative-test: malformed skipped-list entry correctly rejected"
 
 # --- image inventory + §3.24 (v1.11.0):
-check skills/sec-review/SKILL.md "Image artifact signals" "SKILL.md §2 missing image detection"
-check skills/sec-review/SKILL.md "\"image\"" "SKILL.md §2 inventory JSON missing image key"
-check skills/sec-review/SKILL.md "### 3.24 Image vulnerability pass" "SKILL.md missing §3.24"
-check skills/sec-review/SKILL.md "image-runner" "SKILL.md §3.24 missing image-runner"
-check skills/sec-review/SKILL.md "__image_status__" "SKILL.md §3.24 missing image sentinel"
-check skills/sec-review/SKILL.md "trivy\|grype" "SKILL.md §3.24 missing trivy/grype"
-check skills/sec-review/SKILL.md "no-image-artifact" "SKILL.md §3.24 missing no-image-artifact clean-skip reason"
-check skills/sec-review/SKILL.md "Docker Scout" "SKILL.md §3.24 missing Docker Scout positioning"
+check skills/sec-audit/SKILL.md "Image artifact signals" "SKILL.md §2 missing image detection"
+check skills/sec-audit/SKILL.md "\"image\"" "SKILL.md §2 inventory JSON missing image key"
+check skills/sec-audit/SKILL.md "### 3.24 Image vulnerability pass" "SKILL.md missing §3.24"
+check skills/sec-audit/SKILL.md "image-runner" "SKILL.md §3.24 missing image-runner"
+check skills/sec-audit/SKILL.md "__image_status__" "SKILL.md §3.24 missing image sentinel"
+check skills/sec-audit/SKILL.md "trivy\|grype" "SKILL.md §3.24 missing trivy/grype"
+check skills/sec-audit/SKILL.md "no-image-artifact" "SKILL.md §3.24 missing no-image-artifact clean-skip reason"
+check skills/sec-audit/SKILL.md "Docker Scout" "SKILL.md §3.24 missing Docker Scout positioning"
 echo "image-orchestrator: SKILL.md §3.24 documents image-runner wire-up"
 
 # --- image fixture-match sanity: synthetic SBOM + image tarball reference
@@ -2036,30 +2036,30 @@ sys.exit(1 if errs else 0)
 fi
 echo "image negative-test: malformed skipped-list entry correctly rejected"
 
-# --- v1.10 default-cwd UX (commands/sec-review.md):
-check commands/sec-review.md "Default-target behaviour" "commands/sec-review.md missing v1.10 default-target section"
-check commands/sec-review.md "current working directory" "commands/sec-review.md missing default-to-cwd rule"
-check commands/sec-review.md "Reviewing \`\$PWD\`\|Reviewing.*\$PWD" "commands/sec-review.md missing canonical cwd-confirmation line"
-echo "v1.10-default-cwd: commands/sec-review.md documents the default-to-cwd rule"
+# --- v1.10 default-cwd UX (commands/sec-audit.md):
+check commands/sec-audit.md "Default-target behaviour" "commands/sec-audit.md missing v1.10 default-target section"
+check commands/sec-audit.md "current working directory" "commands/sec-audit.md missing default-to-cwd rule"
+check commands/sec-audit.md "Reviewing \`\$PWD\`\|Reviewing.*\$PWD" "commands/sec-audit.md missing canonical cwd-confirmation line"
+echo "v1.10-default-cwd: commands/sec-audit.md documents the default-to-cwd rule"
 
 # --- v1.10 default-cwd UX (skill SKILL.md §1):
-check skills/sec-review/SKILL.md "Default-to-cwd (v1.10.0+)\|Default-to-cwd" "SKILL.md §1 missing v1.10 default-to-cwd bullet"
-check skills/sec-review/SKILL.md "Default behaviour (v1.10.0+)\|when invoked without a positional path argument" "SKILL.md Inputs missing v1.10 default-to-cwd doc"
+check skills/sec-audit/SKILL.md "Default-to-cwd (v1.10.0+)\|Default-to-cwd" "SKILL.md §1 missing v1.10 default-to-cwd bullet"
+check skills/sec-audit/SKILL.md "Default behaviour (v1.10.0+)\|when invoked without a positional path argument" "SKILL.md Inputs missing v1.10 default-to-cwd doc"
 echo "v1.10-default-cwd: SKILL.md §1 documents the default-to-cwd contract"
 
 # --- v1.10 uncovered-tech detection registry:
-check skills/sec-review/references/uncovered-tech-fingerprints.md "^## Detection entries" "uncovered-tech-fingerprints.md missing Detection entries section"
-check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`java\`" "uncovered-tech-fingerprints.md missing Java entry"
-check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`cpp\`" "uncovered-tech-fingerprints.md missing C/C++ entry"
-check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`solidity\`" "uncovered-tech-fingerprints.md missing Solidity entry"
-check skills/sec-review/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`php\`" "uncovered-tech-fingerprints.md missing PHP entry"
-check skills/sec-review/references/uncovered-tech-fingerprints.md "spotbugs\|find-sec-bugs" "uncovered-tech-fingerprints.md missing Java tooling"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "^## Detection entries" "uncovered-tech-fingerprints.md missing Detection entries section"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`java\`" "uncovered-tech-fingerprints.md missing Java entry"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`cpp\`" "uncovered-tech-fingerprints.md missing C/C++ entry"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`solidity\`" "uncovered-tech-fingerprints.md missing Solidity entry"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "suggested_lane:.*\`php\`" "uncovered-tech-fingerprints.md missing PHP entry"
+check skills/sec-audit/references/uncovered-tech-fingerprints.md "spotbugs\|find-sec-bugs" "uncovered-tech-fingerprints.md missing Java tooling"
 echo "v1.10-uncovered-tech: references/uncovered-tech-fingerprints.md catalogues 16 known-but-uncovered technologies"
 
 # --- v1.10 SKILL.md §2 uncovered-tech subsection:
-check skills/sec-review/SKILL.md "Uncovered-technology detection (v1.10.0+)" "SKILL.md §2 missing uncovered-tech detection subsection"
-check skills/sec-review/SKILL.md "uncovered_tech" "SKILL.md §2 missing uncovered_tech array reference"
-check skills/sec-review/SKILL.md "uncovered-tech-fingerprints.md" "SKILL.md §2 missing fingerprint registry pointer"
+check skills/sec-audit/SKILL.md "Uncovered-technology detection (v1.10.0+)" "SKILL.md §2 missing uncovered-tech detection subsection"
+check skills/sec-audit/SKILL.md "uncovered_tech" "SKILL.md §2 missing uncovered_tech array reference"
+check skills/sec-audit/SKILL.md "uncovered-tech-fingerprints.md" "SKILL.md §2 missing fingerprint registry pointer"
 echo "v1.10-uncovered-tech: SKILL.md §2 documents uncovered-technology detection"
 
 # --- v1.10 report-writer Step 5.5 wire-up:

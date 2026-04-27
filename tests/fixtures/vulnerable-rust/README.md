@@ -1,6 +1,6 @@
 # vulnerable-rust fixture
 
-Minimal Cargo project used by the sec-review Rust lane's E2E assertions
+Minimal Cargo project used by the sec-audit Rust lane's E2E assertions
 (Stage 2 Task 2.3 of v0.7.0).
 
 ## Intentional findings

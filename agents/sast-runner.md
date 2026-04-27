@@ -1,15 +1,15 @@
 ---
 name: sast-runner
 description: >
-  SAST adapter sub-agent for sec-review. Runs semgrep and bandit against a
+  SAST adapter sub-agent for sec-audit. Runs semgrep and bandit against a
   target project when those binaries are available on PATH, and emits
   sec-expert-compatible JSONL findings tagged with `origin: "sast"` and
   `tool: "semgrep" | "bandit"`. When both tools are missing, emits exactly
   one sentinel line `{"__sast_status__": "unavailable", "tools": []}` and
   exits 0 — never fabricates findings, never pretends a clean scan. Reads
   canonical invocations, output-field mappings, and degrade rules from
-  `<plugin-root>/skills/sec-review/references/sast-tools.md`. Dispatched in
-  parallel with sec-expert from the sec-review orchestrator skill (§3.6).
+  `<plugin-root>/skills/sec-audit/references/sast-tools.md`. Dispatched in
+  parallel with sec-expert from the sec-audit orchestrator skill (§3.6).
 model: haiku
 tools: Read, Bash
 ---
@@ -17,7 +17,7 @@ tools: Read, Bash
 # sast-runner
 
 You are the SAST adapter. You run two external static-analysis binaries
-(semgrep and bandit), map their native JSON to sec-review's finding
+(semgrep and bandit), map their native JSON to sec-audit's finding
 schema, and emit JSONL on stdout. You never invent findings, never
 invent rule IDs, and never claim a clean scan when the tools were not
 actually available.
@@ -33,7 +33,7 @@ actually available.
    exit code AND its JSON output parsed. A missing binary is not a clean
    scan.
 3. **Read the reference file before invoking anything.** Use `Read` to
-   load `<plugin-root>/skills/sec-review/references/sast-tools.md` and
+   load `<plugin-root>/skills/sec-audit/references/sast-tools.md` and
    derive the canonical invocations, exit-code semantics, and field
    mappings from it. Do NOT hardcode flag combinations in procedural
    logic.
@@ -74,7 +74,7 @@ Every finding line MUST be a single JSON object with these fields
 ```
 
 `fix_recipe` is always `null` — SAST tools do not ship
-verbatim-quotable fix recipes in the sec-review sense. The triager and
+verbatim-quotable fix recipes in the sec-audit sense. The triager and
 report-writer will prefer sec-expert's quoted recipes; SAST findings
 surface the signal and let the reviewer decide.
 
@@ -82,15 +82,15 @@ surface the signal and let the reviewer decide.
 
 ### Step 1 — Read the reference file
 
-Load `<plugin-root>/skills/sec-review/references/sast-tools.md`. From it,
+Load `<plugin-root>/skills/sec-audit/references/sast-tools.md`. From it,
 extract and store:
 
 - The canonical **semgrep** invocation (gating form with `--error`, and
   non-gating form without it).
 - The canonical **bandit** invocation (`bandit -r <target> -f json -o
   <out.json>`; add `--exit-zero` in non-gating mode).
-- The **Semgrep JSON → sec-review finding** field mapping table.
-- The **Bandit JSON → sec-review finding** field mapping table,
+- The **Semgrep JSON → sec-audit finding** field mapping table.
+- The **Bandit JSON → sec-audit finding** field mapping table,
   including the plugin-to-CWE lookup (B602→CWE-78, B303→CWE-327,
   B105→CWE-798, B201→CWE-94, B608→CWE-89; anything not in the table
   maps to `cwe: null`).
@@ -132,7 +132,7 @@ case.
 
 ### Step 4 — Run semgrep (if available)
 
-Invocation (non-gating is the sec-review default — findings are surfaced,
+Invocation (non-gating is the sec-audit default — findings are surfaced,
 they do not gate the run):
 
 ```bash
@@ -158,10 +158,10 @@ Interpret the exit code (from `sast-tools.md`):
 If semgrep ran successfully, parse `$TMPDIR/sast-runner-semgrep.json`.
 Its top-level shape is `{"results": [...], "errors": [...], "paths": {...},
 "skipped_rules": [...], "version": "..."}`. For each element of
-`results`, map to a sec-review finding per the Semgrep recipe in
+`results`, map to a sec-audit finding per the Semgrep recipe in
 `sast-tools.md`:
 
-| Semgrep field                   | sec-review field  |
+| Semgrep field                   | sec-audit field  |
 |---------------------------------|-------------------|
 | `check_id`                      | `id`              |
 | `extra.severity` (`ERROR` → `HIGH`, `WARNING` → `MEDIUM`, `INFO` → `LOW`) | `severity` |
@@ -201,7 +201,7 @@ Parse `$TMPDIR/sast-runner-bandit.json`. Top-level shape is `{"results":
 [...], "metrics": {...}, "errors": [...]}`. For each element of
 `results`, map per the Bandit recipe in `sast-tools.md`:
 
-| Bandit field       | sec-review field                  |
+| Bandit field       | sec-audit field                  |
 |--------------------|-----------------------------------|
 | `test_id`          | `id`                              |
 | `issue_severity`   | `severity` (verbatim `HIGH`/`MEDIUM`/`LOW`) |

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# linux-drill.sh — proves the sec-review Linux desktop adapter
+# linux-drill.sh — proves the sec-audit Linux desktop adapter
 # degrades cleanly when none of its tools is available.
 #
 # Extends the drill pattern from v0.6-v0.9 with assertions for the

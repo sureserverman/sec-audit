@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# android-drill.sh — proves the sec-review Android adapter degrades
+# android-drill.sh — proves the sec-audit Android adapter degrades
 # cleanly when none of mobsfscan / apkleaks / android-lint is on PATH.
 #
 # Strategy mirrors sast-drill.sh / dast-drill.sh / webext-drill.sh /
