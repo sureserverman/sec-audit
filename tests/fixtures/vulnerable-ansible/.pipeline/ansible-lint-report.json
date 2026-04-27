@@ -1,0 +1,8 @@
+[
+  {"check_name":"partial-become","message":"Top-level `become: yes` escalates the entire play; scope to specific tasks instead.","location":{"path":"playbook.yml","lines":{"begin":{"line":12}}},"severity":"major","categories":["security"]},
+  {"check_name":"package-latest","message":"Package installs should not use latest.","location":{"path":"playbook.yml","lines":{"begin":{"line":21}}},"severity":"minor","categories":["idempotency"]},
+  {"check_name":"risky-shell-pipe","message":"Shells that use pipes should set the pipefail option","location":{"path":"playbook.yml","lines":{"begin":{"line":24}}},"severity":"major","categories":["security"]},
+  {"check_name":"command-instead-of-module","message":"Use systemd module instead of running systemctl","location":{"path":"playbook.yml","lines":{"begin":{"line":27}}},"severity":"minor","categories":["idempotency"]},
+  {"check_name":"no-changed-when","message":"Commands should not change things if nothing needs doing","location":{"path":"playbook.yml","lines":{"begin":{"line":27}}},"severity":"minor","categories":["idempotency"]},
+  {"check_name":"no-log-password","message":"password should use no_log","location":{"path":"playbook.yml","lines":{"begin":{"line":33}}},"severity":"major","categories":["security"]}
+]

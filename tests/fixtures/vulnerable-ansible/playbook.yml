@@ -1,0 +1,35 @@
+---
+# Intentionally insecure Ansible playbook — fixture for ansible-runner / ansible-lint.
+# Carries multiple findings:
+#   risky-shell-pipe (shell with | and no pipefail)
+#   command-instead-of-shell (could use module)
+#   command-instead-of-module (using command for systemctl)
+#   no-changed-when (command without changed_when)
+#   no-log-password (password handling without no_log)
+#   package-latest (state=latest)
+#   partial-become (top-level become with no scoping)
+
+- hosts: webservers
+  become: yes              # play-level become — partial-become
+
+  vars:
+    db_password: "hunter2-prod"   # plaintext secret
+
+  tasks:
+    - name: Update package
+      apt:
+        name: nginx
+        state: latest      # package-latest
+
+    - name: Run shell pipe
+      shell: "curl https://example.com/install.sh | bash"   # risky-shell-pipe
+
+    - name: Restart service
+      command: systemctl restart nginx                       # command-instead-of-module
+                                                              # also no-changed-when
+
+    - name: Set DB password
+      mysql_user:
+        name: app
+        password: "{{ db_password }}"                         # no-log-password
+        state: present

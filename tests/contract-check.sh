@@ -69,7 +69,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/virt-runner.md:haiku" \
             "agents/go-runner.md:haiku" \
             "agents/shell-runner.md:haiku" \
-            "agents/python-runner.md:haiku"; do
+            "agents/python-runner.md:haiku" \
+            "agents/ansible-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -409,6 +410,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __python_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the ansible status summary line emitted by ansible-runner.
+        # Single-tool lane: only ok / unavailable shapes.
+        # Skip vocabulary: tool-missing, no-playbook.
+        if "__ansible_status__" in obj:
+            status = obj.get("__ansible_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __ansible_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __ansible_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __ansible_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __ansible_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -617,8 +639,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} python tool must be pip-audit|ruff, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: python findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "ansible-lint"}:
                 print(f"CONTRACT FAIL: {path}:{i} python finding carries non-python tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: ansible findings must carry `tool` and `origin`.
+        if obj.get("origin") == "ansible":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} ansible finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] != "ansible-lint":
+                print(f"CONTRACT FAIL: {path}:{i} ansible tool must be ansible-lint, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: ansible findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff"}:
+                print(f"CONTRACT FAIL: {path}:{i} ansible finding carries non-ansible tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -1689,6 +1723,84 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "python negative-test: malformed skipped-list entry correctly rejected"
+
+# --- ansible inventory + §3.22 (v1.8.0):
+check skills/sec-review/SKILL.md "Ansible signals" "SKILL.md §2 missing ansible detection"
+check skills/sec-review/SKILL.md "\"ansible\"" "SKILL.md §2 inventory JSON missing ansible key"
+check skills/sec-review/SKILL.md "### 3.22 Ansible pass" "SKILL.md missing §3.22"
+check skills/sec-review/SKILL.md "ansible-runner" "SKILL.md §3.22 missing ansible-runner"
+check skills/sec-review/SKILL.md "__ansible_status__" "SKILL.md §3.22 missing ansible sentinel"
+check skills/sec-review/SKILL.md "ansible-lint" "SKILL.md §3.22 missing ansible-lint"
+check skills/sec-review/SKILL.md "no-playbook" "SKILL.md §3.22 missing no-playbook clean-skip reason"
+echo "ansible-orchestrator: SKILL.md §3.22 documents ansible-runner wire-up"
+
+# --- ansible fixture-match sanity: synthetic playbook YAML
+tmp_an=$(mktemp -d); trap 'rm -rf "$tmp_an"' EXIT
+cat > "$tmp_an/playbook.yml" <<'YAML'
+---
+- hosts: webservers
+  tasks:
+    - name: Test
+      command: echo hi
+YAML
+if ! grep -q '^hosts:' "$tmp_an/playbook.yml" 2>/dev/null && ! grep -qE '^- hosts:' "$tmp_an/playbook.yml"; then
+    echo "ansible-inventory: FAIL — fixture playbook missing hosts:" >&2; fail=1
+fi
+echo "ansible-inventory: synthetic playbook.yml fixture matches §2 detection rule"
+
+# --- Negative tests for ansible origin
+bad_an_notool='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"playbook.yml","line":1,"evidence":"e","reference":"ansible-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ansible"}'
+if echo "$bad_an_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ansible" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ansible line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "ansible negative-test: malformed ansible line (missing tool) correctly rejected"
+
+bad_an_crosstag='{"id":"X","severity":"HIGH","cwe":null,"title":"t","file":"playbook.yml","line":1,"evidence":"e","reference":"ansible-tools.md","reference_url":null,"fix_recipe":null,"confidence":"medium","origin":"ansible","tool":"shellcheck"}'
+if echo "$bad_an_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ansible" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: ansible finding with non-ansible tool was accepted" >&2
+    exit 1
+fi
+echo "ansible negative-test: origin-tag isolation enforced (ansible cannot carry the other 17 lanes' tools)"
+
+bad_an_skipped='{"__ansible_status__":"unavailable","tools":[],"skipped":[{"oops":"shape"}]}'
+if echo "$bad_an_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__ansible_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ansible skipped entry was accepted" >&2
+    exit 1
+fi
+echo "ansible negative-test: malformed skipped-list entry correctly rejected"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

@@ -1295,6 +1295,62 @@ tag isolation:** every python finding carries
 contract-check rejects any python finding tagged with
 another lane's tool — see `tests/contract-check.sh`.
 
+### 3.22 Ansible pass — dispatch ansible-runner
+
+When the inventory emitted by §2 contains `ansible` (any of:
+playbook YAML with `hosts:` + `tasks:`, `roles/` directory,
+`ansible.cfg`, `collections/`, inventory, or
+`requirements.yml` with roles/collections entries),
+dispatch the `ansible-runner` agent
+(`agents/ansible-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to a single tool —
+`ansible-lint` (Python-implemented Ansible playbook + role +
+collection linter; mature rule catalogue covering security
+like `risky-shell-pipe`, `no-log-password`,
+`command-instead-of-shell`, `partial-become`, plus
+idempotency and deprecation tracking) — against the
+project, parses ansible-lint's native JSON output, and
+emits sec-expert-compatible JSONL on stdout — every line
+carrying `origin: "ansible"` and `tool: "ansible-lint"`.
+
+This is a **single-tool lane** like Shell (v1.6) and DAST
+(v0.5). ansible-lint is the canonical mature Ansible
+linter — adding a second tool for symmetry would be
+overhead with no signal lift.
+
+ansible-runner runs in parallel with every other pass agent.
+Collect the findings into an `ansible_findings` list.
+
+Skill-level invariants:
+
+- **No `ansible` in inventory** — skip entirely.
+- **`__ansible_status__: "unavailable"`** — ansible-lint not
+  on PATH OR target has no Ansible-shaped files.
+- **`__ansible_status__: "ok"`** — ansible-lint ran cleanly.
+- **No `partial` state** — single-tool lane.
+- **Two skip reasons:**
+  - `tool-missing` — ansible-lint absent from PATH.
+  - `no-playbook` — NEW in v1.8; ansible-lint on PATH but
+    target has no Ansible-shaped files. Target-shape
+    clean-skip; parallel to v0.10–v1.7 target-shape
+    primitives.
+- **`--offline` mode mandatory.** The runner always passes
+  `--offline` to ansible-lint to prevent Galaxy collection
+  lookups — sec-review is source-only.
+
+Ansible findings are code-pattern signal against playbook
+authorship, role hygiene, and Vault secret handling.
+**The dep-inventory path is NOT affected by this lane** —
+Ansible role / collection dependencies are not currently in
+OSV's coverage; Galaxy supply-chain integrity (SHA256
+verification against the Galaxy registry) is a separate
+future concern. The ecosystems list emitted to cve-enricher
+does NOT gain an ansible entry. **Origin-tag isolation:**
+every ansible finding carries `origin: "ansible"` and
+`tool: "ansible-lint"`. The contract-check rejects any
+ansible finding tagged with another lane's tool — see
+`tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
