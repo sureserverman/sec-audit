@@ -999,6 +999,81 @@ NEW target-shape reason:** `no-playbook` (ansible-lint on
 PATH but target has no Ansible-shaped files). Parallel to
 the existing v0.10–v1.7 target-shape primitives.
 
+## Networking-as-code lane (v1.9.0)
+
+A twenty-second agent, **`netcfg-runner`** (haiku-pinned,
+`Read` + `Bash` tools), joins the pipeline whenever the §2
+inventory detects networking-as-code configurations — Tor
+`torrc`, WireGuard wg-quick `*.conf`, sing-box JSON, or
+Xray-core JSON. Cross-platform, no host-OS gate.
+
+The runner dispatches two **structural validators** (NOT
+security scanners):
+
+- **`sing-box check`** — sing-box's self-validation
+  subcommand. Parses the JSON config and validates schema +
+  cross-field constraints without starting any listeners or
+  network activity. Catches typos, missing required fields,
+  type mismatches, impossible cross-field constraints.
+- **`xray test -confdir`** — Xray-core's parse + validate
+  subcommand. Same shape — schema + structural validation,
+  no network activity. (Note: NOT `xray run -test`, which
+  binds ports.)
+
+**Important shape distinction.** Tor (`torrc`) and WireGuard
+(`*.conf`) have NO runner-invoked validator — sec-expert
+handles them entirely via reference packs. Mature
+source-only / network-free validators do not exist for those
+formats. The runner adds structural-correctness signal for
+sing-box / Xray on top of sec-expert's security-pattern
+signal across all four sub-technologies.
+
+Output carries `origin: "netcfg"` and
+`tool: "sing-box" | "xray"`. Reference packs live in
+`references/netcfg/`:
+
+- `tor.md` — `ControlPort` bound to public interface
+  (CWE-306), missing `HashedControlPassword` /
+  `CookieAuthentication` (CWE-306), `HiddenServiceDir`
+  under world-traversable parent (CWE-732), v2 onion
+  addresses (CWE-326 — deprecated 2021), `ExitRelay 1`
+  without explicit `ExitPolicy` (CWE-693), `SOCKSPort`
+  without isolation flags (CWE-200), `DataDirectory`
+  outside `/var/lib/tor/` (CWE-732).
+- `wireguard.md` — `PrivateKey` embedded in committed
+  config (CWE-798), conf file mode > 0600 (CWE-732),
+  `AllowedIPs = 0.0.0.0/0` on a non-gateway peer (CWE-863),
+  `Endpoint` IP-vs-DNS tradeoff (CWE-1188), missing
+  `PreSharedKey` for post-quantum hybrid in high-stakes
+  deployments (CWE-326), `PostUp` / `PostDown` shell hooks
+  with attacker-influenced interpolation (CWE-78).
+- `sing-box.md` — SOCKS / HTTP / mixed inbound bound to
+  `0.0.0.0` (CWE-200), authentication-less inbound on
+  non-loopback (CWE-306), TLS `insecure: true` (CWE-295),
+  `experimental.clash_api` exposed on non-loopback
+  (CWE-306), plaintext DNS resolver as primary (CWE-319 —
+  defeats the privacy-tool purpose), Reality `short_id`
+  array containing `""` (CWE-326), `direct` outbound rules
+  leaking sensitive destinations (CWE-200).
+- `xray.md` — SOCKS / HTTP / dokodemo bound to `0.0.0.0`
+  (CWE-200), `streamSettings.security: "none"` on
+  credential-bearing inbound (CWE-319),
+  `tls.allowInsecure: true` (CWE-295), `api` inbound on
+  non-loopback (CWE-306), VMess legacy `alterId > 0`
+  (CWE-327 — MD5-based, deprecated 2022), Shadowsocks with
+  deprecated cipher (CWE-327 — migrate to SS-2022
+  Blake3-AEAD), Reality without `serverNames` enumeration
+  (CWE-345).
+
+The runner is read-only — it never uses `sing-box run` /
+`xray run` (which would bind ports), only the structural-
+validator subcommands.
+
+**Dep-inventory NOT affected.** Tor / WireGuard / sing-box
+/ Xray configurations are not package-manifest dependency
+graphs. **Skip vocabulary gains two NEW target-shape
+reasons:** `no-singbox-config` and `no-xray-config`.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -1140,6 +1215,7 @@ names from the other 12 lanes).
 | Shell                     | Shell scripts (`*.sh`/`*.bash`/`*.zsh`/`*.ksh` or shebang-detected) | `shellcheck` (cross-platform; single-tool lane) | `references/shell/{command-injection,file-handling,script-hardening}.md`, `references/shell-tools.md` | v1.6.0     |
 | Python                    | Python project (`requirements.txt` / `pyproject.toml` / `setup.py` / `Pipfile` + `*.py`) | `pip-audit` (OSV-backed reachability), `ruff` (`S` + `B` rule families; cross-platform) | `references/python/{deserialization,subprocess-and-async,framework-deepening}.md`, `references/python-tools.md` | v1.7.0     |
 | Ansible                   | Playbook YAML (`hosts:` + `tasks:`), `roles/`, `ansible.cfg`, `collections/`, `inventory`, `requirements.yml` | `ansible-lint` (cross-platform; single-tool lane; `--offline` for source-only) | `references/ansible/{playbook-security,role-secrets-and-vault}.md`, `references/ansible-tools.md` | v1.8.0     |
+| Networking-as-code        | Tor `torrc`, WireGuard `[Interface]`+`[Peer]` conf, sing-box JSON (sing-box-vocab inbounds), Xray JSON (Xray-vocab protocols) | `sing-box check`, `xray test -confdir` (structural validators, NOT security scanners; sec-expert reads packs for security patterns + handles Tor/WG entirely) | `references/netcfg/{tor,wireguard,sing-box,xray}.md`, `references/netcfg-tools.md` | v1.9.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

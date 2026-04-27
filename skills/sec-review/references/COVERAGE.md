@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.8.0. This file is the authoritative "what does
+    plugin as of v1.9.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across seventeen tool lanes plus sec-expert
+software projects across eighteen tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to eighteen review streams in parallel
-(seventeen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to nineteen review streams in parallel
+(eighteen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -441,6 +441,47 @@ Dispatch discipline.
   Galaxy registry) is a separate future concern.
 - **Shipped in:** v1.8.0.
 
+### netcfg
+
+- **Target shape:** any of the four sub-technologies — Tor
+  `torrc` / `torrc-defaults` / `torrc.d/*.conf`; WireGuard
+  `*.conf` with `[Interface]` + (`[Peer]` or `PrivateKey`
+  or `ListenPort`); sing-box JSON with top-level
+  `inbounds` + `outbounds` arrays AND sing-box-vocabulary
+  inbound types (socks, http, mixed, vless, trojan,
+  hysteria, hysteria2, tuic, naive, shadowsocks); Xray
+  JSON with top-level `inbounds` + `outbounds` arrays AND
+  Xray-vocabulary protocols (vless, vmess, trojan,
+  shadowsocks, dokodemo-door, freedom, blackhole).
+- **Tools:** `sing-box check` and `xray test -confdir` —
+  STRUCTURAL validators (catch typos, schema violations,
+  cross-field impossibilities), NOT security scanners.
+  Cross-platform Go binaries. Tor (torrc) and WireGuard
+  (*.conf) are NOT linted by any runner-invoked tool —
+  sec-expert handles them entirely via reference packs.
+- **Reference packs:** `references/netcfg/tor.md`,
+  `references/netcfg/wireguard.md`,
+  `references/netcfg/sing-box.md`,
+  `references/netcfg/xray.md`,
+  `references/netcfg-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-singbox-config`
+  (NEW in v1.9 — target-shape; sing-box on PATH but no
+  sing-box-shaped JSON), `no-xray-config` (NEW in v1.9 —
+  target-shape; xray on PATH but no Xray-shaped JSON).
+- **Origin tag:** `"netcfg"`. Tool whitelist: `sing-box`,
+  `xray`.
+- **Dep-inventory:** NOT affected — Tor / WireGuard /
+  sing-box / Xray configurations are not package-manifest
+  dependency graphs.
+- **Runner-vs-sec-expert split:** the runner emits
+  STRUCTURAL findings only (sing-box / xray invalid-config
+  errors). All security-pattern findings (Tor ControlPort
+  exposure, WG AllowedIPs scoping, sing-box CORS / Reality
+  short_id, Xray VMess legacy / SS deprecated cipher) come
+  from sec-expert reading the reference packs.
+- **Shipped in:** v1.9.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -471,10 +512,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**15 canonical reason values** as of v1.8, grouped by semantic
+**17 canonical reason values** as of v1.9, grouped by semantic
 category:
 
-### Target-shape (12)
+### Target-shape (14)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -489,7 +530,9 @@ category:
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 | `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
-| `no-playbook`     | ansible              | No Ansible-shaped files under target (no playbook YAML, roles/, ansible.cfg, collections/, inventory). |
+| `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |
+| `no-singbox-config`| netcfg              | No sing-box-shaped JSON under target (sing-box check applicable).       |
+| `no-xray-config`  | netcfg               | No Xray-shaped JSON under target (xray test applicable).                |
 
 ### Host-OS-gated (3)
 
