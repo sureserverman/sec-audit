@@ -941,6 +941,64 @@ vocabulary unchanged from v1.6's pattern** — only
 `tool-missing` and `no-requirements` apply (the latter is a
 target-shape clean-skip when no Python manifest is present).
 
+## Ansible lane (v1.8.0)
+
+A twenty-first agent, **`ansible-runner`** (haiku-pinned,
+`Read` + `Bash` tools), joins the pipeline whenever the §2
+inventory detects an Ansible project — any of: a playbook
+YAML with `hosts:` + `tasks:`, a `roles/` directory, an
+`ansible.cfg`, a `collections/` directory, an inventory
+file, or a `requirements.yml` with role/collection entries.
+Cross-platform, no host-OS gate. **Single-tool lane** like
+Shell (v1.6) and DAST (v0.5).
+
+The runner dispatches a single tool:
+
+- **`ansible-lint`** (Python-implemented) — the canonical
+  mature Ansible playbook + role + collection linter.
+  Mature rule catalogue covering security
+  (`risky-shell-pipe`, `no-log-password`,
+  `command-instead-of-shell`, `partial-become`,
+  `risky-file-permissions`, `risky-octal`), idempotency
+  (`no-changed-when`, `command-instead-of-module`,
+  `package-latest`), syntax/style (`yaml`, `key-order`),
+  and deprecation tracking. Always invoked with `--offline`
+  to suppress Galaxy collection lookups — sec-review is
+  source-only.
+
+Output carries `origin: "ansible"` and
+`tool: "ansible-lint"`. Reference packs live in
+`references/ansible/`:
+
+- `playbook-security.md` — `shell:` module with attacker-
+  influenced Jinja interpolation (CWE-78), `command:` /
+  `shell:` without `changed_when` (CWE-754), Jinja2
+  template-injection in module args (CWE-94),
+  `state: latest` package versions (CWE-1104),
+  play-level `become: yes` without task-scoping (CWE-269),
+  `risky-shell-pipe` without `pipefail` (CWE-754),
+  `command-instead-of-module` forfeiting idempotency
+  (CWE-693).
+- `role-secrets-and-vault.md` — plaintext secret in
+  playbook YAML (CWE-798), tasks handling secrets without
+  `no_log: true` (CWE-532), `lookup('env', ...)` flowing
+  into task argv visible in `ps` (CWE-214), git-module
+  `accept_hostkey: yes` bypassing host-key check
+  (CWE-295), vault password in command-line arg / shell
+  history (CWE-214).
+
+The runner is read-only — ansible-lint runs as a static
+analyzer; the lane never executes playbooks, never installs
+collections, never decrypts vaults.
+
+**Dep-inventory NOT affected.** Ansible role / collection
+dependencies are not in OSV's coverage; Galaxy supply-chain
+integrity (SHA256 verification against the Galaxy registry)
+is a separate future concern. **Skip vocabulary gains one
+NEW target-shape reason:** `no-playbook` (ansible-lint on
+PATH but target has no Ansible-shaped files). Parallel to
+the existing v0.10–v1.7 target-shape primitives.
+
 ## Cross-platform polish (v1.0.0)
 
 The v1.0 release adds no new reference packs and no new runners.
@@ -1081,6 +1139,7 @@ names from the other 12 lanes).
 | Go                        | Go module (`go.mod` + `*.go`)                       | `gosec`, `staticcheck` (both cross-platform Go binaries) | `references/go/{stdlib-security,module-ecosystem,web-frameworks}.md`, `references/go-tools.md` | v1.5.0     |
 | Shell                     | Shell scripts (`*.sh`/`*.bash`/`*.zsh`/`*.ksh` or shebang-detected) | `shellcheck` (cross-platform; single-tool lane) | `references/shell/{command-injection,file-handling,script-hardening}.md`, `references/shell-tools.md` | v1.6.0     |
 | Python                    | Python project (`requirements.txt` / `pyproject.toml` / `setup.py` / `Pipfile` + `*.py`) | `pip-audit` (OSV-backed reachability), `ruff` (`S` + `B` rule families; cross-platform) | `references/python/{deserialization,subprocess-and-async,framework-deepening}.md`, `references/python-tools.md` | v1.7.0     |
+| Ansible                   | Playbook YAML (`hosts:` + `tasks:`), `roles/`, `ansible.cfg`, `collections/`, `inventory`, `requirements.yml` | `ansible-lint` (cross-platform; single-tool lane; `--offline` for source-only) | `references/ansible/{playbook-security,role-secrets-and-vault}.md`, `references/ansible-tools.md` | v1.8.0     |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

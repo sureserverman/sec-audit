@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-review
-    plugin as of v1.7.0. This file is the authoritative "what does
+    plugin as of v1.8.0. This file is the authoritative "what does
     sec-review actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,8 +21,8 @@
 ## Scope
 
 The sec-review plugin performs citation-grounded security review of
-software projects across sixteen tool lanes plus sec-expert code
-reasoning. It reads source trees and pre-built artifacts, emits
+software projects across seventeen tool lanes plus sec-expert
+code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
 quoted verbatim from primary-source reference packs (vendor docs +
@@ -31,8 +31,8 @@ CISA).
 
 ## Lanes
 
-The plugin dispatches up to seventeen review streams in parallel
-(sixteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to eighteen review streams in parallel
+(seventeen tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -408,6 +408,39 @@ Dispatch discipline.
   swallowing, FastAPI DI bypass, Django ORM `.extra()`).
 - **Shipped in:** v1.7.0.
 
+### ansible
+
+- **Target shape:** any of: a `*.yml` / `*.yaml` file with
+  `hosts:` + `tasks:` (canonical playbook), a `roles/`
+  directory with role-shape subdirectories, an
+  `ansible.cfg`, a `collections/` directory, an inventory
+  file or directory, or a `requirements.yml` with `roles:`
+  / `collections:` entries.
+- **Tools:** `ansible-lint` (Python-implemented Ansible
+  playbook + role + collection linter; mature rule catalogue
+  covering security like `risky-shell-pipe`,
+  `no-log-password`, `command-instead-of-shell`,
+  `partial-become`, plus idempotency, deprecation tracking).
+  Single-tool lane like Shell (v1.6) and DAST (v0.5).
+  Cross-platform; always invoked with `--offline` to suppress
+  Galaxy collection lookups.
+- **Reference packs:**
+  `references/ansible/playbook-security.md`,
+  `references/ansible/role-secrets-and-vault.md`,
+  `references/ansible-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-playbook` (NEW in
+  v1.8 — target-shape; ansible-lint applicable but no
+  Ansible-shaped files under target).
+- **Origin tag:** `"ansible"`. Tool whitelist: `ansible-lint`.
+  Single-tool lane has no `partial` status — only `ok` /
+  `unavailable`.
+- **Dep-inventory:** NOT affected — Ansible role / collection
+  dependencies are not in OSV's coverage; Galaxy
+  supply-chain integrity (SHA256 verification against the
+  Galaxy registry) is a separate future concern.
+- **Shipped in:** v1.8.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -438,10 +471,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**14 canonical reason values** as of v1.7, grouped by semantic
+**15 canonical reason values** as of v1.8, grouped by semantic
 category:
 
-### Target-shape (11)
+### Target-shape (12)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -455,7 +488,8 @@ category:
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
-| `no-requirements` | python               | No Python manifest (requirements.txt/pyproject.toml/setup.py/Pipfile) or `*.py` files under target. |
+| `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
+| `no-playbook`     | ansible              | No Ansible-shaped files under target (no playbook YAML, roles/, ansible.cfg, collections/, inventory). |
 
 ### Host-OS-gated (3)
 
