@@ -8,24 +8,32 @@ The plugin is arranged as its own single-plugin marketplace — one `/plugin mar
 
 ## Install
 
-From a Claude Code session:
+From a Claude Code session, add the marketplace and install the plugin:
 
 ```text
-/plugin marketplace add https://github.com/<you>/sec-audit.git
-/plugin install sec-audit
+/plugin marketplace add sureserverman/sec-audit
+/plugin install sec-audit@sec-audit-marketplace
 ```
 
-Or for a local clone:
+The shorthand `sureserverman/sec-audit` resolves to `https://github.com/sureserverman/sec-audit.git`. The full URL form also works:
 
 ```text
-/plugin marketplace add /home/user/dev/sec-audit
-/plugin install sec-audit
+/plugin marketplace add https://github.com/sureserverman/sec-audit.git
+/plugin install sec-audit@sec-audit-marketplace
 ```
+
+To update later, run `/plugin marketplace update sec-audit-marketplace` followed by `/plugin install sec-audit@sec-audit-marketplace` again. To remove: `/plugin uninstall sec-audit@sec-audit-marketplace` and (optionally) `/plugin marketplace remove sec-audit-marketplace`.
 
 After install, two things become available:
 
-- `/sec-audit <path-to-project>` — slash command, the primary entry point.
+- `/sec-audit [path-to-project]` — slash command, the primary entry point. Path defaults to the current working directory when omitted (v1.10+).
 - `Skill sec-audit` — the same behavior as a skill invocation (natural-language triggers: "do a security review", "CVE scan this repo", "audit dependencies", "harden this service").
+
+### Requirements
+
+- Claude Code 2.0+ (plugin marketplace support).
+- Network access for live CVE enrichment (NVD 2.0, OSV.dev, GHSA, CISA KEV). The pipeline degrades cleanly when offline — see [CVE feeds & privacy](#cve-feeds--privacy).
+- Optional tool-lane CLIs on `PATH` for the runners that wrap them (semgrep, bandit, zap-baseline, addons-linter, retire, cargo-audit, cargo-deny, cargo-geiger, cargo-vet, mobsfscan, apkleaks, trivy, grype, …). Each lane probes for its tools and emits an `unavailable` / `partial` sentinel when they are missing — no lane is mandatory.
 
 Optional env vars (not required):
 
