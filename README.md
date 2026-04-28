@@ -1141,6 +1141,70 @@ vocabulary gains one NEW target-shape reason:**
 `no-image-artifact` (tool on PATH but target has no image
 tarball / OCI layout / SBOM).
 
+## AI tools lane (v1.12.0)
+
+A twenty-fourth agent, **`ai-tools-runner`** (haiku-pinned,
+`Read` + `Bash` tools), joins the pipeline whenever the §2
+inventory detects AI coding tool config under target — Claude
+Code plugins (`.claude-plugin/plugin.json`,
+`.claude-plugin/marketplace.json`, `agents/*.md`,
+`skills/**/SKILL.md`, `commands/*.md`, `hooks.json`,
+`.claude/settings.json`, `.claude/settings.local.json`), MCP
+server config (`.mcp.json` at any depth), Cursor rules
+(`.cursor/rules/*.mdc`, `.cursorrules`), Codex agents/config
+(`AGENTS.md`, `.codex/config.toml`, `.codex/agents/*.md`), or
+OpenCode config (`opencode.json`, `.opencode/`). Cross-platform,
+no host-OS gate.
+
+The runner is a **single-tool lane** like Shell (v1.6) and
+Ansible (v1.8): it shells out to `jq --exit-status` against
+the AI-tool-config JSON shapes only and emits a MEDIUM
+CWE-1284 finding when a manifest is malformed. It never
+scans for security patterns — same split as the netcfg lane
+(v1.9). All security reasoning happens in **sec-expert**
+loaded with the per-platform reference packs:
+
+- `claude-code-plugin.md` — `Bash(*)` wildcards in
+  `allowed-tools` (CWE-77), shell hooks interpolating
+  `$TOOL_INPUT` unquoted (CWE-78),
+  `dangerouslyDisableSandbox: true` (CWE-749),
+  `--dangerously-skip-permissions` in hook commands
+  (CWE-269), hardcoded `sk-ant-` / `sk-proj-` / `gho_` /
+  AWS credentials (CWE-798), agent `tools:` over-scoping
+  (CWE-693), skill description leakage (informational).
+- `claude-code-mcp.md` — HTTP MCP URLs (CWE-319), unpinned
+  `npx` / `uvx` MCP server commands without `<pkg>@<version>`
+  pin (CWE-1395 supply-chain), stdio MCP `command:`
+  interpolating env vars into shell (CWE-78), MCP `env:`
+  blocks with hardcoded API keys (CWE-798), MCP servers
+  trusting `${input:...}` user prompts as command args
+  (CWE-77).
+- `prompt-injection.md` — indirect prompt injection in
+  skill / agent / rule descriptions (CWE-94 / OWASP LLM01),
+  hidden Unicode tag chars `U+E0000–U+E007F` (CWE-1007),
+  zero-width chars `U+200B–U+200D` (CWE-1007), skill bodies
+  reading `~/.bash_history` / `~/.ssh/` / `.env` into
+  context (CWE-200 — OWASP LLM06), `WebFetch(<arbitrary
+  user-controlled URL>)` (CWE-918 SSRF), description-leak
+  pattern (informational).
+- `cursor-rules.md` — `alwaysApply: true` rules without
+  `globs:` filter (CWE-693), legacy `.cursorrules`
+  (informational), API keys / secrets in rule body
+  (CWE-798), `<instructions>You are now…</instructions>`
+  injection (CWE-94).
+- `codex-opencode.md` — `AGENTS.md` instruction-override
+  prompts (CWE-94), `.codex/config.toml` with
+  `approval_policy = "never"` (CWE-269), `sandbox_mode =
+  "danger-full-access"` (CWE-749), hardcoded provider keys
+  in `opencode.json` (CWE-798), `opencode.json` `mcp:`
+  reusing `claude-code-mcp.md` anti-patterns
+  (cross-linked).
+
+Output carries `origin: "ai-tools"` and `tool: "jq"`.
+**Skip vocabulary gains one NEW target-shape reason:**
+`no-ai-tool-config` (tool on PATH but target has no
+AI-tool-config JSON shape).
+
 ## UX improvements (v1.10.0)
 
 The v1.10 release adds no new lanes. Two ergonomic improvements
@@ -1352,6 +1416,7 @@ names from the other 12 lanes).
 | Ansible                   | Playbook YAML (`hosts:` + `tasks:`), `roles/`, `ansible.cfg`, `collections/`, `inventory`, `requirements.yml` | `ansible-lint` (cross-platform; single-tool lane; `--offline` for source-only) | `references/ansible/{playbook-security,role-secrets-and-vault}.md`, `references/ansible-tools.md` | v1.8.0     |
 | Networking-as-code        | Tor `torrc`, WireGuard `[Interface]`+`[Peer]` conf, sing-box JSON (sing-box-vocab inbounds), Xray JSON (Xray-vocab protocols) | `sing-box check`, `xray test -confdir` (structural validators, NOT security scanners; sec-expert reads packs for security patterns + handles Tor/WG entirely) | `references/netcfg/{tor,wireguard,sing-box,xray}.md`, `references/netcfg-tools.md` | v1.9.0     |
 | Container image vuln scan | Image tarball (with `manifest.json` / `index.json` inside), OCI layout dir, SBOM (SPDX/CycloneDX) | `trivy image --input <tarball>` (Aqua), `grype <input>` (Anchore — also accepts SBOMs); deduped by (file, vuln_id, pkg) tuple; OSS-equivalent of Docker Scout | `references/image/{image-vulnerabilities,sbom-and-provenance}.md`, `references/image-tools.md` | v1.11.0    |
+| AI tools                  | Claude Code plugins (`.claude-plugin/plugin.json`, `agents/*.md`, `skills/**/SKILL.md`, `commands/*.md`, `hooks.json`, `.claude/settings*.json`), MCP server config (`.mcp.json`), Cursor (`.cursor/rules/*.mdc` / `.cursorrules`), Codex (`AGENTS.md`, `.codex/config.toml`, `.codex/agents/*.md`), OpenCode (`opencode.json`, `.opencode/`) | `jq` (single-tool lane; structural JSON validator — sec-expert reads packs for security patterns: prompt injection, allowed-tools wildcards, hardcoded credentials, dangerous hooks, MCP supply-chain, Cursor alwaysApply scoping, Codex sandbox bypass) | `references/ai-tools/{claude-code-plugin,claude-code-mcp,prompt-injection,cursor-rules,codex-opencode}.md`, `references/ai-tools-tools.md` | v1.12.0    |
 | CVE enrichment            | Manifests + retire + crates.io + Maven + NuGet + CocoaPods/SwiftPM + Debian (best-effort beyond crates.io/Maven/NuGet) | OSV `querybatch`, NVD 2.0, GHSA, CISA KEV  | `references/cve-feeds.md`                                                              | v0.2.0     |
 
 ## Known limits & false positives

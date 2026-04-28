@@ -28,7 +28,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -246,6 +246,50 @@ Detect the technology stack. Read only — do not install or execute.
   emitted findings. The image lane is the OSS-equivalent of
   Docker Scout's CVE-scanning surface (without the daemon /
   registry / Docker Hub login dependencies).
+- **AI-tools signals (v1.12.0+)**: any of the following
+  triggers the `ai-tools` inventory key:
+  - **Claude Code plugin** — `.claude-plugin/plugin.json` or
+    `.claude-plugin/marketplace.json` at project root.
+  - **Claude Code project settings** — `.claude/settings.json`
+    or `.claude/settings.local.json`.
+  - **Claude Code subagents / skills / commands** — any of:
+    `agents/*.md` whose YAML frontmatter contains both `name:`
+    and `description:` keys; `skills/**/SKILL.md` whose
+    frontmatter contains both `name:` and `description:`;
+    `commands/*.md` with YAML frontmatter (any of `description:`,
+    `argument-hint:`, `allowed-tools:`).
+  - **MCP server config** — `.mcp.json` at any depth under
+    target.
+  - **Cursor rules** — `.cursor/rules/*.mdc` files OR a
+    `.cursorrules` file at project root.
+  - **Codex agents / config** — `AGENTS.md` at any depth (also
+    consumed by OpenCode and recent Claude Code), `.codex/config.toml`,
+    or `.codex/agents/*.md`.
+  - **OpenCode config** — `opencode.json` at project root or
+    a `.opencode/` directory.
+  When detected, add `"ai-tools"` with values reflecting the
+  detected platform(s): `"ai-tools": ["claude-code"]`,
+  `["cursor"]`, `["codex"]`, `["opencode"]`, or combinations
+  (`["claude-code", "cursor"]` is common when a repo carries
+  both a Claude plugin definition and `.cursor/rules/`).
+  `AGENTS.md` alone fires both `codex` and `opencode` because
+  the file is shared between those tools — emit BOTH inventory
+  values so the report renders coverage for each. Load
+  `references/ai-tools/claude-code-plugin.md`,
+  `references/ai-tools/claude-code-mcp.md`,
+  `references/ai-tools/prompt-injection.md`,
+  `references/ai-tools/cursor-rules.md`,
+  `references/ai-tools/codex-opencode.md`, and the tool-lane
+  reference `references/ai-tools-tools.md` — load only the
+  per-platform packs matching detected values to keep the
+  sec-expert context tight; `prompt-injection.md` always loads
+  when the lane is active (it covers cross-tool patterns). No
+  ecosystem entry — AI-tool config files are not
+  package-manifest dependency graphs; supply-chain risk for
+  MCP server packages (`npx <pkg>` / `uvx <pkg>` invocations
+  inside `.mcp.json`) is enforced at the code-pattern layer
+  via the `claude-code-mcp.md` CWE-1395 pattern, not via CVE
+  feeds.
 - **Networking-as-code signals**: any of the following
   triggers the `netcfg` inventory key:
   - **Tor** — `torrc` / `torrc-defaults` / `torrc.d/*.conf`
@@ -550,6 +594,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "ansible":     [],
   "netcfg":      [],
   "image":       [],
+  "ai-tools":    [],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -1630,6 +1675,75 @@ gets the +20-pt KEV bonus per §5's prioritization rubric.
 `origin: "image"` and `tool: "trivy" | "grype"`. The
 contract-check rejects any image finding tagged with another
 lane's tool — see `tests/contract-check.sh`.
+
+### 3.25 AI-tools pass — dispatch ai-tools-runner
+
+When the inventory emitted by §2 contains `ai-tools` (any of
+the Claude Code / Cursor / Codex / OpenCode signals fired),
+dispatch the `ai-tools-runner` agent
+(`agents/ai-tools-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to `jq --exit-status` against the
+AI-tool-config JSON shapes only — `.claude-plugin/plugin.json`,
+`.claude-plugin/marketplace.json`, `.mcp.json` at any depth,
+`.claude/settings.json`, `.claude/settings.local.json`,
+`opencode.json` — and emits sec-expert-compatible JSONL on
+stdout, every line carrying `origin: "ai-tools"` and
+`tool: "jq"`. The agent is a STRUCTURAL validator: it catches
+malformed JSON manifests but does NOT scan for security
+patterns. Single-tool lane like Shell (v1.6) and Ansible
+(v1.8); cross-platform; no host-OS gate.
+
+ai-tools-runner runs in parallel with every other pass agent.
+Collect the findings into an `ai_tools_findings` list.
+
+Skill-level invariants:
+
+- **No `ai-tools` in inventory** — skip entirely. Do NOT
+  invoke jq on unrelated trees.
+- **`__ai_tools_status__: "unavailable"`** — jq absent from
+  PATH, OR no AI-tool-config file under target. Add the
+  `⚠ AI-tools jq unavailable — install jq to enable JSON
+  manifest validation` banner to the Review metadata block.
+  Do NOT fabricate findings.
+- **`__ai_tools_status__: "ok"`** — jq ran. Merge the
+  findings into the triaged stream. Single-tool lane has no
+  `partial` status.
+- **Two skip reasons:**
+  - `tool-missing` — the jq binary is absent from PATH.
+  - `no-ai-tool-config` — jq on PATH but target has no
+    AI-tool-config JSON file. Target-shape clean-skip;
+    parallel to `no-shell-source` / `no-playbook` /
+    `no-image-artifact`.
+
+**Runner-vs-sec-expert split** (mirrors the netcfg lane):
+the runner emits STRUCTURAL findings only (jq parse errors
+on malformed manifests). All security-pattern findings —
+prompt injection in skill / agent / rule descriptions
+(`prompt-injection.md`); `Bash(*)` wildcards in
+`allowed-tools` and `dangerouslyDisableSandbox: true` flags
+(`claude-code-plugin.md`); HTTP MCP server URLs and unpinned
+`npx`/`uvx` MCP commands (`claude-code-mcp.md`);
+`alwaysApply: true` rules without `globs:` filters
+(`cursor-rules.md`); `approval_policy = "never"` and
+`sandbox_mode = "danger-full-access"` in
+`.codex/config.toml` (`codex-opencode.md`); hardcoded
+`sk-ant-` / `sk-proj-` / `gho_` / AWS credential strings in
+any of the above files (CWE-798 — covered across all five
+packs) — come from sec-expert reading the per-platform
+reference packs loaded at §2 Inventory.
+
+**No dep-inventory effect.** AI-tool config files reference
+MCP server packages (`npx <pkg>` / `uvx <pkg>`) and skill
+content but are not package-manifest dependency graphs in
+the OSV sense. Supply-chain risk for MCP server packages is
+enforced at the code-pattern layer via
+`claude-code-mcp.md`'s CWE-1395 unpinned-package rule — the
+sec-expert reasoning surface — rather than via cve-enricher.
+
+**Origin-tag isolation:** every ai-tools finding carries
+`origin: "ai-tools"` and `tool: "jq"`. The contract-check
+rejects any ai-tools finding tagged with another lane's
+tool — see `tests/contract-check.sh`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

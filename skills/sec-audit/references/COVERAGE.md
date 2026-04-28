@@ -2,7 +2,7 @@
 
 <!--
     Single-source-of-truth coverage enumeration for the sec-audit
-    plugin as of v1.11.0. This file is the authoritative "what does
+    plugin as of v1.12.0. This file is the authoritative "what does
     sec-audit actually cover?" reference — read it before the per-
     lane packs to understand the plugin's shape.
 
@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across nineteen tool lanes plus sec-expert
+software projects across twenty tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -50,8 +50,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to twenty review streams in parallel
-(nineteen tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty-one review streams in parallel
+(twenty tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -541,6 +541,55 @@ Dispatch discipline.
   future).
 - **Shipped in:** v1.11.0.
 
+### ai-tools (AI coding tool config audit)
+
+- **Target shape:** any of: Claude Code plugin manifest
+  (`.claude-plugin/plugin.json` / `.claude-plugin/marketplace.json`);
+  Claude Code project settings (`.claude/settings.json` /
+  `.claude/settings.local.json`); Claude Code subagents / skills /
+  commands (`agents/*.md`, `skills/**/SKILL.md`, `commands/*.md`
+  with YAML `name:` + `description:` frontmatter); MCP server config
+  (`.mcp.json` at any depth); Cursor rules (`.cursor/rules/*.mdc` or
+  `.cursorrules`); Codex agents/config (`AGENTS.md`,
+  `.codex/config.toml`, `.codex/agents/*.md`); OpenCode config
+  (`opencode.json` or `.opencode/`). Inventory values:
+  `["claude-code"]`, `["cursor"]`, `["codex"]`, `["opencode"]`, or
+  combinations. `AGENTS.md` fires both `codex` and `opencode`.
+- **Tools:** `jq` (universal C-implemented JSON validator;
+  `--exit-status .` mode for structural well-formedness check).
+  Single-tool lane like Shell (v1.6) and Ansible (v1.8).
+  Cross-platform.
+- **Reference packs:** `references/ai-tools/claude-code-plugin.md`,
+  `references/ai-tools/claude-code-mcp.md`,
+  `references/ai-tools/prompt-injection.md`,
+  `references/ai-tools/cursor-rules.md`,
+  `references/ai-tools/codex-opencode.md`,
+  `references/ai-tools-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-ai-tool-config` (NEW
+  in v1.12 — target-shape; jq on PATH but no AI-tool-config
+  JSON shape under target).
+- **Origin tag:** `"ai-tools"`. Tool whitelist: `jq`.
+  Single-tool lane has no `partial` status — only `ok` /
+  `unavailable`.
+- **Dep-inventory:** NOT affected — AI-tool config files
+  reference MCP server packages (`npx <pkg>` / `uvx <pkg>`)
+  and skill content but are not package-manifest dependency
+  graphs in the OSV sense. Supply-chain risk for MCP server
+  packages is enforced at the code-pattern layer via
+  `claude-code-mcp.md`'s CWE-1395 unpinned-package rule.
+- **Runner-vs-sec-expert split:** the runner emits STRUCTURAL
+  findings only (jq parse errors on malformed manifests). All
+  security-pattern findings (prompt injection in
+  skill / agent / rule descriptions; `Bash(*)` wildcards in
+  `allowed-tools`; `dangerouslyDisableSandbox: true`; HTTP MCP
+  server URLs and unpinned `npx`/`uvx`; `alwaysApply: true`
+  rules without `globs:`; `approval_policy = "never"` and
+  `sandbox_mode = "danger-full-access"`; hardcoded `sk-ant-` /
+  `sk-proj-` / `gho_` / AWS keys) come from sec-expert reading
+  the per-platform reference packs.
+- **Shipped in:** v1.12.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -571,10 +620,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**18 canonical reason values** as of v1.11, grouped by semantic
+**19 canonical reason values** as of v1.12, grouped by semantic
 category:
 
-### Target-shape (15)
+### Target-shape (16)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -593,6 +642,7 @@ category:
 | `no-singbox-config`| netcfg              | No sing-box-shaped JSON under target (sing-box check applicable).       |
 | `no-xray-config`  | netcfg               | No Xray-shaped JSON under target (xray test applicable).                |
 | `no-image-artifact`| image               | No image tarball / OCI layout / SBOM under target (trivy/grype scope).  |
+| `no-ai-tool-config`| ai-tools             | No AI-tool-config JSON shape under target (jq applicable; no plugin.json / .mcp.json / settings.json / opencode.json). |
 
 ### Host-OS-gated (3)
 

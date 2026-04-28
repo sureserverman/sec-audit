@@ -72,7 +72,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/python-runner.md:haiku" \
             "agents/ansible-runner.md:haiku" \
             "agents/netcfg-runner.md:haiku" \
-            "agents/image-runner.md:haiku"; do
+            "agents/image-runner.md:haiku" \
+            "agents/ai-tools-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -474,6 +475,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __image_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the ai-tools status summary line emitted by ai-tools-runner.
+        # Skip vocabulary: tool-missing, no-ai-tool-config.
+        # Single-tool lane: only ok/unavailable (no partial).
+        if "__ai_tools_status__" in obj:
+            status = obj.get("__ai_tools_status__")
+            if status not in {"ok", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __ai_tools_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __ai_tools_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __ai_tools_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __ai_tools_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         missing = [k for k in required if k not in obj]
         if missing:
             print(f"CONTRACT FAIL: {path}:{i} missing fields: {missing}", file=sys.stderr)
@@ -718,8 +740,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} image tool must be trivy|grype, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: image findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "jq"}:
                 print(f"CONTRACT FAIL: {path}:{i} image finding carries non-image tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: ai-tools findings must carry `tool` and `origin`.
+        if obj.get("origin") == "ai-tools":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} ai-tools finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"jq"}:
+                print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: ai-tools findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype"}:
+                print(f"CONTRACT FAIL: {path}:{i} ai-tools finding carries non-ai-tools tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -2035,6 +2069,83 @@ sys.exit(1 if errs else 0)
     exit 1
 fi
 echo "image negative-test: malformed skipped-list entry correctly rejected"
+
+# --- ai-tools inventory + §3.25 (v1.12.0):
+check skills/sec-audit/SKILL.md "AI-tools signals" "SKILL.md §2 missing ai-tools detection"
+check skills/sec-audit/SKILL.md "\"ai-tools\"" "SKILL.md §2 inventory JSON missing ai-tools key"
+check skills/sec-audit/SKILL.md "### 3.25 AI-tools pass" "SKILL.md missing §3.25"
+check skills/sec-audit/SKILL.md "ai-tools-runner" "SKILL.md §3.25 missing ai-tools-runner"
+check skills/sec-audit/SKILL.md "__ai_tools_status__" "SKILL.md §3.25 missing ai-tools sentinel"
+check skills/sec-audit/SKILL.md "no-ai-tool-config" "SKILL.md §3.25 missing no-ai-tool-config clean-skip reason"
+echo "ai-tools-orchestrator: SKILL.md §3.25 documents ai-tools-runner wire-up"
+
+# --- ai-tools fixture-match sanity: synthetic plugin.json + .mcp.json reference
+tmp_at=$(mktemp -d); trap 'rm -rf "$tmp_at"' EXIT
+mkdir -p "$tmp_at/.claude-plugin"
+cat > "$tmp_at/.claude-plugin/plugin.json" <<'JSON'
+{"name":"demo","version":"0.1.0","description":"demo plugin"}
+JSON
+cat > "$tmp_at/.mcp.json" <<'JSON'
+{"mcpServers":{"foo":{"command":"npx","args":["-y","@modelcontextprotocol/server-foo"]}}}
+JSON
+if ! [ -f "$tmp_at/.claude-plugin/plugin.json" ] || ! [ -f "$tmp_at/.mcp.json" ]; then
+    echo "ai-tools-inventory: FAIL — fixture missing" >&2; fail=1
+fi
+echo "ai-tools-inventory: synthetic plugin.json + .mcp.json fixture matches §2 detection rule"
+
+# --- Negative tests for ai-tools origin
+bad_at_notool='{"id":"X","severity":"MEDIUM","cwe":"CWE-1284","title":"t","file":"plugin.json","line":1,"evidence":"e","reference":"ai-tools-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"ai-tools"}'
+if echo "$bad_at_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ai-tools" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ai-tools line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "ai-tools negative-test: malformed ai-tools line (missing tool) correctly rejected"
+
+bad_at_crosstag='{"id":"X","severity":"MEDIUM","cwe":"CWE-1284","title":"t","file":"plugin.json","line":1,"evidence":"e","reference":"ai-tools-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"ai-tools","tool":"shellcheck"}'
+if echo "$bad_at_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "ai-tools" and obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: ai-tools finding with non-ai-tools tool was accepted" >&2
+    exit 1
+fi
+echo "ai-tools negative-test: origin-tag isolation enforced (ai-tools cannot carry the other 20 lanes' tools)"
+
+bad_at_skipped='{"__ai_tools_status__":"unavailable","tools":[],"skipped":[{"oops":"shape"}]}'
+if echo "$bad_at_skipped" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if "__ai_tools_status__" in obj:
+        for e in obj.get("skipped", []):
+            if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed ai-tools skipped entry was accepted" >&2
+    exit 1
+fi
+echo "ai-tools negative-test: malformed skipped-list entry correctly rejected"
 
 # --- v1.10 default-cwd UX (commands/sec-audit.md):
 check commands/sec-audit.md "Default-target behaviour" "commands/sec-audit.md missing v1.10 default-target section"
