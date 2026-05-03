@@ -556,9 +556,17 @@ Dispatch discipline.
   `["claude-code"]`, `["cursor"]`, `["codex"]`, `["opencode"]`, or
   combinations. `AGENTS.md` fires both `codex` and `opencode`.
 - **Tools:** `jq` (universal C-implemented JSON validator;
-  `--exit-status .` mode for structural well-formedness check).
-  Single-tool lane like Shell (v1.6) and Ansible (v1.8).
-  Cross-platform.
+  `--exit-status .` mode for structural well-formedness check)
+  AND `mcp-scan inspect --json` (Invariant Labs; rebranded
+  `snyk-agent-scan` after the Snyk acquisition; Apache-2.0)
+  for tool-poisoning + malicious-description detection on
+  `.mcp.json` / `claude_desktop_config.json` / skill markdown
+  trees. Static-only: the runner uses `inspect` mode and
+  forbids the `scan` subcommand and
+  `--dangerously-run-mcp-servers`, both of which would launch
+  stdio MCP servers locally. Two-tool lane like SAST
+  (semgrep + bandit) and webext (addons-linter + web-ext +
+  retire). Cross-platform.
 - **Reference packs:** `references/ai-tools/claude-code-plugin.md`,
   `references/ai-tools/claude-code-mcp.md`,
   `references/ai-tools/prompt-injection.md`,
@@ -566,12 +574,16 @@ Dispatch discipline.
   `references/ai-tools/codex-opencode.md`,
   `references/ai-tools-tools.md`.
 - **Host-OS gate:** none.
-- **Skip reasons:** `tool-missing`, `no-ai-tool-config` (NEW
-  in v1.12 — target-shape; jq on PATH but no AI-tool-config
-  JSON shape under target).
-- **Origin tag:** `"ai-tools"`. Tool whitelist: `jq`.
-  Single-tool lane has no `partial` status — only `ok` /
-  `unavailable`.
+- **Skip reasons:** `tool-missing`, `no-ai-tool-config`
+  (target-shape; tool on PATH but no in-scope file under
+  target), `parse-failed` (NEW in v1.13 — mcp-scan ran but
+  output JSON could not be parsed into a recognized issue
+  list).
+- **Origin tag:** `"ai-tools"`. Tool whitelist:
+  `jq`, `mcp-scan`. As of v1.13 this is a two-tool lane,
+  so all three status values apply: `ok` (both ran),
+  `partial` (one ran, one missing or parse-failed),
+  `unavailable` (both missing or no in-scope inputs).
 - **Dep-inventory:** NOT affected — AI-tool config files
   reference MCP server packages (`npx <pkg>` / `uvx <pkg>`)
   and skill content but are not package-manifest dependency
@@ -620,7 +632,7 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**19 canonical reason values** as of v1.12, grouped by semantic
+**20 canonical reason values** as of v1.13, grouped by semantic
 category:
 
 ### Target-shape (16)
@@ -657,6 +669,12 @@ category:
 | Reason               | Lane(s)  | Meaning                                                         |
 |----------------------|----------|-----------------------------------------------------------------|
 | `no-notary-profile`  | ios      | `$NOTARY_PROFILE` unset; `xcrun notarytool history` skipped.    |
+
+### Tool-output (1, NEW in v1.13)
+
+| Reason          | Lane(s)   | Meaning                                                                                                |
+|-----------------|-----------|--------------------------------------------------------------------------------------------------------|
+| `parse-failed`  | ai-tools  | mcp-scan ran but its output JSON could not be parsed into a recognized issue list. No findings emitted; tool reported only in skipped[]. |
 
 ### Universal catch-all (1)
 

@@ -740,7 +740,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} image tool must be trivy|grype, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: image findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "jq"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "jq", "mcp-scan"}:
                 print(f"CONTRACT FAIL: {path}:{i} image finding carries non-image tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         # Origin-aware validation: ai-tools findings must carry `tool` and `origin`.
@@ -748,8 +748,8 @@ with open(path) as fh:
             if "tool" not in obj:
                 print(f"CONTRACT FAIL: {path}:{i} ai-tools finding missing 'tool' field", file=sys.stderr)
                 errs += 1
-            elif obj["tool"] not in {"jq"}:
-                print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq, got {obj['tool']!r}", file=sys.stderr)
+            elif obj["tool"] not in {"jq", "mcp-scan"}:
+                print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq|mcp-scan, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: ai-tools findings must NOT carry any other lane's tool name.
             if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype"}:
@@ -2070,7 +2070,7 @@ sys.exit(1 if errs else 0)
 fi
 echo "image negative-test: malformed skipped-list entry correctly rejected"
 
-# --- ai-tools inventory + §3.25 (v1.12.0):
+# --- ai-tools inventory + §3.25 (v1.12.0; v1.13 adds mcp-scan):
 check skills/sec-audit/SKILL.md "AI-tools signals" "SKILL.md §2 missing ai-tools detection"
 check skills/sec-audit/SKILL.md "\"ai-tools\"" "SKILL.md §2 inventory JSON missing ai-tools key"
 check skills/sec-audit/SKILL.md "### 3.25 AI-tools pass" "SKILL.md missing §3.25"
@@ -2078,6 +2078,14 @@ check skills/sec-audit/SKILL.md "ai-tools-runner" "SKILL.md §3.25 missing ai-to
 check skills/sec-audit/SKILL.md "__ai_tools_status__" "SKILL.md §3.25 missing ai-tools sentinel"
 check skills/sec-audit/SKILL.md "no-ai-tool-config" "SKILL.md §3.25 missing no-ai-tool-config clean-skip reason"
 echo "ai-tools-orchestrator: SKILL.md §3.25 documents ai-tools-runner wire-up"
+
+# --- ai-tools mcp-scan integration (v1.13.0):
+check agents/ai-tools-runner.md "mcp-scan" "ai-tools-runner.md missing mcp-scan integration"
+check agents/ai-tools-runner.md "snyk-agent-scan" "ai-tools-runner.md missing snyk-agent-scan fallback probe"
+check agents/ai-tools-runner.md "inspect" "ai-tools-runner.md missing 'inspect' (static-only) mode"
+check skills/sec-audit/references/ai-tools-tools.md "mcp-scan" "ai-tools-tools.md missing mcp-scan canonical invocation"
+check skills/sec-audit/references/ai-tools-tools.md "parse-failed" "ai-tools-tools.md missing parse-failed skip vocab"
+echo "ai-tools-mcp-scan: agents/ai-tools-runner.md + references/ai-tools-tools.md document mcp-scan inspect mode"
 
 # --- ai-tools fixture-match sanity: synthetic plugin.json + .mcp.json reference
 tmp_at=$(mktemp -d); trap 'rm -rf "$tmp_at"' EXIT

@@ -1,0 +1,7 @@
+{
+  "name": "vulnerable-ai-tools",
+  "version": "0.1.0",
+  "description": "Synthetic fixture: intentionally-poisoned plugin manifest used by tests/ai-tools-e2e.sh to exercise the ai-tools-runner lane (jq + mcp-scan).",
+  "author": { "name": "sec-audit-tests" },
+  "license": "MIT"
+}
