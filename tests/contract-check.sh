@@ -73,7 +73,8 @@ for pair in "agents/sec-expert.md:sonnet" "agents/cve-enricher.md:haiku" \
             "agents/ansible-runner.md:haiku" \
             "agents/netcfg-runner.md:haiku" \
             "agents/image-runner.md:haiku" \
-            "agents/ai-tools-runner.md:haiku"; do
+            "agents/ai-tools-runner.md:haiku" \
+            "agents/webapp-runner.md:haiku"; do
     file="${pair%%:*}"; model="${pair##*:}"
     awk '/^---$/{n++;next} n==1' "$file" | \
         python3 -c "import sys,yaml; d=yaml.safe_load(sys.stdin); \
@@ -475,6 +476,27 @@ with open(path) as fh:
                         print(f"CONTRACT FAIL: {path}:{i} __image_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
                         errs += 1
             continue
+        # Allow the webapp status summary line emitted by webapp-runner. (v1.14.0)
+        # Skip vocabulary: tool-missing, no-webapp-source, no-node-source, no-rails-source.
+        # Three-tool lane: ok / partial / unavailable.
+        if "__webapp_status__" in obj:
+            status = obj.get("__webapp_status__")
+            if status not in {"ok", "partial", "unavailable"}:
+                print(f"CONTRACT FAIL: {path}:{i} bad __webapp_status__ {status!r}", file=sys.stderr)
+                errs += 1
+            if not isinstance(obj.get("tools", []), list):
+                print(f"CONTRACT FAIL: {path}:{i} __webapp_status__ tools must be a list", file=sys.stderr)
+                errs += 1
+            sk = obj.get("skipped", [])
+            if not isinstance(sk, list):
+                print(f"CONTRACT FAIL: {path}:{i} __webapp_status__ skipped must be a list", file=sys.stderr)
+                errs += 1
+            else:
+                for e in sk:
+                    if not (isinstance(e, dict) and "tool" in e and "reason" in e):
+                        print(f"CONTRACT FAIL: {path}:{i} __webapp_status__ skipped entry must have tool+reason: {e!r}", file=sys.stderr)
+                        errs += 1
+            continue
         # Allow the ai-tools status summary line emitted by ai-tools-runner.
         # Skip vocabulary: tool-missing, no-ai-tool-config.
         # Single-tool lane: only ok/unavailable (no partial).
@@ -752,8 +774,20 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq|mcp-scan, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: ai-tools findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "bearer", "njsscan", "brakeman"}:
                 print(f"CONTRACT FAIL: {path}:{i} ai-tools finding carries non-ai-tools tool {obj.get('tool')!r}", file=sys.stderr)
+                errs += 1
+        # Origin-aware validation: webapp findings must carry `tool` and `origin`. (v1.14.0)
+        if obj.get("origin") == "webapp":
+            if "tool" not in obj:
+                print(f"CONTRACT FAIL: {path}:{i} webapp finding missing 'tool' field", file=sys.stderr)
+                errs += 1
+            elif obj["tool"] not in {"bearer", "njsscan", "brakeman"}:
+                print(f"CONTRACT FAIL: {path}:{i} webapp tool must be bearer|njsscan|brakeman, got {obj['tool']!r}", file=sys.stderr)
+                errs += 1
+            # Origin-tag isolation: webapp findings must NOT carry any other lane's tool name.
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan"}:
+                print(f"CONTRACT FAIL: {path}:{i} webapp finding carries non-webapp tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
 PY
@@ -2195,6 +2229,69 @@ if ! grep -q "OMIT the entire section\|omit.*entire section\|do not render an em
     echo "contract-check: FAIL — report-writer Step 5.5 missing empty-array omission rule" >&2
     fail=1
 fi
+
+# --- webapp inventory + §3.26 (v1.14.0):
+check skills/sec-audit/SKILL.md "Webapp signals (v1.14.0+)" "SKILL.md §2 missing webapp detection rule"
+check skills/sec-audit/SKILL.md "\"webapp\"" "SKILL.md §2 inventory JSON missing webapp key"
+check skills/sec-audit/SKILL.md "### 3.26 Webapp pass" "SKILL.md missing §3.26"
+check skills/sec-audit/SKILL.md "webapp-runner" "SKILL.md §3.26 missing webapp-runner"
+check skills/sec-audit/SKILL.md "__webapp_status__" "SKILL.md §3.26 missing webapp sentinel"
+check skills/sec-audit/SKILL.md "no-webapp-source" "SKILL.md §3.26 missing no-webapp-source clean-skip reason"
+check skills/sec-audit/SKILL.md "no-rails-source" "SKILL.md §3.26 missing no-rails-source clean-skip reason"
+check skills/sec-audit/SKILL.md "no-node-source" "SKILL.md §3.26 missing no-node-source clean-skip reason"
+echo "webapp-orchestrator: SKILL.md §3.26 documents webapp-runner wire-up"
+
+# --- webapp tool/agent files:
+check agents/webapp-runner.md "bearer" "webapp-runner.md missing bearer integration"
+check agents/webapp-runner.md "njsscan" "webapp-runner.md missing njsscan integration"
+check agents/webapp-runner.md "brakeman" "webapp-runner.md missing brakeman integration"
+check skills/sec-audit/references/webapp-tools.md "bearer scan" "webapp-tools.md missing bearer canonical invocation"
+check skills/sec-audit/references/webapp-tools.md "--report security" "webapp-tools.md missing --report security flag"
+check skills/sec-audit/references/webapp-tools.md "--no-exit-on-warn" "webapp-tools.md missing brakeman --no-exit-on-warn"
+echo "webapp-tools: webapp-tools.md + webapp-runner.md document bearer + njsscan + brakeman"
+
+# --- webapp reference-pack catalogue:
+for pack in sql-injection ssrf xxe path-traversal file-upload open-redirect ssti mass-assignment idor-bac prototype-pollution command-injection-web http-header-misuse deserialization-web; do
+    check "skills/sec-audit/references/webapp/${pack}.md" "## Source" "webapp/${pack}.md missing Source section"
+    check "skills/sec-audit/references/webapp/${pack}.md" "## Dangerous patterns" "webapp/${pack}.md missing Dangerous patterns section"
+    check "skills/sec-audit/references/webapp/${pack}.md" "## Fix recipes" "webapp/${pack}.md missing Fix recipes section"
+done
+echo "webapp-references: 13 OWASP-Top-10 reference packs present with required sections"
+
+# --- Negative tests for webapp origin
+bad_wa_notool='{"id":"X","severity":"HIGH","cwe":"CWE-89","title":"t","file":"app.py","line":1,"evidence":"e","reference":"webapp-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"webapp"}'
+if echo "$bad_wa_notool" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "webapp" and "tool" not in obj:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: malformed webapp line (missing tool) was accepted" >&2
+    exit 1
+fi
+echo "webapp negative-test: malformed webapp line (missing tool) correctly rejected"
+
+bad_wa_crosstag='{"id":"X","severity":"HIGH","cwe":"CWE-89","title":"t","file":"app.py","line":1,"evidence":"e","reference":"webapp-tools.md","reference_url":null,"fix_recipe":null,"confidence":"high","origin":"webapp","tool":"semgrep"}'
+if echo "$bad_wa_crosstag" | python3 -c '
+import json, sys
+errs = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    obj = json.loads(line)
+    if obj.get("origin") == "webapp" and obj.get("tool") not in {"bearer","njsscan","brakeman"}:
+        errs += 1
+sys.exit(1 if errs else 0)
+' >/dev/null 2>&1; then
+    echo "contract-check: FAIL — negative test: webapp finding with non-webapp tool was accepted" >&2
+    exit 1
+fi
+echo "webapp negative-test: origin-tag isolation enforced (webapp cannot carry the other 21 lanes' tools)"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

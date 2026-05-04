@@ -1511,6 +1511,7 @@ skills/
       webservers/          — nginx, Apache, Caddy
       proxies/             — HAProxy, Traefik, Envoy
       frontend/            — XSS, CSP, CSRF, cookies
+      webapp/              — SQLi, SSRF, XXE, path traversal, file upload, open redirect, SSTI, mass assignment, IDOR/BAC, prototype pollution, command injection, HTTP header misuse, deserialization (v1.14)
       auth/                — OAuth2, OIDC, JWT, sessions, MFA, passwords
       tls/                 — TLS BCP, HSTS, cert rotation
       containers/          — Docker, Kubernetes, Dockerfile hardening
@@ -1523,6 +1524,58 @@ tests/fixtures/
   tiny-django/             — minimal Django SQLi+XSS fixture
   sample-stack/            — Django + nginx + Docker + vulnerable deps
 ```
+
+## Webapp lane (v1.14.0)
+
+A twenty-fifth agent, **`webapp-runner`** (haiku-pinned,
+`Read` + `Bash` tools), joins the pipeline whenever the §2
+inventory detects ≥1 web-framework signal (django / flask /
+fastapi / express / nextjs / rails / spring). It runs three
+web-application SAST tools — `bearer` (Apache-2.0;
+cross-language SAST tuned for OWASP Top 10 + sensitive-data
+flow tracking; supports JS / TS / Java / Ruby / PHP / Go /
+Python), `njsscan` (MIT; MobSF-family Node.js-specific
+scanner; covers Express / Hapi / Koa / Fastify), and
+`brakeman` (MIT; Ruby-on-Rails-only with deep Rails-idiom
+analysis) — emitting JSONL findings tagged with
+`origin: "webapp"` and `tool: "bearer" | "njsscan" |
+"brakeman"`.
+
+Coverage spans the OWASP Top 10 web-vulnerability classes
+the existing frontend pack (XSS / CSRF / CSP / cookies) does
+not address: **SQL injection** (CWE-89), **SSRF** (CWE-918,
+A10:2021), **XXE** (CWE-611), **path traversal incl. ZIP
+slip** (CWE-22), **file upload** (CWE-434), **open redirect**
+(CWE-601), **server-side template injection** (CWE-1336),
+**mass assignment** (CWE-915), **IDOR / broken access
+control** (CWE-639 / CWE-285, A01:2021), **prototype
+pollution** (CWE-1321), **command injection in web context**
+(CWE-78), **HTTP request smuggling / CORS misconfig / host
+header injection** (CWE-444 / CWE-942 / CWE-644), and
+**insecure deserialization** (CWE-502).
+
+Lane filter: `/sec-audit /path --only=webapp` runs only the
+webapp-runner stream; `--skip=webapp` excludes it.
+
+Skip vocabulary (4 reasons): `tool-missing`,
+`no-webapp-source` (bearer on PATH but no framework manifest),
+`no-node-source` (njsscan on PATH but no `*.js` / `*.ts`
+files), `no-rails-source` (brakeman on PATH but the target
+is not a Rails app).
+
+Delineation from the SAST lane: SAST runs `semgrep`
+(`p/owasp-top-ten`) + `bandit` (Python) on every project. The
+webapp lane adds (1) **bearer's data-flow tracking** that
+semgrep's syntactic rules lack; (2) **njsscan's Node-specific
+patterns** — prototype pollution sinks, `eval(req.body)`,
+`child_process.exec` with template-string interpolation,
+hardcoded JWT secrets; (3) **brakeman's Rails-aware analysis**
+that semgrep cannot match (`params.permit` correctness,
+`find_by_sql`, ERB SSTI, `render file:` traversal).
+
+Webapp findings are code-pattern signal; cve-enricher is
+unaffected (package-version CVEs are already covered by the
+language-specific runners + sec-expert manifest reasoning).
 
 ## License
 

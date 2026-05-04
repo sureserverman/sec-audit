@@ -28,7 +28,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -507,6 +507,42 @@ Detect the technology stack. Read only — do not install or execute.
   declarations reference cloud resources and provider versions, not
   package-manifest dependencies; provider-version CVE enrichment is
   a separate future concern.
+- **Webapp signals (v1.14.0+)**: ANY of the seven web-framework
+  signals — django / flask / fastapi (Python) / express / nextjs
+  (Node) / rails (Ruby) / spring (Java) — already detected under
+  the `frameworks` key triggers the `webapp` inventory key as a
+  secondary marker for the webapp tool lane. The detection rule
+  is:
+  - if `frameworks` ⊇ `{"django"}` → emit `"webapp": ["django"]`
+  - if `frameworks` ⊇ `{"flask"}` → emit `"webapp": ["flask"]`
+  - if `frameworks` ⊇ `{"fastapi"}` → emit `"webapp": ["fastapi"]`
+  - if `frameworks` ⊇ `{"express"}` → emit `"webapp": ["express"]`
+  - if `frameworks` ⊇ `{"nextjs"}` → emit `"webapp": ["nextjs"]`
+  - if `frameworks` ⊇ `{"rails"}` → emit `"webapp": ["rails"]`
+  - if `frameworks` ⊇ `{"spring"}` → emit `"webapp": ["spring"]`
+
+  Multiple framework values combine (`"webapp": ["django",
+  "express"]` for a Django REST API + Express BFF monorepo).
+  Load `references/webapp/sql-injection.md`,
+  `references/webapp/ssrf.md`, `references/webapp/xxe.md`,
+  `references/webapp/path-traversal.md`,
+  `references/webapp/file-upload.md`,
+  `references/webapp/open-redirect.md`,
+  `references/webapp/ssti.md`,
+  `references/webapp/mass-assignment.md`,
+  `references/webapp/idor-bac.md`,
+  `references/webapp/prototype-pollution.md` (only when `nextjs`
+  or `express` in the value list),
+  `references/webapp/command-injection-web.md`,
+  `references/webapp/http-header-misuse.md`,
+  `references/webapp/deserialization-web.md`, and the tool-lane
+  reference `references/webapp-tools.md` — load only the
+  per-class packs whose CWE class is plausibly reachable from
+  the detected framework. The brakeman tool runs only when
+  `rails` is in the value list; njsscan only when `express` or
+  `nextjs`; bearer always runs when ANY value is present. No
+  ecosystem entry — webapp findings are code-pattern signal,
+  not package-version signal; CVE enrichment is unaffected.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
 
@@ -595,6 +631,7 @@ Emit an `inventory.json` record (in-memory only) like:
   "netcfg":      [],
   "image":       [],
   "ai-tools":    [],
+  "webapp":      ["django"],
   "rust":        [],
   "auth":        ["django-sessions"],
   "containers":  ["docker"],
@@ -684,7 +721,7 @@ behaviour since v0.7; v1.0 makes it the documented contract.
    summary table at the top of the Review-metadata block with one
    row per dispatched lane. See `agents/report-writer.md` Step 2.5.
 
-The canonical lane list (20 total) is enumerated in
+The canonical lane list (21 total) is enumerated in
 `references/COVERAGE.md` — the single source of truth for which
 inventory keys map to which runners, reference packs, tools, and
 skip reasons.
@@ -1744,6 +1781,107 @@ sec-expert reasoning surface — rather than via cve-enricher.
 `origin: "ai-tools"` and `tool: "jq"`. The contract-check
 rejects any ai-tools finding tagged with another lane's
 tool — see `tests/contract-check.sh`.
+
+### 3.26 Webapp pass — dispatch webapp-runner
+
+When the inventory emitted by §2 contains `webapp` (any of the
+seven web-framework signals — django / flask / fastapi /
+express / nextjs / rails / spring — fired in the Framework
+signals detection rule), dispatch the `webapp-runner` agent
+(`agents/webapp-runner.md`, pinned to haiku, tools: Read +
+Bash). The agent shells out to up to three web-application
+SAST tools — `bearer` (cross-language; data-flow-tracking
+SAST tuned for OWASP Top 10; supports JavaScript, TypeScript,
+Java, Ruby, PHP, Go, Python), `njsscan` (Node.js-specific
+MobSF-family scanner; Express/Hapi/Koa/Fastify rules), and
+`brakeman` (Ruby-on-Rails-only; deep Rails-idiom analysis) —
+against the project root, parses each tool's native JSON
+output, and emits sec-expert-compatible JSONL on stdout —
+every line carrying `origin: "webapp"` and `tool: "bearer" |
+"njsscan" | "brakeman"`. Findings cover SQL injection (CWE-89),
+SSRF (CWE-918), XXE (CWE-611), path traversal (CWE-22), file
+upload (CWE-434), open redirect (CWE-601), SSTI (CWE-1336),
+mass assignment (CWE-915), IDOR / broken access control
+(CWE-639 / CWE-285), prototype pollution (CWE-1321), command
+injection in web context (CWE-78), HTTP request smuggling /
+CORS misconfig / host-header injection (CWE-444 / CWE-942 /
+CWE-644), and insecure deserialization (CWE-502).
+
+**Delineation from the SAST lane (§3.6).** The SAST lane runs
+`bandit` (Python) + `semgrep` (`p/owasp-top-ten`) on every
+project; the webapp lane is additive, not replacement. Three
+reasons it deepens coverage:
+
+1. **`bearer` adds data-flow tracking** — semgrep's
+   `p/owasp-top-ten` is largely syntactic (sink-only). bearer
+   tracks tainted data from sources (HTTP request body, query
+   params, headers) to sinks (SQL exec, subprocess, redirect,
+   render-with-html) across function boundaries.
+2. **`njsscan` covers Node-specific idioms semgrep misses** —
+   prototype-pollution sinks, `eval(req.body)`, child_process
+   exec with template-string interpolation, regex-DoS in
+   request handlers, hardcoded JWT secrets.
+3. **`brakeman` is Rails-only and irreplaceable** — Rails
+   idioms (`params[:user]`, `before_action`, `acts_as_*`,
+   `find_by_sql("...#{x}")`) require parser-aware analysis.
+   semgrep cannot match `params.permit(:role)` correctness
+   against the model's attribute list; brakeman can.
+
+webapp-runner runs in parallel with every other pass agent
+(sec-expert, sast-runner, dast-runner, finding-triager, the
+other tool runners, cve-enricher). Its input is the project
+tree (read only), so other agents may read the same files
+without observable conflict. Collect the webapp JSONL into a
+`webapp_findings` list alongside the other streams.
+
+Skill-level invariants the orchestrator enforces on the webapp
+stream:
+
+- **No `webapp` in inventory** — skip this pass entirely. Do
+  NOT probe for bearer / njsscan / brakeman on unrelated
+  projects (an Android app or a Rust CLI does not benefit
+  from web-framework SAST and the tool installs are heavy).
+- **`__webapp_status__: "unavailable"`** — none of the three
+  tools was on PATH, OR no web-framework signal fired, OR
+  every tool crashed. Add the `⚠ Webapp tools unavailable —
+  install bearer, njsscan, and/or brakeman to enable the
+  web-application static-analysis pass` banner to the Review
+  metadata block. Do NOT fabricate findings. Do NOT treat
+  the absence as a clean scan.
+- **`__webapp_status__: "partial"`** — some tools ran and
+  others were missing or cleanly inapplicable. Merge the
+  findings; note the missing/skipped tools in the
+  Review-metadata section (`Webapp tools run: bearer,
+  njsscan; brakeman skipped — no-rails-source`).
+- **`__webapp_status__: "ok"`** — every available + applicable
+  tool ran. Merge the webapp findings into the triaged
+  stream.
+- **Four skip reasons (webapp lane):**
+  - `tool-missing` — binary absent from PATH.
+  - `no-webapp-source` — bearer on PATH but target has no
+    recognised web-framework manifest. Target-shape
+    clean-skip; parallel to `no-shell-source` /
+    `no-playbook` / `no-image-artifact`.
+  - `no-node-source` — njsscan on PATH but no `*.js` /
+    `*.ts` / `*.jsx` / `*.tsx` files under target.
+  - `no-rails-source` — brakeman on PATH but the target is
+    not a Rails app (no Gemfile mentioning rails AND no
+    `config/application.rb`).
+
+**No dep-inventory effect.** Webapp findings are code-pattern
+signal, not package-version signal. The `__dep_inventory__`
+pathway is unaffected — bearer / njsscan / brakeman do not
+emit `{component, version}` pairs in our invocation, and
+package-version CVEs are already covered by language-specific
+runners (python-runner's pip-audit, the Node ecosystem feed
+via cve-enricher, etc.) plus sec-expert reasoning over
+manifests.
+
+**Origin-tag isolation:** every webapp finding carries
+`origin: "webapp"` and `tool: "bearer" | "njsscan" |
+"brakeman"`. The contract-check rejects any webapp finding
+tagged with another lane's tool — see
+`tests/contract-check.sh`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

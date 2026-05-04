@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across twenty tool lanes plus sec-expert
+software projects across twenty-one tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -50,8 +50,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to twenty-one review streams in parallel
-(twenty tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty-two review streams in parallel
+(twenty-one tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -602,6 +602,68 @@ Dispatch discipline.
   the per-platform reference packs.
 - **Shipped in:** v1.12.0.
 
+### webapp (web-application static analysis)
+
+- **Target shape:** any web-app source tree where ≥1 framework
+  signal among django / flask / fastapi / express / nextjs /
+  rails / spring fired in the §2 Inventory Framework signals
+  detection rule. Inventory values mirror the framework names:
+  `["django"]`, `["flask"]`, `["fastapi"]`, `["express"]`,
+  `["nextjs"]`, `["rails"]`, `["spring"]`, or combinations
+  (`["django", "express"]` for a Django REST API + Express
+  BFF; `["rails", "express"]` for a Rails API + Node SSR
+  frontend monorepo).
+- **Tools:** `bearer` (Apache-2.0; cross-language SAST tuned
+  for OWASP Top 10 + sensitive-data flow; supports JS / TS /
+  Java / Ruby / PHP / Go / Python; emits JSON via `bearer
+  scan --report security --format json`); `njsscan` (MIT;
+  MobSF-family Node.js-specific scanner; covers Express /
+  Hapi / Koa / Fastify; emits JSON via `njsscan --json`);
+  `brakeman` (MIT; Ruby-on-Rails-only SAST with deep
+  Rails-idiom analysis; emits JSON via `brakeman --format
+  json --no-progress --no-exit-on-warn`). Three-tool lane
+  like webext (addons-linter + web-ext + retire) and rust
+  (cargo-audit/deny/geiger/vet). Cross-platform.
+- **Reference packs:** `references/webapp/sql-injection.md`,
+  `references/webapp/ssrf.md`, `references/webapp/xxe.md`,
+  `references/webapp/path-traversal.md`,
+  `references/webapp/file-upload.md`,
+  `references/webapp/open-redirect.md`,
+  `references/webapp/ssti.md`,
+  `references/webapp/mass-assignment.md`,
+  `references/webapp/idor-bac.md`,
+  `references/webapp/prototype-pollution.md`,
+  `references/webapp/command-injection-web.md`,
+  `references/webapp/http-header-misuse.md`,
+  `references/webapp/deserialization-web.md`,
+  `references/webapp-tools.md`. Existing
+  `references/frontend/{xss,csrf,csp,samesite-cookies}.md`
+  remain in the frontend lane and are NOT duplicated here.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-webapp-source`
+  (bearer on PATH but no recognised framework manifest),
+  `no-node-source` (njsscan on PATH but no `*.js` / `*.ts`
+  / `*.jsx` / `*.tsx` files), `no-rails-source` (brakeman
+  on PATH but the target is not a Rails app — no Gemfile
+  mentioning rails AND no `config/application.rb`).
+- **Origin tag:** `"webapp"`. Tool whitelist: `bearer`,
+  `njsscan`, `brakeman`. Three-tool lane → all three
+  status values apply: `ok` (every available + applicable
+  tool ran), `partial` (some ran, others missing or
+  cleanly inapplicable), `unavailable` (none could run).
+- **Dep-inventory:** NOT affected — webapp findings are
+  code-pattern signal, not package-version signal. Package-
+  version CVEs are already covered by language-specific
+  runners (python-runner's pip-audit, the npm/Maven/RubyGems
+  ecosystems via cve-enricher) plus sec-expert reasoning
+  over manifests.
+- **Delineation from SAST lane:** SAST runs `semgrep` (with
+  `p/owasp-top-ten`) + `bandit` (Python) on every project.
+  webapp is additive: bearer adds data-flow tracking that
+  semgrep's syntactic rules lack; njsscan adds Node-specific
+  patterns; brakeman is the only deeply-Rails-aware SAST.
+- **Shipped in:** v1.14.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -632,10 +694,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**20 canonical reason values** as of v1.13, grouped by semantic
+**23 canonical reason values** as of v1.14, grouped by semantic
 category:
 
-### Target-shape (16)
+### Target-shape (19)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -655,6 +717,9 @@ category:
 | `no-xray-config`  | netcfg               | No Xray-shaped JSON under target (xray test applicable).                |
 | `no-image-artifact`| image               | No image tarball / OCI layout / SBOM under target (trivy/grype scope).  |
 | `no-ai-tool-config`| ai-tools             | No AI-tool-config JSON shape under target (jq applicable; no plugin.json / .mcp.json / settings.json / opencode.json). |
+| `no-webapp-source`| webapp               | bearer on PATH but target has no recognised web-framework manifest (no Python / Node / Ruby / Java / PHP / Go signal). |
+| `no-node-source`  | webapp               | njsscan on PATH but no `*.js` / `*.ts` / `*.jsx` / `*.tsx` files under target.                                         |
+| `no-rails-source` | webapp               | brakeman on PATH but target is not a Rails app (no Gemfile mentioning rails AND no `config/application.rb`).           |
 
 ### Host-OS-gated (3)
 
