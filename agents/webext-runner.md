@@ -1,20 +1,6 @@
 ---
 name: webext-runner
-description: >
-  Browser-extension static-analysis adapter sub-agent for sec-audit. Runs
-  `addons-linter`, `web-ext lint`, and `retire.js` against a caller-supplied
-  `target_path` (the extension source directory) when those binaries are
-  available on PATH, and emits sec-expert-compatible JSONL findings tagged
-  with `origin: "webext"` and `tool: "addons-linter" | "web-ext" | "retire"`.
-  When none of the three tools is available, emits exactly one sentinel
-  line `{"__webext_status__": "unavailable", "tools": []}` and exits 0 —
-  never fabricates findings, never pretends a clean scan. When some tools
-  are present, emits `{"__webext_status__": "partial", "tools": [...]}`
-  listing only the tools that actually ran. Reads canonical invocations,
-  output-field mappings, and degrade rules from
-  `<plugin-root>/skills/sec-audit/references/webext-tools.md`. Dispatched
-  by the sec-audit orchestrator skill (§3.8) when `webext` is in the
-  detected inventory.
+description: "Browser-extension static-analysis adapter for sec-audit. Runs addons-linter, web-ext, and retire.js against extension source under target_path; emits JSONL findings tagged origin: \"webext\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.8."
 model: haiku
 tools: Read, Bash
 ---

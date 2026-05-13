@@ -1,29 +1,6 @@
 ---
 name: python-runner
-description: >
-  Python static-analysis adapter sub-agent for sec-audit.
-  Runs `pip-audit` (PyPA-maintained PyPI vulnerability scanner
-  with OSV-backed metadata + reachability hints) and `ruff`
-  (Rust-implemented Python linter with the `S`-prefix
-  flake8-bandit security ruleset and the `B`-prefix
-  flake8-bugbear bug-prone-pattern ruleset) against a
-  caller-supplied `target_path` (a Python project root with a
-  manifest — requirements.txt / pyproject.toml / setup.py /
-  Pipfile) when those binaries are on PATH, and emits
-  sec-expert-compatible JSONL findings tagged with
-  `origin: "python"` and `tool: "pip-audit" | "ruff"`. When
-  neither tool is available OR the target has no Python
-  manifest, emits exactly one sentinel line
-  `{"__python_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Reads canonical invocations + per-rule mapping tables
-  from
-  `<plugin-root>/skills/sec-audit/references/python-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.21)
-  when `python` is in the detected inventory. Cross-platform,
-  no host-OS gate. Findings with CVE aliases flow through the
-  cve-enricher via the `PyPI` ecosystem (OSV-native, no
-  adapter change required).
+description: "Python static-analysis adapter for sec-audit. Runs pip-audit and ruff against a Python project root under target_path; emits JSONL findings tagged origin: \"python\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.21."
 model: haiku
 tools: Read, Bash
 ---

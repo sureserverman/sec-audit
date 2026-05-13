@@ -1,23 +1,6 @@
 ---
 name: rust-runner
-description: >
-  Rust/Cargo static-analysis adapter sub-agent for sec-audit. Runs
-  `cargo-audit`, `cargo-deny`, `cargo-geiger`, and `cargo-vet` against a
-  caller-supplied `target_path` (the Rust project root containing
-  Cargo.toml) when those subcommands are available, and emits
-  sec-expert-compatible JSONL findings tagged with `origin: "rust"` and
-  `tool: "cargo-audit" | "cargo-deny" | "cargo-geiger" | "cargo-vet"`.
-  When `cargo` is missing or none of the four subcommands responds,
-  emits exactly one sentinel line `{"__rust_status__": "unavailable",
-  "tools": []}` and exits 0 — never fabricates findings, never pretends
-  a clean scan. When some subcommands are present, emits
-  `{"__rust_status__": "partial", "tools": [...]}` listing only those
-  that actually ran. Reads canonical invocations, output-field mappings,
-  and degrade rules from `<plugin-root>/skills/sec-audit/references/rust-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.9) when `rust` is
-  in the detected inventory. Findings with CVE aliases flow through the
-  cve-enricher via the `crates.io` ecosystem (OSV-native, no adapter
-  change required).
+description: "Rust/Cargo static-analysis adapter for sec-audit. Runs cargo-audit, cargo-deny, cargo-geiger, and cargo-vet against a Cargo project root under target_path; emits JSONL findings tagged origin: \"rust\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.9."
 model: haiku
 tools: Read, Bash
 ---

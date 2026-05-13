@@ -1,31 +1,6 @@
 ---
 name: webapp-runner
-description: >
-  Web-application static-analysis adapter sub-agent for sec-audit.
-  Runs `bearer` (cross-language SAST tuned for OWASP Top 10 +
-  data-flow tracking, supports JS/TS/Java/Ruby/PHP/Go/Python),
-  `njsscan` (Node.js-specific MobSF-family scanner), and
-  `brakeman` (Ruby-on-Rails-only SAST) against a caller-supplied
-  `target_path` (a web-application source tree with at least one
-  framework signal among django / flask / fastapi / express /
-  nextjs / rails / spring) when those binaries are on PATH, and
-  emits sec-expert-compatible JSONL findings tagged with
-  `origin: "webapp"` and `tool: "bearer" | "njsscan" |
-  "brakeman"`. Findings cover SQL injection, SSRF, XXE, path
-  traversal, file upload, open redirect, SSTI, mass assignment,
-  IDOR / broken access control, prototype pollution, command
-  injection, HTTP header misuse, and insecure deserialization.
-  When none of the three tools is available OR the target has
-  no recognised web-framework signal, emits exactly one sentinel
-  line `{"__webapp_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Reads canonical invocations + per-tool mapping tables
-  from
-  `<plugin-root>/skills/sec-audit/references/webapp-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.26) when
-  `webapp` is in the detected inventory. Cross-platform, no
-  host-OS gate. webapp findings do NOT feed cve-enricher —
-  they are code-pattern signal, not package-version signal.
+description: "Web-application static-analysis adapter for sec-audit. Runs bearer, njsscan, and brakeman against web-framework source trees under target_path; emits JSONL findings tagged origin: \"webapp\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.26."
 model: haiku
 tools: Read, Bash
 ---

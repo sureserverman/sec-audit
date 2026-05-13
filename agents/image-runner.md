@@ -1,29 +1,6 @@
 ---
 name: image-runner
-description: >
-  Container-image vulnerability-scan adapter sub-agent for
-  sec-audit. The OSS-equivalent of Docker Scout's CVE-scanning
-  surface — without Docker daemon, Docker Hub login, or
-  registry-pull dependencies. Runs `trivy image --input
-  <tarball>` (Aqua Security; offline-capable; vulnerability
-  scanner with `--scanners vuln` mode) and `grype <input>`
-  (Anchore; accepts image tarballs / OCI layouts / SBOMs)
-  against image-shaped artifacts under a caller-supplied
-  `target_path` when those binaries are on PATH, and emits
-  sec-expert-compatible JSONL findings tagged with
-  `origin: "image"` and `tool: "trivy" | "grype"`. When
-  neither tool is available OR the target has no image
-  artifact (no `*.tar` / OCI layout / SBOM file), emits
-  exactly one sentinel line
-  `{"__image_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Reads canonical invocations + per-tool output mapping
-  tables from
-  `<plugin-root>/skills/sec-audit/references/image-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.24)
-  when `image` is in the detected inventory. Cross-platform,
-  no host-OS gate. Runner deduplicates trivy+grype overlap by
-  `(file, vuln_id, package_name)` tuple before emitting.
+description: "Container-image vulnerability-scan adapter for sec-audit. Runs trivy and grype against image tarballs/OCI layouts under target_path; emits JSONL findings tagged origin: \"image\". Sentinel-exits when tools or image artifacts are unavailable. Dispatched by sec-audit §3.24."
 model: haiku
 tools: Read, Bash
 ---

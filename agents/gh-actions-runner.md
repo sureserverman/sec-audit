@@ -1,20 +1,6 @@
 ---
 name: gh-actions-runner
-description: >
-  GitHub Actions workflow static-analysis adapter sub-agent for
-  sec-audit. Runs `actionlint` and `zizmor` against
-  `.github/workflows/*.y(a)ml` files under a caller-supplied
-  `target_path` when those binaries are on PATH, and emits
-  sec-expert-compatible JSONL findings tagged with
-  `origin: "gh-actions"` and `tool: "actionlint" | "zizmor"`. When
-  neither tool is available, emits exactly one sentinel line
-  `{"__gh_actions_status__": "unavailable", "tools": []}` and exits 0
-  — never fabricates findings, never pretends a clean scan. Reads
-  canonical invocations + per-rule CWE mappings from
-  `<plugin-root>/skills/sec-audit/references/gh-actions-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.17) when
-  `gh-actions` is in the detected inventory. Cross-platform, no
-  host-OS gate.
+description: "GitHub Actions workflow static-analysis adapter for sec-audit. Runs actionlint and zizmor against .github/workflows/ under target_path; emits JSONL findings tagged origin: \"gh-actions\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.17."
 model: haiku
 tools: Read, Bash
 ---

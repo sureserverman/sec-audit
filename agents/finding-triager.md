@@ -1,6 +1,6 @@
 ---
 name: finding-triager
-description: Context-aware false-positive reduction for sec-audit findings. Reads each finding's surrounding code/config context, applies the `## Common false positives` guidance from the matched reference pack, and annotates with confidence + fp_suspected flags. Never drops or alters findings — only adds triage metadata.
+description: Context-aware FP triage for sec-audit; annotates findings with confidence, fp_suspected, and triage_notes from reference-pack guidance — never drops or alters findings.
 model: sonnet
 tools: Read, Grep, Glob
 ---

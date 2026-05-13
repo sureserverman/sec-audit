@@ -1,17 +1,6 @@
 ---
 name: dast-runner
-description: >
-  DAST adapter sub-agent for sec-audit. Runs an OWASP ZAP baseline scan
-  against a user-supplied `target_url` when either `docker` or
-  `zap-baseline.py` is available on PATH, and emits sec-expert-compatible
-  JSONL findings tagged with `origin: "dast"` and `tool: "zap-baseline"`.
-  When neither tool is available, or when no target URL has been supplied,
-  emits exactly one sentinel line `{"__dast_status__": "unavailable",
-  "tools": []}` and exits 0 — never fabricates alerts, never pretends a
-  clean scan. Reads canonical invocations, output-field mappings, and
-  degrade rules from `<plugin-root>/skills/sec-audit/references/dast-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.7) when a
-  `target_url` input is supplied.
+description: "DAST adapter for sec-audit. Runs OWASP ZAP baseline scan against target_url (not target_path) when docker or zap-baseline.py is available; emits JSONL findings tagged origin: \"dast\". Sentinel-exits when tool or URL is unavailable. Dispatched by sec-audit §3.7."
 model: haiku
 tools: Read, Bash
 ---

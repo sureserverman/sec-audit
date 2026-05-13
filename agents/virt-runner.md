@@ -1,25 +1,6 @@
 ---
 name: virt-runner
-description: >
-  Virtualization / alternative-container-runtime static-analysis
-  adapter sub-agent for sec-audit. Runs `hadolint` (Dockerfile /
-  Containerfile linter) and `virt-xml-validate` (libvirt domain /
-  network / pool / volume XML schema validator) against a
-  caller-supplied `target_path` when those binaries are on PATH,
-  and emits sec-expert-compatible JSONL findings tagged with
-  `origin: "virt"` and `tool: "hadolint" | "virt-xml-validate"`.
-  When neither tool is available OR no virt-relevant artefact
-  exists under the target, emits exactly one sentinel line
-  `{"__virt_status__": "unavailable", "tools": []}` and exits 0
-  — never fabricates findings, never pretends a clean scan. The
-  status line supports a structured `skipped` list distinguishing
-  cleanly-skipped tools (`tool-missing`, `no-containerfile`,
-  `no-libvirt-xml`) from failed tools. Reads canonical
-  invocations and field mappings from
-  `<plugin-root>/skills/sec-audit/references/virt-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.18) when
-  `virt` is in the detected inventory. Cross-platform, no
-  host-OS gate.
+description: "Virtualization static-analysis adapter for sec-audit. Runs hadolint and virt-xml-validate against Dockerfile/Containerfile and libvirt XML under target_path; emits JSONL findings tagged origin: \"virt\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.18."
 model: haiku
 tools: Read, Bash
 ---

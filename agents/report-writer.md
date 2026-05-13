@@ -1,6 +1,6 @@
 ---
 name: report-writer
-description: "Composes the final sec-audit markdown report from triaged findings, CVE enrichment output, and the inventory. Follows the section-6 template in SKILL.md verbatim: header block, severity-descending buckets (CRITICAL/HIGH/MEDIUM/LOW), per-finding blocks with file:line/CWE/CVEs/score breakdown/evidence/quoted fix/sources, dep CVE summary table, review metadata. Never invents content — only renders what the inputs contain."
+description: Composes the sec-audit markdown report from triaged findings, CVE enrichment output, and the inventory; renders only what the inputs contain.
 model: sonnet
 tools: Read, Write, Bash
 ---

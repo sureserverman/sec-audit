@@ -1,15 +1,6 @@
 ---
 name: sast-runner
-description: >
-  SAST adapter sub-agent for sec-audit. Runs semgrep and bandit against a
-  target project when those binaries are available on PATH, and emits
-  sec-expert-compatible JSONL findings tagged with `origin: "sast"` and
-  `tool: "semgrep" | "bandit"`. When both tools are missing, emits exactly
-  one sentinel line `{"__sast_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean scan. Reads
-  canonical invocations, output-field mappings, and degrade rules from
-  `<plugin-root>/skills/sec-audit/references/sast-tools.md`. Dispatched in
-  parallel with sec-expert from the sec-audit orchestrator skill (§3.6).
+description: "SAST adapter for sec-audit. Runs semgrep and bandit against target_path; emits JSONL findings tagged origin: \"sast\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.6."
 model: haiku
 tools: Read, Bash
 ---

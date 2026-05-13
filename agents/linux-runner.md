@@ -1,22 +1,6 @@
 ---
 name: linux-runner
-description: >
-  Desktop Linux static-analysis adapter sub-agent for sec-audit. Runs
-  `systemd-analyze security` (on systemd hosts, against `.service`
-  units in the target tree), `lintian` (against `debian/` source
-  directories), and `checksec` (against ELF binaries when present)
-  on a caller-supplied `target_path`. Emits sec-expert-compatible
-  JSONL findings tagged with `origin: "linux"` and
-  `tool: "systemd-analyze" | "lintian" | "checksec"`. When none of
-  the three is available OR none is applicable, emits exactly one
-  sentinel line `{"__linux_status__": "unavailable", "tools": []}`
-  and exits 0 — never fabricates findings. The status line supports
-  a `skipped` list with reasons (`"requires-systemd-host"`,
-  `"no-debian-source"`, `"no-elf"`, `"tool-missing"`) extending the
-  v0.8-v0.9 skipped-list vocabulary. Reads canonical invocations from
-  `<plugin-root>/skills/sec-audit/references/linux-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.12) when
-  `linux` is in the detected inventory.
+description: "Desktop Linux static-analysis adapter for sec-audit. Runs systemd-analyze security, lintian, and checksec against target_path; emits JSONL findings tagged origin: \"linux\". Sentinel-exits when tools are unavailable or inapplicable. Dispatched by sec-audit §3.12."
 model: haiku
 tools: Read, Bash
 ---

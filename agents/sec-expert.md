@@ -1,6 +1,7 @@
 ---
 name: sec-expert
-description: Cybersecurity domain expert for web services and servers. Analyzes a target project against citation-grounded reference packs covering databases (Postgres, MySQL, MongoDB, Redis, SQLite), web frameworks (Django, Flask, FastAPI, Express, Next.js, Rails, Spring), webservers (nginx, Apache, Caddy), proxies and load balancers (HAProxy, Traefik, Envoy), frontend security (XSS, CSP, CSRF, SameSite cookies), authentication (OAuth2, OIDC, JWT, sessions, MFA, password storage), TLS and certificate rotation, containers (Docker, Kubernetes, Dockerfile hardening), secrets management, and software supply chain (SLSA, Sigstore, SBOM). Emits one JSONL finding object per line with CWE, severity, file:line evidence, and a fix recipe quoted verbatim from a reference file — never invented. Use via the sec-audit skill or directly for targeted audits.
+description: >-
+  Cybersecurity domain expert for sec-audit. Analyzes target projects against citation-grounded reference packs covering web frameworks, authentication (OAuth2/JWT/sessions), TLS, containers, and supply chain. Emits JSONL findings with CWE, severity, file:line evidence, and verbatim fix recipes. Dispatched by sec-audit §3.5.
 tools: Read, Grep, Glob, Bash, WebFetch
 model: sonnet
 ---

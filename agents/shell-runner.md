@@ -1,25 +1,6 @@
 ---
 name: shell-runner
-description: >
-  Shell-script static-analysis adapter sub-agent for
-  sec-audit. Runs `shellcheck` (the canonical Haskell-based
-  static analyzer for bash/sh/dash/ksh shell scripts, with
-  `SCxxxx` rule IDs covering quoting, command injection, file
-  handling, and control-flow correctness) against
-  shell-shaped files under a caller-supplied `target_path`
-  when the binary is on PATH, and emits sec-expert-compatible
-  JSONL findings tagged with `origin: "shell"` and
-  `tool: "shellcheck"`. When shellcheck is not available OR
-  the target has no shell-shaped files, emits exactly one
-  sentinel line
-  `{"__shell_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Reads canonical invocations + per-rule CWE mapping
-  from
-  `<plugin-root>/skills/sec-audit/references/shell-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.20)
-  when `shell` is in the detected inventory. Cross-platform,
-  no host-OS gate. First single-tool lane since DAST (v0.5).
+description: "Shell-script static-analysis adapter for sec-audit. Runs shellcheck against shell-shaped files under target_path; emits JSONL findings tagged origin: \"shell\". Sentinel-exits when tool is unavailable. Dispatched by sec-audit §3.20."
 model: haiku
 tools: Read, Bash
 ---

@@ -1,36 +1,6 @@
 ---
 name: ai-tools-runner
-description: >
-  AI-tools static-analysis adapter sub-agent for sec-audit.
-  Runs two tools against AI-tool-config files under a
-  caller-supplied `target_path`:
-  (1) `jq --exit-status` — universal JSON structural
-  validator for `.claude-plugin/plugin.json`,
-  `.claude-plugin/marketplace.json`, `.mcp.json` at any
-  depth, `.claude/settings.json`,
-  `.claude/settings.local.json`, `opencode.json`.
-  (2) `mcp-scan inspect --json` (Invariant Labs; rebranded
-  `snyk-agent-scan` after the Snyk acquisition) — tool-
-  poisoning + malicious-description scanner for `.mcp.json`,
-  `claude_desktop_config.json`, and skill / agent markdown
-  trees. Static-only mode (`inspect`); the runner NEVER
-  invokes `mcp-scan scan` and NEVER passes
-  `--dangerously-run-mcp-servers`, both of which would launch
-  stdio MCP servers locally.
-  Emits sec-expert-compatible JSONL findings tagged with
-  `origin: "ai-tools"` and `tool: "jq" | "mcp-scan"`. When
-  both tools are missing OR no in-scope inputs exist, emits
-  exactly one sentinel line
-  `{"__ai_tools_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Status `"partial"` when one tool ran and the other
-  was missing. Reads canonical invocations + per-tool mapping
-  tables from
-  `<plugin-root>/skills/sec-audit/references/ai-tools-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.25) when
-  `ai-tools` is in the detected inventory. Cross-platform, no
-  host-OS gate. Two-tool lane like SAST (semgrep + bandit)
-  and webext (addons-linter + web-ext + retire).
+description: "AI-tools static-analysis adapter for sec-audit. Runs jq (JSON structural validator) and mcp-scan (tool-poisoning + malicious-description scanner) against AI-tool-config files under target_path; emits JSONL findings tagged origin: \"ai-tools\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.25."
 model: haiku
 tools: Read, Bash
 ---

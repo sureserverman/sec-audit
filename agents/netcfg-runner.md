@@ -1,30 +1,6 @@
 ---
 name: netcfg-runner
-description: >
-  Networking-as-code static-analysis adapter sub-agent for
-  sec-audit. Runs `sing-box check` and `xray test` (the
-  self-validation subcommands of sing-box and Xray-core,
-  which parse the JSON config and validate schema +
-  cross-field constraints without starting any listeners or
-  network activity) against netcfg-shaped files under a
-  caller-supplied `target_path` when those binaries are on
-  PATH, and emits sec-expert-compatible JSONL findings
-  tagged with `origin: "netcfg"` and
-  `tool: "sing-box" | "xray"`. When neither tool is available
-  OR the target has no sing-box / Xray JSON files, emits
-  exactly one sentinel line
-  `{"__netcfg_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Tor (torrc) and WireGuard (*.conf) patterns are
-  covered by sec-expert reading the netcfg/tor.md and
-  netcfg/wireguard.md reference packs; no tool runs against
-  them in this lane (mature source-only / network-free
-  validators do not exist for these formats). Reads canonical
-  invocations + per-tool mapping tables from
-  `<plugin-root>/skills/sec-audit/references/netcfg-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.23)
-  when `netcfg` is in the detected inventory. Cross-platform,
-  no host-OS gate.
+description: "Networking-config static-analysis adapter for sec-audit. Runs sing-box check and xray test against netcfg-shaped files under target_path; emits JSONL findings tagged origin: \"netcfg\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.23."
 model: haiku
 tools: Read, Bash
 ---

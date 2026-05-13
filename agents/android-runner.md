@@ -1,26 +1,6 @@
 ---
 name: android-runner
-description: >
-  Android static-analysis adapter sub-agent for sec-audit. Runs
-  `mobsfscan`, `apkleaks` (when an APK is present under the target
-  tree), and `android-lint` (via gradle when available, else the
-  standalone `lint` binary) against a caller-supplied `target_path`
-  (the Android source tree or app module root) when those tools are
-  on PATH, and emits sec-expert-compatible JSONL findings tagged with
-  `origin: "android"` and
-  `tool: "mobsfscan" | "apkleaks" | "android-lint"`. When none of the
-  three is available, emits exactly one sentinel line
-  `{"__android_status__": "unavailable", "tools": []}` and exits 0 —
-  never fabricates findings, never pretends a clean scan. The status
-  line supports a NEW `"skipped"` list distinguishing cleanly-skipped
-  tools (apkleaks when no `*.apk`/`*.aab` exists under the target)
-  from failed tools (on PATH but crashed). Reads canonical invocations,
-  output-field mappings, and degrade rules from
-  `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.10) when
-  `android` is in the detected inventory. Findings flow to
-  cve-enricher via the `Maven` ecosystem (OSV-native, no adapter
-  change required).
+description: "Android static-analysis adapter for sec-audit. Runs mobsfscan, apkleaks, and android-lint against target_path; emits JSONL findings tagged origin: \"android\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.10."
 model: haiku
 tools: Read, Bash
 ---

@@ -1,22 +1,6 @@
 ---
 name: ios-runner
-description: >
-  iOS static-analysis adapter sub-agent for sec-audit. Runs
-  `mobsfscan` against Swift/Obj-C source trees, plus Apple's
-  `codesign`, `spctl`, and `xcrun notarytool` binaries when (a) the
-  runner is on a macOS host AND (b) a `.app` / `.framework` /
-  `.xcarchive` bundle is present under the target. Emits sec-expert-
-  compatible JSONL findings tagged with `origin: "ios"` and `tool:
-  "mobsfscan" | "codesign" | "spctl" | "notarytool"`. When none of the
-  tools is available, emits exactly one sentinel line
-  `{"__ios_status__": "unavailable", "tools": []}` and exits 0 —
-  never fabricates findings. The status line supports a `skipped`
-  list that distinguishes cleanly-skipped tools (requires-macos-host,
-  no-bundle, no-notary-profile) from failed tools. Reads canonical
-  invocations and field mappings from
-  `<plugin-root>/skills/sec-audit/references/mobile-tools.md`
-  (iOS subsection). Dispatched by the sec-audit orchestrator skill
-  (§3.11) when `ios` is in the detected inventory.
+description: "iOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, and notarytool on macOS hosts with bundle artifacts under target_path; emits JSONL findings tagged origin: \"ios\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.11."
 model: haiku
 tools: Read, Bash
 ---

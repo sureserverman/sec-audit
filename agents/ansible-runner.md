@@ -1,27 +1,6 @@
 ---
 name: ansible-runner
-description: >
-  Ansible static-analysis adapter sub-agent for sec-audit.
-  Runs `ansible-lint` (the canonical Ansible playbook + role +
-  collection linter, with rule IDs covering security like
-  `risky-shell-pipe`, `no-log-password`,
-  `command-instead-of-shell`, `partial-become`, plus
-  idempotency and deprecation tracking) against
-  Ansible-shaped files under a caller-supplied `target_path`
-  when the binary is on PATH, and emits sec-expert-compatible
-  JSONL findings tagged with `origin: "ansible"` and
-  `tool: "ansible-lint"`. When ansible-lint is not available
-  OR the target has no Ansible-shaped files, emits exactly
-  one sentinel line
-  `{"__ansible_status__": "unavailable", "tools": []}` and
-  exits 0 — never fabricates findings, never pretends a clean
-  scan. Reads canonical invocations + per-rule mapping tables
-  from
-  `<plugin-root>/skills/sec-audit/references/ansible-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.22)
-  when `ansible` is in the detected inventory. Cross-platform,
-  no host-OS gate. Single-tool lane like Shell (v1.6) and
-  DAST (v0.5).
+description: "Ansible static-analysis adapter for sec-audit. Runs ansible-lint against Ansible-shaped files under target_path; emits JSONL findings tagged origin: \"ansible\". Sentinel-exits when tool is unavailable. Dispatched by sec-audit §3.22."
 model: haiku
 tools: Read, Bash
 ---

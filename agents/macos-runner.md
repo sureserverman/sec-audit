@@ -1,26 +1,6 @@
 ---
 name: macos-runner
-description: >
-  Desktop macOS static-analysis adapter sub-agent for sec-audit. Runs
-  `mobsfscan` against Swift/Obj-C source trees, plus Apple's
-  `codesign`, `spctl`, `pkgutil`, and `stapler` binaries when the
-  runner is on a macOS host AND an appropriate artifact (`.app` /
-  `.framework` / `.pkg` / `.dmg`) is present under the target. Emits
-  sec-expert-compatible JSONL findings tagged with `origin: "macos"`
-  and `tool: "mobsfscan" | "codesign" | "spctl" | "pkgutil" |
-  "stapler"`. Sibling agent to `ios-runner` (v0.9.0); cross-platform
-  SwiftPM packages may satisfy both iOS and macOS inventory signals,
-  in which case both runners dispatch independently and their
-  findings render in separate report sections. When none of the
-  tools is available, emits the sentinel `{"__macos_status__":
-  "unavailable", "tools": []}` and exits 0. The structured `skipped`
-  list distinguishes clean-skips by reason
-  (`"requires-macos-host"` shared with iOS;
-  `"no-bundle"`, `"no-pkg"` (NEW in v0.11), `"no-notary-profile"`,
-  `"tool-missing"`). Reads canonical invocations from
-  `<plugin-root>/skills/sec-audit/references/mobile-tools.md`
-  (iOS + macOS subsections). Dispatched by the sec-audit
-  orchestrator skill (§3.13) when `macos` is in the inventory.
+description: "Desktop macOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, pkgutil, and stapler on macOS hosts with bundle/pkg artifacts under target_path; emits JSONL findings tagged origin: \"macos\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.13."
 model: haiku
 tools: Read, Bash
 ---

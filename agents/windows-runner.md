@@ -1,25 +1,6 @@
 ---
 name: windows-runner
-description: >
-  Desktop Windows static-analysis adapter sub-agent for sec-audit.
-  Runs `binskim` (Microsoft PE static-analysis scanner, cross-
-  platform via dotnet), `osslsigncode` (cross-platform Authenticode
-  verifier), and `sigcheck` (Sysinternals; Windows-host-only)
-  against a caller-supplied `target_path` containing Windows source
-  or PE artifacts (`.exe`/`.dll`/`.msi`/`.msix`/`.sys`). Emits sec-
-  expert-compatible JSONL findings tagged with `origin: "windows"`
-  and `tool: "binskim" | "osslsigncode" | "sigcheck"`. Unlike the
-  iOS/macOS lanes where most Apple binaries are macOS-host-gated,
-  two of the three Windows tools run cross-platform — only
-  `sigcheck` clean-skips with `reason: "requires-windows-host"`
-  (THIRD host-OS-gated skip reason after v0.9's
-  `requires-macos-host` and v0.10's `requires-systemd-host`). When
-  none of the tools is available OR no PE artifact exists under
-  the target, emits `{"__windows_status__": "unavailable", "tools":
-  []}` and exits 0. Reads canonical invocations from
-  `<plugin-root>/skills/sec-audit/references/windows-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.14) when
-  `windows` is in the inventory.
+description: "Desktop Windows static-analysis adapter for sec-audit. Runs binskim, osslsigncode, and sigcheck against PE artifacts under target_path; emits JSONL findings tagged origin: \"windows\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.14."
 model: haiku
 tools: Read, Bash
 ---

@@ -1,18 +1,6 @@
 ---
 name: k8s-runner
-description: >
-  Kubernetes manifest static-analysis adapter sub-agent for sec-audit.
-  Runs `kube-score` and `kubesec` against `*.yaml`/`*.yml` files under
-  a caller-supplied `target_path` when those binaries are on PATH, and
-  emits sec-expert-compatible JSONL findings tagged with `origin:
-  "k8s"` and `tool: "kube-score" | "kubesec"`. When neither tool is
-  available, emits exactly one sentinel line
-  `{"__k8s_status__": "unavailable", "tools": []}` and exits 0 —
-  never fabricates findings. Reads canonical invocations + per-check
-  CWE mappings from
-  `<plugin-root>/skills/sec-audit/references/k8s-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.15) when `k8s`
-  is in the detected inventory. Cross-platform, no host-OS gate.
+description: "Kubernetes manifest static-analysis adapter for sec-audit. Runs kube-score and kubesec against YAML manifests under target_path; emits JSONL findings tagged origin: \"k8s\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.15."
 model: haiku
 tools: Read, Bash
 ---

@@ -1,25 +1,6 @@
 ---
 name: go-runner
-description: >
-  Go static-analysis adapter sub-agent for sec-audit. Runs
-  `gosec` (security-focused linter with `Gxxx` rule IDs) and
-  `staticcheck` (comprehensive bug-finding + simplifications +
-  style analyzer with `SAxxxx`/`Sxxxx`/`STxxxx`/`Uxxxx` rules)
-  against a caller-supplied `target_path` (a Go module root
-  containing go.mod) when those binaries are on PATH, and
-  emits sec-expert-compatible JSONL findings tagged with
-  `origin: "go"` and `tool: "gosec" | "staticcheck"`. When
-  neither tool is available OR the target has no `*.go` files,
-  emits exactly one sentinel line
-  `{"__go_status__": "unavailable", "tools": []}` and exits 0
-  — never fabricates findings, never pretends a clean scan.
-  Reads canonical invocations + per-rule CWE mappings from
-  `<plugin-root>/skills/sec-audit/references/go-tools.md`.
-  Dispatched by the sec-audit orchestrator skill (§3.19) when
-  `go` is in the detected inventory. Cross-platform, no
-  host-OS gate. Findings with CVE aliases flow through the
-  cve-enricher via the `Go` ecosystem (OSV-native, no adapter
-  change required).
+description: "Go static-analysis adapter for sec-audit. Runs gosec and staticcheck against a Go module root under target_path; emits JSONL findings tagged origin: \"go\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.19."
 model: haiku
 tools: Read, Bash
 ---

@@ -1,17 +1,6 @@
 ---
 name: iac-runner
-description: >
-  IaC static-analysis adapter sub-agent for sec-audit. Runs `tfsec`
-  and `checkov` against Terraform (.tf) and Pulumi source under a
-  caller-supplied `target_path`. Both tools are cross-platform —
-  no host-OS gate. Emits sec-expert-compatible JSONL findings
-  tagged with `origin: "iac"` and `tool: "tfsec" | "checkov"`.
-  When neither tool is available, emits
-  `{"__iac_status__": "unavailable", "tools": []}` and exits 0.
-  Reads canonical invocations from
-  `<plugin-root>/skills/sec-audit/references/iac-tools.md`.
-  Dispatched by the orchestrator skill (§3.16) when `iac` is in
-  the inventory.
+description: "IaC static-analysis adapter for sec-audit. Runs tfsec and checkov against Terraform/Pulumi source under target_path; emits JSONL findings tagged origin: \"iac\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.16."
 model: haiku
 tools: Read, Bash
 ---
