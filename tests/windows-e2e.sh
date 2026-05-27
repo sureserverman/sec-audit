@@ -35,7 +35,7 @@ os=$(jq -rs 'map(select(.origin=="windows" and .tool=="osslsigncode")) | length'
 echo "  (b) osslsigncode findings: $os"
 
 # 16-lane origin-tag isolation — reject 21 other tool names
-leak=$(jq -rs 'map(select(.origin=="windows" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="pkgutil" or .tool=="stapler" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="windows" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="pkgutil" or .tool=="stapler" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 [ "$leak" -eq 0 ] || { echo "windows-e2e: FAIL (c) — $leak windows findings carry a non-windows tool tag" >&2; exit 1; }
 echo "  (c) origin-tag isolation: 0 cross-tagged findings (21 other tools rejected)"
 

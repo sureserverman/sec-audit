@@ -545,6 +545,22 @@ Detect the technology stack. Read only — do not install or execute.
   not package-version signal; CVE enrichment is unaffected.
 - **Auth / secrets signals**: occurrences of `jwt`, `oauth`, `passport`,
   `django-allauth`, `NextAuth`, `SECRET_KEY`, `.env*` files.
+- **Supply-chain signals**: any PyPI manifest (`requirements.txt`,
+  `pyproject.toml`, `setup.py`, `poetry.lock`, `Pipfile.lock`) OR any npm
+  manifest (`package.json`, `package-lock.json`) under the target (excluding
+  vendored `node_modules/` / `.venv/`). When present, add `"supply-chain"`
+  to the inventory with the ecosystems found — `"supply-chain": ["pypi"]`,
+  `["npm"]`, or `["pypi", "npm"]`. This drives the `supply-chain` lane
+  (§3.27), which detects *malicious* dependencies (install hooks,
+  obfuscation, typosquatting, known-malware) via GuardDog + OSV-Scanner —
+  distinct from the *known-CVE* enrichment cve-enricher performs over the
+  same manifests (§4) and the *missing-hygiene* advice sec-expert draws from
+  `references/supply-chain/{dep-pinning,sbom,sigstore,slsa}.md`. Load the
+  detective pack `references/supply-chain/malicious-packages.md` and the
+  tool-lane reference `references/supply-chain-tools.md`. No NEW ecosystem
+  entry is added for CVE enrichment — the PyPI/npm ecosystems are already
+  emitted by the manifest detection above; `supply-chain` is a code/feed
+  *malware* signal layered on top.
 
 ### Uncovered-technology detection (v1.10.0+)
 
@@ -1883,6 +1899,78 @@ manifests.
 tagged with another lane's tool — see
 `tests/contract-check.sh`.
 
+### 3.27 Supply-chain pass — dispatch supply-chain-runner
+
+When the inventory emitted by §2 contains `supply-chain` (a PyPI or npm
+dependency manifest was found), dispatch the `supply-chain-runner` agent
+(`agents/supply-chain-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to up to two supply-chain tools — `guarddog` (Datadog,
+Apache-2.0; heuristic malicious-package scanner: install-time code execution,
+obfuscation, download-and-exec, exfiltration, typosquatting / dependency
+confusion; PyPI + npm) and `osv-scanner` (Google, Apache-2.0; resolves the
+full lockfile graph and reports OSV `MAL-` malicious-package advisories
+including transitive deps) — against the project's dependency set, parses
+each tool's native JSON, and emits sec-expert-compatible JSONL on stdout —
+every line carrying `origin: "supply-chain"` and `tool: "guarddog" |
+"osv-scanner"`. Findings cover embedded malicious code / install hooks
+(CWE-506), code injection (CWE-94), download-without-integrity (CWE-494),
+exfiltration (CWE-200), typosquatting / dependency confusion (CWE-1357), and
+trojan-source (CWE-1007).
+
+**Delineation from cve-enricher (§4) and the supply-chain reference packs.**
+Three distinct supply-chain surfaces, no overlap:
+
+1. **This lane (`supply-chain`)** — *malicious* dependency detection:
+   GuardDog heuristics over the dependency code, plus OSV-Scanner's `MAL-`
+   advisories. The runner keeps ONLY `MAL-` IDs from OSV-Scanner and drops
+   every ordinary CVE/GHSA result — those are §4's job.
+2. **cve-enricher (§4)** — *known-CVE* enrichment over the dep inventory, and
+   (as of v1.15) `MAL-` classification of the **direct** deps it queries. The
+   report-writer deduplicates malicious-package hits by `(ecosystem, name,
+   version, id)` across this lane's OSV-Scanner output and §4's `malicious`
+   array; OSV-Scanner's value-add is **transitive** reach the direct-dep
+   inventory misses.
+3. **sec-expert reference packs** (`supply-chain/{dep-pinning,sbom,sigstore,
+   slsa}.md` + the new `malicious-packages.md`) — *missing-hygiene* advice
+   (unpinned deps, no SBOM, no provenance) and the citation-grounded fix
+   recipes the report quotes verbatim.
+
+supply-chain-runner runs in parallel with every other pass agent. Its input
+is the project tree (read-only) plus GuardDog's own download cache (outside
+the target), so other agents may read the same files without conflict.
+Collect the JSONL into a `supply_chain_findings` list.
+
+Skill-level invariants the orchestrator enforces:
+
+- **No `supply-chain` in inventory** — skip entirely. Do not probe for
+  guarddog / osv-scanner on projects with no PyPI/npm manifest.
+- **`__supply_chain_status__: "unavailable"`** — neither tool on PATH, OR no
+  PyPI/npm manifest, OR both crashed. Add the `⚠ Supply-chain tools
+  unavailable — install guarddog and/or osv-scanner to enable
+  malicious-dependency detection` banner to Review metadata. Do NOT fabricate
+  findings; do NOT treat absence as a clean scan.
+- **`__supply_chain_status__: "partial"`** — one tool ran, the other was
+  missing/inapplicable. Merge findings; note the skipped tool(s) in Review
+  metadata (`Supply-chain tools run: guarddog; osv-scanner skipped —
+  tool-missing`).
+- **`__supply_chain_status__: "ok"`** — both available tools ran. Merge the
+  findings into the triaged stream.
+- **Two skip reasons (supply-chain lane):**
+  - `tool-missing` — binary absent from PATH.
+  - `no-supply-chain-source` — a tool is on PATH but the target has no
+    PyPI/npm manifest. Target-shape clean-skip; parallel to
+    `no-webapp-source` / `no-image-artifact`.
+
+**No NEW dep-inventory effect.** GuardDog/OSV-Scanner findings are
+malware signal, not `{component, version}` CVE inventory; the PyPI/npm
+ecosystems were already emitted by §2 manifest detection and flow to §4
+unchanged.
+
+**Origin-tag isolation:** every supply-chain finding carries
+`origin: "supply-chain"` and `tool: "guarddog" | "osv-scanner"`. The
+contract-check rejects any supply-chain finding tagged with another lane's
+tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
@@ -1920,6 +2008,74 @@ reports these states; the skill decides what to do with them):
 Attach each CVE entry to the corresponding dep-level finding, and
 promote HIGH/CRITICAL CVSS CVEs to top-level findings (not just footnotes
 on the dep inventory).
+
+**Malicious-package hits (cve-enricher `malicious` array).** As of v1.15
+cve-enricher also classifies OSV `MAL-` advisories and GHSA `type: malware`
+entries (returned by the same OSV/GHSA calls — no extra requests) into a
+per-package `malicious` array with `kind: "malicious_package"`. Treat every
+such entry as a **CRITICAL top-level finding unconditionally** — a known-bad
+package already in the dependency set is not a "maybe reachable"
+vulnerability. These carry no CVSS (`cvss: null`) and no KEV (`kev: null`);
+in the §5 rubric give them the `CRITICAL=36` CVSS-tier score, `+25` exposure
+(the dependency executes in the build/runtime), and `0` exploit/auth
+modifiers — they always land in the CRITICAL bucket. Render them under a
+`Malicious dependency` sub-header so they are not visually merged with
+ordinary CVEs. This is the package-feed half of supply-chain detection; the
+code-heuristic half is the `supply-chain` lane (§3.27).
+
+## 4.5 Deep dependency diff (opt-in — dispatch dep-diff-analyst)
+
+Runs ONLY when the command passed `--deep-deps` (skill input `deep_deps:
+true`). This is the point-in-time port of elastic/supply-chain-monitor's
+release-diff classification: for a bounded set of *already-suspicious*
+dependencies, fetch the installed version N and its prior published version
+N-1 registry-natively, diff them, and have a sonnet agent decide whether the
+release looks compromised. It is off by default because it is network- and
+LLM-heavy.
+
+**Candidate selection.** Build the candidate set as the union of:
+1. every package in cve-enricher's `malicious` array (§4), and
+2. every package named by an `origin: "supply-chain"` finding (§3.27).
+
+Deduplicate by `(ecosystem, name, version)`. Cap the set at `deep_deps_max`
+(skill input; default 10), prioritizing malicious-feed hits > guarddog HIGH >
+guarddog MEDIUM. If the candidate set is empty (nothing suspicious surfaced),
+do NOT dispatch — there is nothing to diff.
+
+**Dispatch.** When `deep_deps` is true AND candidates exist, dispatch the
+`dep-diff-analyst` agent (`agents/dep-diff-analyst.md`, pinned to **sonnet**,
+tools: Read + Bash + WebFetch) with `{"candidates": [...]}` on stdin. The agent
+fetches N and N-1 from the PyPI JSON API / npm registry (no `pip`/`npm
+install`), runs a bounded `diff -ruN`, classifies each benign / suspicious /
+malicious per `references/deep-deps-tools.md` (reusing the heuristic catalogue
+in `references/supply-chain/malicious-packages.md`), and emits JSONL — every
+finding line carrying `origin: "deep-deps"`, `tool: "dep-diff"`, and a
+`verdict` field. Only `suspicious`/`malicious` verdicts produce finding lines;
+`benign` is counted in the status summary. Collect into `deep_deps_findings`.
+
+This pass depends on §3.27 and §4 output (its candidates), so it runs after
+them — not in the §3 parallel fan-out. Skill-level invariants:
+
+- **`deep_deps` falsy OR empty candidate set** — skip entirely; add no banner
+  (the pass is opt-in; its absence is normal). Do not probe registries.
+- **`__deep_deps_status__: "unavailable"`** — flag set + candidates existed but
+  every registry fetch failed (offline). Add the `⚠ Deep-deps pass offline —
+  re-run with network to diff flagged releases` banner to Review metadata. Do
+  NOT fabricate verdicts.
+- **`__deep_deps_status__: "partial"`** — some candidates diffed, others skipped
+  (`no-prior-version` / `registry-unreachable`). Merge findings; note skipped
+  candidates in Review metadata.
+- **`__deep_deps_status__: "ok"`** — at least one candidate diffed. Merge
+  findings into the triaged stream.
+- **Cost bound.** Opt-in flag + `deep_deps_max` cap + sonnet pin; per-run token
+  accounting (§6 metadata) records the deep-deps cost separately.
+
+**Scoring (§5).** A `malicious` verdict scores as CRITICAL (CVSS-tier 36, +25
+exposure — the dependency executes in build/runtime); a `suspicious` verdict
+scores as its HIGH/MEDIUM severity. Render `deep-deps` findings under a
+`Deep-dependency diff` sub-header, deduplicated against §4's `Malicious
+dependency` entries by `(ecosystem, name, version)` — a package flagged by the
+feed AND confirmed by the diff appears once, annotated with both signals.
 
 ## 5. Prioritize
 

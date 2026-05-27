@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across twenty-one tool lanes plus sec-expert
+software projects across twenty-three tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -664,6 +664,84 @@ Dispatch discipline.
   patterns; brakeman is the only deeply-Rails-aware SAST.
 - **Shipped in:** v1.14.0.
 
+### supply-chain (malicious-dependency detection)
+
+- **Target shape:** any PyPI manifest (`requirements.txt`,
+  `pyproject.toml`, `setup.py`, `poetry.lock`, `Pipfile.lock`)
+  or npm manifest (`package.json`, `package-lock.json`) under
+  the target (vendored `node_modules/` / `.venv/` excluded).
+  Inventory value reflects ecosystems found: `["pypi"]`,
+  `["npm"]`, or `["pypi", "npm"]`.
+- **Tools:** `guarddog` (Datadog, Apache-2.0; heuristic
+  malicious-package scanner — install-time code execution,
+  obfuscation, download-and-exec, exfiltration, typosquatting /
+  dependency confusion; PyPI + npm; `guarddog <eco> verify
+  <manifest> --output-format json`); `osv-scanner` (Google,
+  Apache-2.0; resolves the full lockfile graph and reports OSV
+  `MAL-` malicious-package advisories incl. transitive deps;
+  `osv-scanner --format json -r <target>`, filtered to `MAL-`
+  IDs only). Two-tool lane like sast (semgrep + bandit).
+  Cross-platform.
+- **Reference packs:**
+  `references/supply-chain/malicious-packages.md` (detective),
+  `references/supply-chain-tools.md` (tool invocations), plus
+  the existing hygiene packs
+  `references/supply-chain/{dep-pinning,sbom,sigstore,slsa}.md`
+  (sec-expert reasoning).
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-supply-chain-source`
+  (a tool is on PATH but the target has no PyPI/npm manifest).
+- **Origin tag:** `"supply-chain"`. Tool whitelist: `guarddog`,
+  `osv-scanner`. Status values: `ok` / `partial` /
+  `unavailable`.
+- **Dep-inventory:** NOT newly affected — the PyPI/npm
+  ecosystems are already emitted by §2 manifest detection and
+  flow to cve-enricher (§4). This lane is malware signal, not
+  package-version signal.
+- **Delineation:** detects *malicious* deps; cve-enricher (§4)
+  enriches *known CVEs* and classifies `MAL-` for **direct**
+  deps (report-writer dedups malicious hits by `(ecosystem,
+  name, version, id)`; OSV-Scanner adds **transitive** reach).
+  The runner drops every non-`MAL-` OSV-Scanner result so CVEs
+  are not double-reported.
+- **Shipped in:** v1.15.0.
+
+### deep-deps (release-diff behavioral verdict — opt-in)
+
+- **Target shape:** opt-in via `--deep-deps[=N]`; runs only when the
+  flag is set AND a candidate set exists. Candidates = union of
+  cve-enricher's `malicious` array (§4) + packages named by
+  `origin: "supply-chain"` findings (§3.27), deduped, capped at
+  `deep_deps_max` (default 10). No flag / no candidates ⇒ does not run.
+- **Tool:** no external binary — the `dep-diff-analyst` sub-agent
+  (sonnet-pinned, tools Read + Bash + WebFetch) fetches version N and
+  N-1 artifacts registry-natively (PyPI JSON API + npm registry, no
+  pip/npm install), runs a bounded `diff -ruN`, and classifies the
+  diff benign / suspicious / malicious. Ports
+  elastic/supply-chain-monitor's release-diff technique point-in-time.
+- **Reference packs:** `references/deep-deps-tools.md` (registry
+  endpoints + download/diff recipe + verdict rubric + field mapping);
+  reuses `references/supply-chain/malicious-packages.md` for the
+  heuristic catalogue.
+- **Host-OS gate:** none (needs network for a live run; CI gates use
+  golden fixtures).
+- **Skip reasons:** `no-prior-version` (flagged release has no
+  predecessor to diff), `registry-unreachable` (fetch failed after one
+  retry).
+- **Origin tag:** `"deep-deps"`. Tool whitelist: `dep-diff` (single
+  synthetic tool). Findings carry a `verdict` field
+  (`malicious`/`suspicious`); `benign` verdicts emit no finding.
+  Status values: `ok` / `partial` / `unavailable`.
+- **Dep-inventory:** consumes §3.27 + §4 output; emits no new ecosystem
+  entry.
+- **Delineation:** the supply-chain lane (§3.27) + cve-enricher (§4)
+  *flag* suspicious deps cheaply (heuristics + feeds); deep-deps
+  *confirms* by reasoning over the actual N-1→N diff — the only signal
+  that catches a compromised release of an otherwise-legitimate
+  package. Report-writer dedups against §4's `Malicious dependency`
+  entries by `(ecosystem, name, version)`.
+- **Shipped in:** v1.16.0.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
@@ -694,10 +772,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**23 canonical reason values** as of v1.14, grouped by semantic
+**26 canonical reason values** as of v1.16, grouped by semantic
 category:
 
-### Target-shape (19)
+### Target-shape (21)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -720,6 +798,8 @@ category:
 | `no-webapp-source`| webapp               | bearer on PATH but target has no recognised web-framework manifest (no Python / Node / Ruby / Java / PHP / Go signal). |
 | `no-node-source`  | webapp               | njsscan on PATH but no `*.js` / `*.ts` / `*.jsx` / `*.tsx` files under target.                                         |
 | `no-rails-source` | webapp               | brakeman on PATH but target is not a Rails app (no Gemfile mentioning rails AND no `config/application.rb`).           |
+| `no-supply-chain-source` | supply-chain  | guarddog / osv-scanner on PATH but target has no PyPI / npm dependency manifest.                                       |
+| `no-prior-version` | deep-deps           | A flagged dependency's installed release is the first published version — no N-1 to diff against.                      |
 
 ### Host-OS-gated (3)
 
@@ -735,11 +815,12 @@ category:
 |----------------------|----------|-----------------------------------------------------------------|
 | `no-notary-profile`  | ios      | `$NOTARY_PROFILE` unset; `xcrun notarytool history` skipped.    |
 
-### Tool-output (1, NEW in v1.13)
+### Tool-output (2)
 
 | Reason          | Lane(s)   | Meaning                                                                                                |
 |-----------------|-----------|--------------------------------------------------------------------------------------------------------|
 | `parse-failed`  | ai-tools  | mcp-scan ran but its output JSON could not be parsed into a recognized issue list. No findings emitted; tool reported only in skipped[]. |
+| `registry-unreachable` | deep-deps | The PyPI/npm registry fetch for a flagged dependency failed after one retry; the release could not be diffed. NEW in v1.16. |
 
 ### Universal catch-all (1)
 

@@ -54,7 +54,7 @@ fi
 echo "  cargo-geiger ceiling: 0 findings above INFO"
 
 # ---- (c) origin-tag isolation across 6 other lanes
-leak=$(jq -rs 'map(select(.origin=="rust" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="rust" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 if [ "$leak" -ne 0 ]; then
     echo "rust-e2e: FAIL (c) — $leak rust findings carry a non-rust tool tag" >&2
     exit 1

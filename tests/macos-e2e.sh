@@ -46,7 +46,7 @@ echo "  (b) trailing status: __macos_status__=$tail_status + $valid_reasons cano
 # 15-lane origin-tag isolation: macos findings must NOT carry the
 # 16 exclusive non-macOS tool names. Shared tools (mobsfscan, codesign,
 # spctl are allowed — dispatch context disambiguates).
-leak=$(jq -rs 'map(select(.origin=="macos" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="notarytool" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="macos" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="notarytool" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 [ "$leak" -eq 0 ] || { echo "macos-e2e: FAIL (c) — $leak macos findings carry a non-macos tool tag" >&2; exit 1; }
 echo "  (c) origin-tag isolation: 0 cross-tagged findings (16 exclusive tools rejected)"
 

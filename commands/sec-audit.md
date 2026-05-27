@@ -17,12 +17,19 @@ Parse `$ARGUMENTS` into:
    restrict dispatch to.
 3. **`--skip=<lanes>`** (optional) — comma-separated lane names to
    exclude from dispatch.
+4. **`--deep-deps[=N]`** (optional, opt-in) — enable the deep-dependency
+   release-diff pass (§4.5). Bare `--deep-deps` enables it with the default
+   candidate cap of **10**; `--deep-deps=N` sets the cap to N. This is NOT a
+   `--only`/`--skip` lane name — it is a separate opt-in flag (the pass is
+   network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
+   not run.
 
-**Canonical lane names (22 total):** `sec-expert`, `sast`, `dast`,
+**Canonical lane names (23 total):** `sec-expert`, `sast`, `dast`,
 `webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
 `k8s`, `iac`, `gh-actions`, `virt`, `go`, `shell`, `python`,
-`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`. Reject any
-invocation that names a lane outside this list.
+`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`.
+Reject any invocation that names a lane outside this list. (`--deep-deps`
+is a flag, not a lane name, and is not accepted in `--only`/`--skip`.)
 
 **Mutual exclusion:** `--only` and `--skip` MUST NOT both be set. The
 two flags are mutually exclusive. If the caller passed both, refuse
@@ -76,6 +83,10 @@ Invoke the `sec-audit` skill (see `skills/sec-audit/SKILL.md`) with:
 - `target_path` — parsed positional argument
 - `only_lanes` — parsed `--only=` list, or omit when absent
 - `skip_lanes` — parsed `--skip=` list, or omit when absent
+- `deep_deps` — `true` when `--deep-deps` / `--deep-deps=N` was passed; omit
+  (falsy) otherwise
+- `deep_deps_max` — the cap N from `--deep-deps=N`, or the default `10` when
+  bare `--deep-deps` was passed; omit when `deep_deps` is falsy
 - `target_url`, `github_token`, `nvd_api_key` — read from env vars
   as before (see SKILL.md Inputs)
 

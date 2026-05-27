@@ -1,0 +1,10 @@
+{
+  "name": "vulnerable-deep-deps-fixture",
+  "version": "1.0.0",
+  "description": "Fixture whose dependencies are flagged upstream (supply-chain lane / cve-enricher MAL-) and then confirmed by the deep-deps release-diff pass. NOT a real project.",
+  "private": true,
+  "dependencies": {
+    "electron-native-notify": "1.1.6",
+    "lodash": "4.17.21"
+  }
+}

@@ -48,7 +48,7 @@ fi
 echo "  (b) android-lint findings: $lint"
 
 # ---- (c) 7-lane origin-tag isolation
-leak=$(jq -rs 'map(select(.origin=="android" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="android" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 if [ "$leak" -ne 0 ]; then
     echo "android-e2e: FAIL (c) — $leak android findings carry a non-android tool tag" >&2
     exit 1

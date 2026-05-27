@@ -1,0 +1,4 @@
+# Intentionally suspicious requirements for sec-audit supply-chain lane tests.
+# NOT a real project. 'python-sqlite' is a known typosquat shape.
+requests==2.32.3
+python-sqlite==0.1.0

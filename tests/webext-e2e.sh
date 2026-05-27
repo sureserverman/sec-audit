@@ -53,7 +53,7 @@ echo "  (b) retire findings: $retire_count"
 
 # ---- Assertion (c): origin-tag isolation — no webext finding carries a
 # SAST or DAST tool name.
-leak=$(jq -rs 'map(select(.origin=="webext" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="webext" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 if [ "$leak" -ne 0 ]; then
     echo "webext-e2e: FAIL (c) — $leak webext findings carry a SAST/DAST tool tag" >&2
     exit 1

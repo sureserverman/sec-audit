@@ -296,6 +296,31 @@ lists every CVE from the advisory; `Fixed in` quotes the advisory's
 `below` field ("Upgrade beyond X.Y.Z"). This makes bundled-library
 risk comparable to manifest-declared-dependency risk in a single table.
 
+**Malicious-package findings (v1.15.0+).** cve-enricher entries carry a
+`malicious` array (each item has `kind: "malicious_package"`,
+`severity: "CRITICAL"`, `cvss: null`, `kev: null`) alongside `cves`. Do NOT
+put these in the CVE table above — a `MAL-` advisory is not a CVSS-scored
+vulnerability. Instead render every malicious-package hit (from BOTH the
+cve-enricher `malicious` array and `origin: "supply-chain"` /
+`tool: "osv-scanner"` findings) as a CRITICAL top-level finding under a
+`### Malicious dependency` sub-header inside `## CRITICAL`, quoting the
+advisory `id` (`MAL-…`), the package coordinate, and the summary.
+Deduplicate by `(ecosystem, name, version, id)` so a direct dep flagged by
+both cve-enricher and the supply-chain lane's OSV-Scanner appears once.
+GuardDog `origin: "supply-chain"` heuristic findings (`tool: "guarddog"`)
+render as ordinary findings in their severity bucket (HIGH/MEDIUM), not in
+this sub-header.
+
+**Deep-deps release-diff findings (v1.16.0+).** `origin: "deep-deps"` /
+`tool: "dep-diff"` findings carry a `verdict` field. Render them under a
+`### Deep-dependency diff` sub-header — `malicious` verdicts inside
+`## CRITICAL`, `suspicious` verdicts in their `## HIGH`/`## MEDIUM` bucket —
+quoting the `evidence` diff hunk and the `file` coordinate
+(`<eco>/<name>@<ver> (vs <prior>)`). Deduplicate against the
+`### Malicious dependency` entries by `(ecosystem, name, version)`: a package
+flagged by the feed/heuristics AND confirmed by the diff appears once,
+annotated with both signals (e.g. "OSV MAL- + diff-confirmed exfil hook").
+
 ### Step 5.5 — Emit Coverage-gap suggestions (v1.10.0+)
 
 Before the Review-metadata block, render a "Coverage-gap

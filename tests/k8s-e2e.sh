@@ -23,7 +23,7 @@ se=$(jq -rs 'map(select(.origin=="k8s" and .tool=="kubesec")) | length' "$jsonl"
 [ "$se" -ge 1 ] || { echo "k8s-e2e: FAIL (b) — no kubesec findings" >&2; exit 1; }
 echo "  (b) kubesec findings: $se"
 
-leak=$(jq -rs 'map(select(.origin=="k8s" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="pkgutil" or .tool=="stapler" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec" or .tool=="binskim" or .tool=="osslsigncode" or .tool=="sigcheck"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="k8s" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="pkgutil" or .tool=="stapler" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec" or .tool=="binskim" or .tool=="osslsigncode" or .tool=="sigcheck" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 [ "$leak" -eq 0 ] || { echo "k8s-e2e: FAIL (c) — $leak cross-lane leaks" >&2; exit 1; }
 echo "  (c) origin-tag isolation: 0 cross-lane leaks (24 other tools rejected)"
 

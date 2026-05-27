@@ -54,7 +54,7 @@ fi
 echo "  (b) trailing status: __ios_status__=$tail_status + $valid_reasons skipped entr(ies) with canonical reason(s)"
 
 # ---- (c) 8-lane origin-tag isolation
-leak=$(jq -rs 'map(select(.origin=="ios" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="apkleaks" or .tool=="android-lint"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="ios" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 if [ "$leak" -ne 0 ]; then
     echo "ios-e2e: FAIL (c) — $leak ios findings carry a non-ios tool tag" >&2
     exit 1

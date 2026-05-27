@@ -40,7 +40,7 @@ li=$(jq -rs 'map(select(.origin=="linux" and .tool=="lintian")) | length' "$json
 echo "  (b) lintian findings: $li"
 
 # ---- (c) 12-lane origin-tag isolation
-leak=$(jq -rs 'map(select(.origin=="linux" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool"))) | length' "$jsonl")
+leak=$(jq -rs 'map(select(.origin=="linux" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 [ "$leak" -eq 0 ] || { echo "linux-e2e: FAIL (c) — $leak linux findings carry a non-linux tool tag" >&2; exit 1; }
 echo "  (c) origin-tag isolation: 0 cross-tagged findings (11 other lanes' tools rejected)"
 
