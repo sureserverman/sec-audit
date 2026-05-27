@@ -56,100 +56,34 @@ Validate: dir exists + contains at least one `.tf` file OR a
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `references/iac-tools.md`; extract invocations, field
-mappings, CWE tables.
-
-### Step 2 — Resolve target + probe tools
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v tfsec 2>/dev/null
-command -v checkov 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" iac <target_path>
 ```
 
-### Step 3 — Handle all-missing case
+The engine probes the tool(s) (`command -v tfsec`, `command -v checkov`), runs them, parses their native
+output, and maps each result to the Finding schema above per `iac-tools.md`.
+Output is faithful JSONL - every line `origin: "iac"`, `tool: "tfsec" | "checkov"` -
+then one `__iac_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
-If `tools_available` is empty, emit unavailable sentinel with
-skipped={tool-missing} entries and exit 0.
-
-### Step 4 — Run each available tool
-
-**tfsec**:
-```bash
-tfsec --format json --out "$TMPDIR/iac-runner-tfsec.json" "$target_path" \
-    2> "$TMPDIR/iac-runner-tfsec.stderr"
-rc_tf=$?
-```
-Non-zero exits with valid JSON are normal.
-
-**checkov**:
-```bash
-checkov --directory "$target_path" --output json \
-    --framework terraform,pulumi \
-    > "$TMPDIR/iac-runner-checkov.json" \
-    2> "$TMPDIR/iac-runner-checkov.stderr"
-rc_ch=$?
-```
-Same normal-non-zero behaviour.
-
-### Step 5 — Parse outputs
-
-**tfsec** (`.results[]`):
-```bash
-jq -c '
-  .results[]? | {
-    id: ("tfsec:" + .rule_id),
-    severity: (.severity | ascii_upcase),
-    cwe: null,
-    title: .description,
-    file: .location.filename,
-    line: (.location.start_line // 0),
-    evidence: (.impact // .description),
-    reference: "iac-tools.md",
-    reference_url: (.link // null),
-    fix_recipe: (.resolution // null),
-    confidence: "high",
-    origin: "iac",
-    tool: "tfsec"
-  }
-' "$TMPDIR/iac-runner-tfsec.json"
+```json
+{"__iac_status__": "unavailable", "tools": []}
 ```
 
-Apply per-rule-name CWE overrides per `iac-tools.md` mapping table.
+Skip reason: `tool-missing` (tfsec/checkov not on PATH).
 
-**checkov** (`.results.failed_checks[]`):
-```bash
-jq -c '
-  .results.failed_checks[]? | {
-    id: ("checkov:" + .check_id),
-    severity: ((.severity // "MEDIUM") | ascii_upcase |
-               if . == "CRITICAL" or . == "HIGH" then "HIGH"
-               elif . == "MEDIUM" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .check_name,
-    file: (.file_path | ltrimstr("/")),
-    line: ((.file_line_range[0]? // 0) | tonumber? // 0),
-    evidence: ((.resource // "") + ": " + .check_name),
-    reference: "iac-tools.md",
-    reference_url: (.guideline // null),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "iac",
-    tool: "checkov"
-  }
-' "$TMPDIR/iac-runner-checkov.json"
-```
+### Step 2 - Polish (presentation only)
 
-Apply checkov-category CWE overrides per the table.
-
-### Step 6 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__iac_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial / unavailable.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __iac_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## What you MUST NOT do
 
