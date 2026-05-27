@@ -1,0 +1,31 @@
+{
+  "lane": "iac", "status_key": "__iac_status__", "origin": "iac", "reference": "iac-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "tfsec", "probe": "tfsec",
+      "invoke": ["tfsec", "--format", "json", "{target}"], "output": "stdout", "findings_path": "results",
+      "const": {"confidence": "high"},
+      "map": {
+        "id": {"concat": ["tfsec:", {"from": "rule_id"}]},
+        "severity": "severity",
+        "cwe": {"from": "rule_id", "lookup": {"AVD-AWS-0086": "CWE-732", "AVD-AWS-0057": "CWE-732", "AVD-AWS-0107": "CWE-284", "AVD-AWS-0080": "CWE-311"}, "default": null},
+        "title": "description", "file": "location.filename", "line": "location.start_line",
+        "evidence": "impact", "reference_url": {"from": "link", "default": null}, "fix_recipe": "resolution"
+      }
+    },
+    {
+      "name": "checkov", "probe": "checkov",
+      "invoke": ["checkov", "-d", "{target}", "-o", "json"], "output": "stdout", "findings_path": "results.failed_checks",
+      "const": {"confidence": "high"},
+      "map": {
+        "id": {"concat": ["checkov:", {"from": "check_id"}]},
+        "severity": {"from": "severity", "map": {"CRITICAL": "HIGH", "HIGH": "HIGH", "MEDIUM": "MEDIUM", "LOW": "LOW", "INFO": "LOW"}, "default": "MEDIUM"},
+        "cwe": {"from": "check_id", "lookup": {"CKV_AWS_41": "CWE-798", "CKV_AWS_19": "CWE-732", "CKV_AWS_62": "CWE-732"}, "default": null},
+        "title": "check_name", "file": "file_path", "line": "file_line_range.0",
+        "evidence": {"concat": [{"from": "resource"}, ": ", {"from": "check_name"}]},
+        "reference_url": "guideline"
+      }
+    }
+  ]
+}
