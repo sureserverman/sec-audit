@@ -63,162 +63,41 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, and do NOT invent, drop, or
+re-rank findings.
 
-Load `references/python-tools.md`; extract invocations,
-field mappings, and per-rule severity/CWE tables.
-
-### Step 2 — Resolve target + probe tools + check applicability
-
-```bash
-command -v pip-audit 2>/dev/null
-command -v ruff 2>/dev/null
-```
-
-Build `tools_available`. Then check applicability:
-
-- **pip-audit applicable** iff `tools_available` contains
-  `pip-audit` AND `find "$target_path" -maxdepth 3 -type f \(
-  -name 'requirements.txt' -o -name 'requirements-*.txt'
-  -o -name 'pyproject.toml' -o -name 'setup.py'
-  -o -name 'Pipfile' \)` yields ≥ 1 result. If pip-audit is
-  on PATH but no manifest exists, record skipped entry
-  `{"tool": "pip-audit", "reason": "no-requirements"}`.
-
-- **ruff applicable** iff `tools_available` contains `ruff`
-  AND `find "$target_path" -type f -name '*.py'` yields ≥ 1
-  result. If no `*.py` files exist, ruff cleanly skips with
-  `{"tool": "ruff", "reason": "no-requirements"}` (reusing
-  the same target-shape skip reason — semantically "no
-  Python source to scan").
-
-If `tools_available` is empty AND no applicability matched,
-emit unavailable sentinel with `tool-missing` skipped
-entries for absent tools, exit 0.
-
-### Step 3 — Run each available + applicable tool
-
-**pip-audit** (prefer requirements file mode):
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-manifest=""
-for cand in "$target_path/requirements.txt" \
-            "$target_path/pyproject.toml"; do
-    if [ -f "$cand" ]; then
-        manifest="$cand"
-        break
-    fi
-done
-
-if [ -n "$manifest" ]; then
-    pip-audit -r "$manifest" --format json \
-        > "$TMPDIR/python-runner-pip-audit.json" \
-        2> "$TMPDIR/python-runner-pip-audit.stderr"
-    rc_pa=$?
-fi
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" python <target_path>
 ```
 
-Non-zero exits with valid JSON output are normal — pip-audit
-exits 1 when vulnerabilities are found, 2 only on tool
-errors. Parse JSON for both 0 and 1 exit codes.
+The engine probes both tools (`command -v ruff`, `command -v pip-audit`), runs
+them, and maps per `python-tools.md`: ruff's JSON array (id `ruff:<code>`,
+per-code severity + CWE tables, `.url`) and pip-audit's nested
+`dependencies[].vulns[]` (id `pip-audit:<GHSA/CVE>`, `CWE-1395`,
+`fix_recipe: upgrade to >=<fix_version>`, `file: requirements.txt`). Output is
+faithful JSONL - every line `origin: "python"`, `tool: "ruff" | "pip-audit"` -
+then one `__python_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when neither is present the only line is the unavailable sentinel:
 
-**ruff** (security rules only):
-
-```bash
-( cd "$target_path" && \
-  ruff check --select=S,B \
-             --output-format=json \
-             . ) \
-    > "$TMPDIR/python-runner-ruff.json" \
-    2> "$TMPDIR/python-runner-ruff.stderr"
-rc_ru=$?
+```json
+{"__python_status__": "unavailable", "tools": []}
 ```
 
-Same normal-non-zero behaviour.
+Skip reasons: `tool-missing`, `no-requirements` (no Python manifest / `*.py`
+under the target).
 
-### Step 4 — Parse outputs
+### Step 2 - Polish (presentation only)
 
-**pip-audit** (`.dependencies[].vulns[]`):
-
-```bash
-jq -c '
-  .dependencies[]? as $dep |
-  $dep.vulns[]? | {
-    id: ("pip-audit:" + .id),
-    severity: "MEDIUM",
-    cwe: "CWE-1395",
-    title: ((.description // "") | .[0:200]),
-    file: "requirements.txt",
-    line: 0,
-    evidence: ($dep.name + " " + $dep.version + " — " + .id),
-    reference: "python-tools.md",
-    reference_url: ("https://osv.dev/vulnerability/" + .id),
-    fix_recipe: (if (.fix_versions // [] | length) > 0
-                 then ("upgrade to >=" + .fix_versions[0])
-                 else null end),
-    confidence: "high",
-    origin: "python",
-    tool: "pip-audit"
-  }
-' "$TMPDIR/python-runner-pip-audit.json"
-```
-
-Severity may be raised to HIGH for KEV-listed CVEs by the
-cve-enricher's downstream pass; the runner emits MEDIUM as
-the conservative default.
-
-**ruff** (top-level array):
-
-```bash
-jq -c '
-  .[]? | {
-    id: ("ruff:" + .code),
-    severity: ((.code // "") |
-               if . == "S102" or . == "S301" or . == "S506" or . == "S608" or . == "S605" or . == "S606" or . == "S307" or . == "S501" or . == "S701" then "HIGH"
-               elif . == "S105" or . == "S106" or . == "S311" or . == "S324" then "MEDIUM"
-               elif test("^S3[12][0-9]$") then "HIGH"
-               elif test("^S") then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: .filename,
-    line: (.location.row // 0),
-    evidence: ((.message // "") | .[0:200]),
-    reference: "python-tools.md",
-    reference_url: (.url // ("https://docs.astral.sh/ruff/rules/#" + .code)),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "python",
-    tool: "ruff"
-  }
-' "$TMPDIR/python-runner-ruff.json"
-```
-
-Apply per-`code` CWE overrides per `python-tools.md` mapping
-table:
-- `S102` / `S307` (exec / eval) → CWE-95
-- `S301` (pickle) → CWE-502
-- `S506` (yaml.load) → CWE-502
-- `S313`-`S320` (XML XXE class) → CWE-611
-- `S608` (fstring SQL) → CWE-89
-- `S605` / `S606` (subprocess shell-tainted) → CWE-78
-- `S105` / `S106` (hardcoded password) → CWE-798
-- `S311` (random for security) → CWE-338
-- `S324` (md5/sha1) → CWE-327
-- `S501` (verify=False) → CWE-295
-- `S701` (Jinja2 autoescape) → CWE-79
-- everything else → null.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__python_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial /
-unavailable. Skip vocabulary:
-- `tool-missing`
-- `no-requirements` (pip-audit + ruff both reuse this when
-  the target lacks Python manifests + source).
+ruff messages are readable (typically pass-through); pip-audit `description`
+fields benefit from a concise CVE-narrative `title` rewrite. You MAY rewrite
+`title` and refine `severity` with context. You MUST NOT change `id`, `file`,
+`line`, `cwe`, `tool`, `origin`, or `fix_recipe`, MUST NOT add or remove
+findings, and MUST relay the `__python_status__` sentinel verbatim. Extraction
+is deterministic; the "never fabricate" guarantees in **Hard rules** are
+enforced by the engine.
 
 ## Output discipline
 

@@ -1,0 +1,5 @@
+{"dependencies":[
+{"name":"requests","version":"2.20.0","vulns":[{"id":"GHSA-x84v-xcm2-53pg","fix_versions":["2.20.1"],"description":"Requests before 2.20.1 sends the Authorization header to the new host on cross-origin redirect (CVE-2018-18074)."}]},
+{"name":"pyyaml","version":"5.3.0","vulns":[{"id":"GHSA-8q59-q68h-6hv4","fix_versions":["5.4.0"],"description":"PyYAML before 5.4 allows arbitrary code execution via full_load / FullLoader (CVE-2020-14343)."}]},
+{"name":"django","version":"3.2.0","vulns":[{"id":"GHSA-v6rh-hp5x-86rv","fix_versions":["3.2.13"],"description":"Django before 3.2.13 is vulnerable to SQL injection via QuerySet.annotate/aggregate/extra (CVE-2022-28346)."}]}
+]}

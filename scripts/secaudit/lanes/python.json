@@ -1,0 +1,32 @@
+{
+  "lane": "python", "status_key": "__python_status__", "origin": "python", "reference": "python-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "ruff", "probe": "ruff", "applicable_glob": "*.py", "inapplicable_reason": "no-requirements",
+      "invoke": ["ruff", "check", "--output-format", "json", "{target}"], "output": "stdout",
+      "const": {"confidence": "high"},
+      "map": {
+        "id": {"concat": ["ruff:", {"from": "code"}]},
+        "severity": {"from": "code", "lookup": {"S102": "HIGH", "S301": "HIGH", "S307": "HIGH", "S501": "HIGH", "S506": "HIGH", "S605": "HIGH", "S606": "HIGH", "S608": "HIGH", "S701": "HIGH"}, "default": "MEDIUM"},
+        "cwe": {"from": "code", "lookup": {"S102": "CWE-95", "S307": "CWE-95", "S301": "CWE-502", "S506": "CWE-502", "S608": "CWE-89", "S605": "CWE-78", "S606": "CWE-78", "S105": "CWE-798", "S106": "CWE-798", "S311": "CWE-338", "S324": "CWE-327", "S501": "CWE-295", "S701": "CWE-79"}, "default": null},
+        "title": "message", "file": "filename", "line": "location.row",
+        "evidence": {"from": "message", "truncate": 200},
+        "reference_url": {"from": "url", "default": null}
+      }
+    },
+    {
+      "name": "pip-audit", "probe": "pip-audit", "applicable_glob": "requirements.txt", "inapplicable_reason": "no-requirements",
+      "invoke": ["pip-audit", "-f", "json", "-r", "{target}/requirements.txt"], "output": "stdout",
+      "findings_path": "dependencies", "flatten": "vulns",
+      "const": {"file": "requirements.txt", "line": 0, "severity": "MEDIUM", "cwe": "CWE-1395", "confidence": "high"},
+      "map": {
+        "id": {"concat": ["pip-audit:", {"from": "id"}]},
+        "title": {"from": "description", "truncate": 200},
+        "evidence": {"concat": [{"from": "_parent.name"}, " ", {"from": "_parent.version"}, " — ", {"from": "id"}]},
+        "reference_url": {"concat": ["https://osv.dev/vulnerability/", {"from": "id"}]},
+        "fix_recipe": {"concat": ["upgrade to >=", {"from": "fix_versions.0"}]}
+      }
+    }
+  ]
+}

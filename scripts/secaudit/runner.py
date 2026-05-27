@@ -95,13 +95,12 @@ def _field(spec, item):
 
 
 def map_item(lane, toolcfg, item):
-    out = {}
+    out = dict(lane.get("finding_const", {}))  # lane defaults (a tool's map/const may override)
     for fld, spec in toolcfg["map"].items():
         out[fld] = _field(spec, item)
     if out.get("line") is None:
         out["line"] = 1
     out.update(toolcfg.get("const", {}))
-    out.update(lane.get("finding_const", {}))
     out["reference"] = lane["reference"]
     out["origin"] = lane["origin"]
     out["tool"] = toolcfg["name"]
@@ -119,6 +118,17 @@ def map_raw(lane, toolcfg, raw_text):
             arr = _get(data, fp) or []
         else:
             arr = data if isinstance(data, list) else []  # tool emits a root array
+    flatten = toolcfg.get("flatten")
+    if flatten:
+        # one finding per child in parent[flatten] (e.g. pip-audit deps[].vulns[]);
+        # the map can reference child fields directly and parent via "_parent.*".
+        out = []
+        for parent in arr:
+            for child in (parent.get(flatten) or []):
+                ctx = dict(child)
+                ctx["_parent"] = parent
+                out.append(map_item(lane, toolcfg, ctx))
+        return out
     return [map_item(lane, toolcfg, it) for it in arr]
 
 
