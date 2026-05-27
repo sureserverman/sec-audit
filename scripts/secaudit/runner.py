@@ -161,6 +161,13 @@ def _xml_items(text, tag):
     """Parse XML (e.g. android-lint) into dicts: each `<tag attr=..>` element's
     attributes become keys; each child element's attributes become a nested dict
     under the child's tag (first child per tag wins)."""
+    import re
+    # Harden against XML entity-expansion (billion-laughs / quadratic blowup):
+    # legitimate tool output never declares a DTD, so refuse any document that
+    # does rather than hand it to expat. Stdlib-only — defusedxml would break
+    # the no-third-party-deps design.
+    if re.search(r"<!DOCTYPE|<!ENTITY", text):
+        return []
     try:
         root = ET.fromstring(text)
     except ET.ParseError:

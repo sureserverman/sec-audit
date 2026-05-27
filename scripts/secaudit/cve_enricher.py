@@ -17,6 +17,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from secaudit import net  # noqa: E402
@@ -92,7 +93,7 @@ def _osv_detail(vid, budget):
     if not budget.ok():
         return None
     budget.spend()
-    status, text = _retrying(lambda: net.get(f"{OSV}/v1/vulns/{vid}"))
+    status, text = _retrying(lambda: net.get(f"{OSV}/v1/vulns/{quote(vid, safe='')}"))
     if status != 200:
         return None
     return _loads(text)

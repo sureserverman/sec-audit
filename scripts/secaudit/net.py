@@ -10,7 +10,15 @@ degrade path without touching the network.
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
+
+
+def _blocked(url):
+    """True if url is not http/https — keep the feed seam from reaching
+    file://, ftp://, data:, etc. when an endpoint base is env-overridden
+    (references/cve-feeds.md). Egress pinning."""
+    return urllib.parse.urlparse(url).scheme not in ("http", "https")
 
 
 def _replay_path(url):
@@ -35,6 +43,8 @@ def _replay_mode():
 
 def get(url, headers=None, timeout=15):
     """Return (status_code, body_text). Never raises on network failure."""
+    if _blocked(url):
+        return 0, ""
     rp = _replay(url)
     if rp is not None:
         return 200, rp
@@ -52,6 +62,8 @@ def get(url, headers=None, timeout=15):
 
 def post(url, body, headers=None, timeout=15):
     """Return (status_code, body_text). `body` is a str (JSON)."""
+    if _blocked(url):
+        return 0, ""
     rp = _replay(url)
     if rp is not None:
         return 200, rp
