@@ -1,0 +1,132 @@
+{
+  "lane": "go",
+  "status_key": "__go_status__",
+  "origin": "go",
+  "reference": "go-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "tools": [
+    {
+      "name": "gosec",
+      "probe": "gosec",
+      "invoke": [
+        "gosec",
+        "-fmt=json",
+        "-quiet",
+        "./..."
+      ],
+      "output": "stdout",
+      "findings_path": "Issues",
+      "map": {
+        "id": {
+          "concat": [
+            "gosec:",
+            {
+              "from": "rule_id"
+            }
+          ]
+        },
+        "severity": "severity",
+        "cwe": {
+          "concat": [
+            "CWE-",
+            {
+              "from": "cwe.ID"
+            }
+          ],
+          "default": null
+        },
+        "title": "details",
+        "file": "file",
+        "line": {
+          "from": "line",
+          "int": true,
+          "default": 1
+        },
+        "evidence": {
+          "from": "code",
+          "truncate": 200
+        },
+        "reference_url": {
+          "from": "cwe.URL",
+          "default": null
+        },
+        "confidence": {
+          "from": "confidence",
+          "map": {
+            "HIGH": "high",
+            "MEDIUM": "medium",
+            "LOW": "low"
+          }
+        }
+      },
+      "env": {
+        "GOFLAGS": "-mod=readonly"
+      }
+    },
+    {
+      "name": "staticcheck",
+      "probe": "staticcheck",
+      "invoke": [
+        "staticcheck",
+        "-f=json",
+        "./..."
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "const": {
+        "confidence": "high"
+      },
+      "map": {
+        "id": {
+          "concat": [
+            "staticcheck:",
+            {
+              "from": "code"
+            }
+          ]
+        },
+        "severity": {
+          "from": "severity",
+          "map": {
+            "error": "MEDIUM",
+            "warning": "LOW",
+            "ignored": "LOW"
+          },
+          "default": "LOW"
+        },
+        "cwe": {
+          "from": "code",
+          "lookup": {
+            "SA1019": "CWE-477",
+            "SA1015": "CWE-401",
+            "SA5007": "CWE-674",
+            "SA1023": "CWE-404",
+            "SA1000": "CWE-134",
+            "SA1006": "CWE-134"
+          },
+          "default": null
+        },
+        "title": "message",
+        "file": "location.file",
+        "line": "location.line",
+        "evidence": {
+          "from": "message",
+          "truncate": 200
+        },
+        "reference_url": {
+          "concat": [
+            "https://staticcheck.dev/docs/checks/#",
+            {
+              "from": "code"
+            }
+          ]
+        }
+      },
+      "env": {
+        "GOFLAGS": "-mod=readonly"
+      }
+    }
+  ]
+}

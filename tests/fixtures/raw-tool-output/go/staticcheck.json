@@ -1,0 +1,1 @@
+{"code":"SA1019","severity":"warning","location":{"file":"main.go","line":33},"message":"io/ioutil.ReadFile has been deprecated since Go 1.16 and an alternative has been available since Go 1.16: As of Go 1.16, this function simply calls os.ReadFile."}

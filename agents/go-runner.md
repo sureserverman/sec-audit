@@ -66,132 +66,42 @@ emit unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+This agent is a **hybrid wrapper**: a deterministic engine extracts findings,
+then you (the LLM) polish their presentation. Do NOT hand-map tool JSON and do
+NOT invent, drop, or re-rank findings.
 
-Load `references/go-tools.md`; extract invocations, field
-mappings, and per-rule CWE tables.
+### Step 1 - Extract (deterministic engine)
 
-### Step 2 — Resolve target + probe tools
-
-```bash
-command -v gosec 2>/dev/null
-command -v staticcheck 2>/dev/null
-```
-
-Build `tools_available`. If empty, emit unavailable sentinel
-with `tool-missing` skipped entries, exit 0.
-
-### Step 3 — Run each available tool
-
-Set `GOFLAGS=-mod=readonly` for both invocations to prevent
-mutations to `go.sum`.
-
-**gosec** (cwd = target_path so reported paths are relative):
+Run the engine, which probes the tools (`command -v gosec`,
+`command -v staticcheck`), runs them read-only (`GOFLAGS=-mod=readonly`, set by
+the lane config so neither tool mutates `go.mod`/`go.sum`), parses gosec's
+`Issues[]` JSON and staticcheck's JSON-lines, and maps each to the Finding
+schema above per `go-tools.md`:
 
 ```bash
-( cd "$target_path" && \
-  GOFLAGS=-mod=readonly gosec -fmt=json -quiet ./... ) \
-    > "$TMPDIR/go-runner-gosec.json" \
-    2> "$TMPDIR/go-runner-gosec.stderr"
-rc_gs=$?
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" go <target_path>
 ```
 
-Non-zero exits with valid JSON output are normal — gosec
-exits non-zero whenever any issue fires.
+The engine emits faithful JSONL - every line `origin: "go"`,
+`tool: "gosec" | "staticcheck"`, with `id`, `file`, `line`, `cwe`, `severity`
+and `evidence` taken verbatim from tool output - followed by one `__go_status__`
+record. A tool absent from PATH is a `tool-missing` skip; when neither tool is
+present the only line is the unavailable sentinel:
 
-**staticcheck**:
-
-```bash
-( cd "$target_path" && \
-  GOFLAGS=-mod=readonly staticcheck -f=json ./... ) \
-    > "$TMPDIR/go-runner-staticcheck.json" \
-    2> "$TMPDIR/go-runner-staticcheck.stderr"
-rc_sc=$?
+```json
+{"__go_status__": "unavailable", "tools": []}
 ```
 
-Same normal-non-zero behaviour. staticcheck emits NDJSON
-(one JSON object per line), not a top-level array.
+### Step 2 - Polish (presentation only)
 
-### Step 4 — Parse outputs
-
-**gosec** (`.Issues[]`):
-
-```bash
-jq -c '
-  .Issues[]? | {
-    id: ("gosec:" + .rule_id),
-    severity: ((.severity // "LOW") |
-               if . == "HIGH" then "HIGH"
-               elif . == "MEDIUM" then "MEDIUM"
-               else "LOW" end),
-    cwe: (if .cwe.ID and (.cwe.ID != "") then ("CWE-" + .cwe.ID) else null end),
-    title: ((.details // "") | split("\n")[0]),
-    file: .file,
-    line: ((.line // "0") | split("-")[0] | tonumber),
-    evidence: ((.code // "") | .[0:200]),
-    reference: "go-tools.md",
-    reference_url: (if .cwe.URL then .cwe.URL else ("https://github.com/securego/gosec/blob/master/README.md#" + .rule_id) end),
-    fix_recipe: null,
-    confidence: ((.confidence // "MEDIUM") |
-                 if . == "HIGH" then "high"
-                 elif . == "LOW" then "low"
-                 else "medium" end),
-    origin: "go",
-    tool: "gosec"
-  }
-' "$TMPDIR/go-runner-gosec.json"
-```
-
-The `.line` field gosec emits is a string (sometimes a range
-like `"42-44"`); the jq `split("-")[0] | tonumber` extracts
-the start line as an integer. The CWE inlining via
-`.cwe.ID` makes per-rule CWE tables unnecessary for gosec —
-the tool ships them.
-
-**staticcheck** (NDJSON; one object per line):
-
-```bash
-jq -c '
-  {
-    id: ("staticcheck:" + .code),
-    severity: ((.severity // "warning") |
-               if . == "error" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: .location.file,
-    line: (.location.line // 0),
-    evidence: ((.message // "") | .[0:200]),
-    reference: "go-tools.md",
-    reference_url: ("https://staticcheck.dev/docs/checks/#" + .code),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "go",
-    tool: "staticcheck"
-  }
-' "$TMPDIR/go-runner-staticcheck.json"
-```
-
-Apply per-`code` CWE overrides per `go-tools.md` mapping
-table:
-- `SA1019` (deprecated symbol) → CWE-477
-- `SA1015` (`time.Tick` leaks) → CWE-401
-- `SA5007` (infinite recursive call) → CWE-674
-- `SA1023` (missing http.Hijacker close) → CWE-404
-- `SA1000` / `SA1006` (unsafe printf) → CWE-134
-- everything else → null.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__go_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial /
-unavailable. The only expected skip reason in this lane is
-`tool-missing` — both tools have no host-OS gate and no
-target-shape preconditions beyond `go.mod` + at least one
-`*.go` file (which the inventory rule guarantees before
-dispatch).
+For each engine-extracted finding you MAY rewrite `title` for readability and
+refine `severity` with project context. You MUST NOT change `id`, `file`,
+`line`, `cwe`, `tool`, or `origin`, MUST NOT add or remove findings, and MUST
+relay the `__go_status__` sentinel verbatim. gosec's `details` are already
+human-readable, so for the go lane this polish is typically a pass-through.
+Because extraction is deterministic, the "never fabricate" guarantees in
+**Hard rules** are enforced by the engine - your polish only rephrases facts
+the engine already extracted.
 
 ## Output discipline
 

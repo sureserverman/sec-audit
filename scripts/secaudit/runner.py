@@ -30,22 +30,42 @@ def load_lane(name):
 
 
 def _get(obj, path):
-    """Navigate a dotted path through dicts. Returns None if any step missing."""
+    """Navigate a dotted path through dicts (and list indices: numeric segment).
+    Returns None if any step is missing."""
     cur = obj
     for part in path.split("."):
         if isinstance(cur, dict) and part in cur:
             cur = cur[part]
+        elif isinstance(cur, list) and part.isdigit() and int(part) < len(cur):
+            cur = cur[int(part)]
         else:
             return None
     return cur
 
 
 def _field(spec, item):
-    """Resolve a field spec (str dotted-path, or dict with from/map/lookup/index/default)."""
+    """Resolve a field spec:
+      - str            -> dotted path lookup
+      - {"concat":[lit|spec,...], "default":d}  -> string concat (literal strings
+        as-is, dict parts resolved; if any dict part is None -> default)
+      - {"from":path, "map"/"lookup":{}, "index":i, "int":true, "truncate":N,
+         "default":d}
+    """
     if isinstance(spec, str):
         return _get(item, spec)
     if not isinstance(spec, dict):
         return spec
+    if "concat" in spec:
+        parts = []
+        for p in spec["concat"]:
+            if isinstance(p, str):
+                parts.append(p)
+            else:
+                v = _field(p, item)
+                if v is None:
+                    return spec.get("default")
+                parts.append(str(v))
+        return "".join(parts)
     default = spec.get("default")
     val = _get(item, spec["from"]) if "from" in spec else None
     if "index" in spec:
@@ -59,6 +79,13 @@ def _field(spec, item):
         return spec["lookup"].get(val, default)
     if val is None:
         return default
+    if spec.get("int"):
+        try:
+            val = int(str(val).split("-")[0].split(":")[0])
+        except (ValueError, TypeError):
+            return default
+    if spec.get("truncate"):
+        val = str(val)[:spec["truncate"]]
     return val
 
 
@@ -77,8 +104,12 @@ def map_item(lane, toolcfg, item):
 
 
 def map_raw(lane, toolcfg, raw_text):
-    data = json.loads(raw_text)
-    arr = _get(data, toolcfg["findings_path"]) or []
+    if toolcfg.get("input_format") == "jsonl":
+        # one JSON object per line (e.g. staticcheck -f json)
+        arr = [json.loads(l) for l in raw_text.splitlines() if l.strip()]
+    else:
+        data = json.loads(raw_text)
+        arr = _get(data, toolcfg["findings_path"]) or []
     return [map_item(lane, toolcfg, it) for it in arr]
 
 
@@ -106,8 +137,10 @@ def run_live(lane, target):
             skipped.append({"tool": tc["name"], "reason": "tool-missing"})
             continue
         argv = [a.replace("{target}", target).replace("{tmp}", tmp) for a in tc["invoke"]]
+        env = os.environ.copy()
+        env.update(tc.get("env", {}))
         try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=600, env=env)
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} failed: {e}\n")
             continue
