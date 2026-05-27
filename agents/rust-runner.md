@@ -104,197 +104,34 @@ stderr, emit the unavailable sentinel, and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/rust-tools.md`.
-Extract, for each of the four subcommands:
-
-- The canonical invocation (exact flags and `--output-format` /
-  `--format json` options);
-- The exit-code semantics (in particular: cargo-audit and cargo-deny
-  exit non-zero when they FOUND something — this is NOT a crash);
-- The field-mapping table from tool-JSON to finding-schema;
-- The severity/CWE mapping rules.
-
-Also extract the three-state sentinel contract (`__rust_status__` ∈
-{`"ok"`, `"partial"`, `"unavailable"`}).
-
-### Step 2 — Resolve the target path
-
-Try the three input sources in order. If none yields a readable
-directory with a `Cargo.toml` at its root, emit
-`{"__rust_status__": "unavailable", "tools": []}` on stdout, log the
-reason to stderr, exit 0.
-
-### Step 3 — Probe tool availability
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v cargo 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" rust <target_path>
 ```
 
-If `cargo` is missing, emit the unavailable sentinel (Step 4). If
-present, probe each subcommand:
-
-```bash
-cargo audit --version 2>/dev/null
-cargo deny --version 2>/dev/null
-cargo geiger --version 2>/dev/null
-cargo vet --version 2>/dev/null
-```
-
-Write one stderr line per subcommand:
-`rust-runner: cargo-audit available at $(which cargo) audit (v...)` or
-`rust-runner: cargo-audit MISSING — skipped` (when `--version` returns
-non-zero OR prints nothing).
-
-Build a `tools_available` list in the order audit, deny, geiger, vet
-containing only the subcommands that resolved.
-
-### Step 4 — Handle the "all missing" case
-
-If `cargo` is missing OR `tools_available` is empty, emit exactly one
-line on stdout — `{"__rust_status__": "unavailable", "tools": []}` —
-and exit 0. Do not emit any finding lines. Do not emit a trailing
-`"ok"` or `"partial"` status; `unavailable` is the only status record
-in this case.
-
-### Step 5 — Run each available tool
-
-For each subcommand in `tools_available`, run it with the canonical
-invocation from `rust-tools.md`. Report paths go to `$TMPDIR` (or
-`/tmp`); never to `target_path`. Working dir is `target_path`.
-
-**cargo-audit** (when available):
-
-```bash
-( cd "$target_path" && cargo audit --json ) \
-  > "$TMPDIR/rust-runner-cargo-audit.json" \
-  2> "$TMPDIR/rust-runner-cargo-audit.stderr"
-rc_au=$?
-```
-
-Exit code 0 means "no vulnerabilities found"; non-zero exit with a
-valid JSON report means "vulnerabilities present" — the normal
-positive case. Only treat as tool failure if the JSON file is missing
-or unparseable.
-
-**cargo-deny** (when available):
-
-```bash
-( cd "$target_path" && cargo deny --format json check all ) \
-  > "$TMPDIR/rust-runner-cargo-deny.json" \
-  2> "$TMPDIR/rust-runner-cargo-deny.stderr"
-rc_de=$?
-```
-
-Same semantics: non-zero exit means "a check failed," not a crash.
-
-**cargo-geiger** (when available):
-
-```bash
-( cd "$target_path" && cargo geiger --output-format Json --all-targets ) \
-  > "$TMPDIR/rust-runner-cargo-geiger.json" \
-  2> "$TMPDIR/rust-runner-cargo-geiger.stderr"
-rc_ge=$?
-```
-
-**cargo-vet** (when available):
-
-```bash
-( cd "$target_path" && cargo vet suggest --output-format json ) \
-  > "$TMPDIR/rust-runner-cargo-vet.json" \
-  2> "$TMPDIR/rust-runner-cargo-vet.stderr"
-rc_ve=$?
-```
-
-For every subcommand: treat exit-code >= 127 OR missing-JSON OR
-unparseable-JSON as tool failure (remove from the effective
-`tools_ran` list, add to `failed`). Non-zero exits that produce valid
-JSON are NOT failures.
-
-### Step 6 — Parse each tool's JSON and emit findings
-
-For each tool whose run succeeded (valid JSON report present), parse
-per the field-mapping table derived from `rust-tools.md` and emit one
-JSON line per finding on stdout.
-
-**cargo-audit**: iterate `vulnerabilities.list[]`. For each entry,
-build a finding where `id = advisory.aliases[0]` if it starts with
-`CVE-`, else `advisory.id` (RUSTSEC-YYYY-NNNN). `severity` from the
-CVSS-band rule documented in rust-tools.md. `cwe` from
-`advisory.cwe[0]` or `CWE-1104` fallback. `file = "Cargo.toml"`,
-`line = 0`. `evidence = advisory.title + " — " + advisory.description`.
-`reference_url = advisory.url`. `fix_recipe = "Upgrade " + package.name
-+ " to " + advisory.patched_versions[0]` when provided; else `"Upgrade
-" + package.name + " — see advisory"`. `confidence = "high"`.
-`origin = "rust"`, `tool = "cargo-audit"`.
-
-**cargo-deny**: iterate diagnostic records. Map `type` →
-finding-schema per the rust-tools.md table. For advisory-type
-diagnostics, derive `id` from the embedded RUSTSEC ID or CVE alias;
-for ban/license/source diagnostics, use the deny code (e.g.
-`B0001` for banned crate) as `id`. `severity` from `error` → HIGH /
-`warning` → MEDIUM / `note`|`help` → LOW. `cwe` per the per-check-type
-table (advisories: from advisory, else CWE-1104; bans: CWE-1104;
-licenses: `null`; sources: CWE-494). `file`+`line` from `labels[0]`'s
-file/line span. `evidence = message`. `fix_recipe = help` field when
-present, else `null`. `confidence = "high"` for advisory matches,
-`"medium"` for others. `tool = "cargo-deny"`.
-
-**cargo-geiger**: iterate `packages[]`. For each package where
-`unsafety.used.functions.unsafe_ > 0`, emit ONE INFO-severity finding:
-`id = package.id.name + "@" + package.id.version`, `severity = "INFO"`,
-`cwe = null`, `title = "Unsafe code in " + package.id.name`,
-`file = package.id.name`, `line = 0`, `evidence = "Unsafe fn count: "
-+ unsafety.used.functions.unsafe_ + "; unsafe expr: " +
-unsafety.used.exprs.unsafe_`, `reference_url = null`, `fix_recipe =
-null` (geiger is signal, not fix), `confidence = "low"`, `tool =
-"cargo-geiger"`. Skip packages with `forbids_unsafe: true` — those
-explicitly deny unsafe and are low-concern. Never elevate above INFO.
-
-**cargo-vet**: iterate `suggestions[]`. For each entry, emit ONE
-LOW-severity finding: `id = crate + "@" + version`, `severity = "LOW"`,
-`cwe = null`, `title = "Unaudited supply-chain entry"`, `file =
-"Cargo.toml"`, `line = 0`, `evidence = "Needs audit criteria: " +
-(suggested_criteria | join ", ")`, `reference_url = null`, `fix_recipe
-= "Run \`cargo vet diff " + crate + " " + diff_from + " " + version +
-"\` and certify, or add an exemption with justification."`, `confidence
-= "medium"`, `tool = "cargo-vet"`.
-
-Emit one JSON object per finding as a single line on stdout. Never
-invent a CWE number; when the tool does not supply one, fall back to
-the per-tool default documented in rust-tools.md OR `null` where the
-table says so.
-
-### Step 7 — Emit the status summary
-
-After all findings have been emitted, append exactly one final line.
-
-If every tool in `tools_available` ran and parsed successfully:
-
-```json
-{"__rust_status__": "ok", "tools": [...], "runs": <N>, "findings": <M>}
-```
-
-If at least one tool ran successfully but at least one failed (missing
-JSON, malformed JSON, exit >= 127):
-
-```json
-{"__rust_status__": "partial", "tools": [...successful ones...], "runs": <N>, "findings": <M>, "failed": [...failed ones...]}
-```
-
-If every tool in `tools_available` failed (tools were available but all
-crashed), fall back to:
+The engine probes the tool(s) (`command -v cargo-audit`, `command -v cargo-deny`, `command -v cargo-geiger`, `command -v cargo-vet`), runs them, parses their native
+output, and maps each result to the Finding schema above per `rust-tools.md`.
+Output is faithful JSONL - every line `origin: "rust"`, `tool: "cargo-audit" | "cargo-deny" | "cargo-geiger" | "cargo-vet"` -
+then one `__rust_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
 ```json
 {"__rust_status__": "unavailable", "tools": []}
 ```
 
-This mirrors the webext contract: consumers have one uniform "could
-not analyse" case.
+The engine probes the cargo subcommands: `cargo audit --version`, `cargo deny --version`, `cargo geiger --version`, `cargo vet --version`. cargo-audit severity is derived from the advisory CVSS band; cargo-geiger findings are capped at INFO (never elevated). Skip reason: `tool-missing`.
 
-This line is mandatory — its absence means the agent crashed mid-run
-and the finding set must be treated as untrusted.
+### Step 2 - Polish (presentation only)
+
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __rust_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

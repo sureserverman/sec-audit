@@ -1,0 +1,4 @@
+{"packages":[
+{"name":"vulnerable-rust-fixture","version":"0.1.0","unsafe_fns":3,"unsafe_exprs":4},
+{"name":"time","version":"0.1.43","unsafe_fns":2,"unsafe_exprs":3}
+]}

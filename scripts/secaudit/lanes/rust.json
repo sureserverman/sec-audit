@@ -1,0 +1,42 @@
+{
+  "lane": "rust", "status_key": "__rust_status__", "origin": "rust", "reference": "rust-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "cargo-audit", "probe": "cargo-audit",
+      "invoke": ["cargo", "audit", "--json"], "output": "stdout", "findings_path": "vulnerabilities.list",
+      "const": {"confidence": "high", "file": "Cargo.toml", "line": 0},
+      "map": {
+        "id": {"from": "advisory.aliases.0", "default": null},
+        "severity": {"from": "advisory.cvss", "cvss_band": true, "default": "MEDIUM"},
+        "cwe": {"concat": ["CWE-", {"from": "advisory.cwe.0"}], "default": "CWE-1104"},
+        "title": "advisory.title", "evidence": "advisory.description",
+        "reference_url": {"from": "advisory.url", "default": null},
+        "fix_recipe": {"concat": ["Upgrade ", {"from": "package.name"}, " to ", {"from": "versions.patched.0"}]}
+      }
+    },
+    {
+      "name": "cargo-deny", "probe": "cargo-deny",
+      "invoke": ["cargo", "deny", "--format", "json", "check"], "output": "stdout", "input_format": "jsonl",
+      "const": {"confidence": "medium", "reference_url": null},
+      "map": {
+        "id": "code",
+        "severity": {"from": "severity", "map": {"error": "HIGH", "warning": "MEDIUM", "note": "LOW", "help": "LOW"}, "default": "MEDIUM"},
+        "cwe": {"from": "code", "lookup": {"B0001": "CWE-1104", "A0003": "CWE-1104", "S0001": "CWE-494"}, "default": null},
+        "title": "message", "evidence": "message",
+        "file": {"from": "labels.0.span.path", "default": null},
+        "line": {"from": "labels.0.span.line", "default": 0}
+      }
+    },
+    {
+      "name": "cargo-geiger", "probe": "cargo-geiger",
+      "invoke": ["cargo", "geiger", "--output-format", "Json"], "output": "stdout", "findings_path": "packages",
+      "const": {"confidence": "low", "severity": "INFO", "cwe": null, "file": "Cargo.lock", "line": 0, "reference_url": null},
+      "map": {
+        "id": {"concat": [{"from": "name"}, "@", {"from": "version"}]},
+        "title": {"concat": ["Unsafe code in ", {"from": "name"}]},
+        "evidence": {"concat": [{"from": "name"}, "@", {"from": "version"}, ": used unsafe functions=", {"from": "unsafe_fns"}, ", exprs=", {"from": "unsafe_exprs"}]}
+      }
+    }
+  ]
+}

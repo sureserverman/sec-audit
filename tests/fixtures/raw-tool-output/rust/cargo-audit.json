@@ -1,0 +1,3 @@
+{"vulnerabilities":{"list":[
+{"advisory":{"id":"RUSTSEC-2020-0071","aliases":["CVE-2020-26235"],"title":"Potential segfault in the time crate","description":"Unix-like operating systems may segfault due to dereferencing a dangling pointer in specific circumstances. This requires an environment variable to be set in a different thread than the affected functions.","cvss":"6.2","cwe":[476],"url":"https://rustsec.org/advisories/RUSTSEC-2020-0071.html"},"package":{"name":"time"},"versions":{"patched":[">=0.2.23"]}}
+]}}

@@ -93,6 +93,13 @@ def _field(spec, item):
         val = str(val)[:spec["truncate"]]
     if "before" in spec:                       # substring before a delimiter
         val = str(val).split(spec["before"])[0]
+    if spec.get("cvss_band"):                   # numeric CVSS base score -> severity tier
+        try:
+            sc = float(val)
+        except (TypeError, ValueError):
+            return spec.get("default", "MEDIUM")
+        return ("CRITICAL" if sc >= 9 else "HIGH" if sc >= 7
+                else "MEDIUM" if sc >= 4 else "LOW" if sc > 0 else "MEDIUM")
     return val
 
 
