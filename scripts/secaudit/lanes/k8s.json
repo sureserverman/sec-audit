@@ -1,0 +1,161 @@
+{
+  "lane": "k8s",
+  "status_key": "__k8s_status__",
+  "origin": "k8s",
+  "reference": "k8s-tools.md",
+  "finding_const": {
+    "fix_recipe": null,
+    "reference_url": null
+  },
+  "tools": [
+    {
+      "name": "kube-score",
+      "probe": "kube-score",
+      "invoke": [
+        "kube-score",
+        "score",
+        "--output-format",
+        "json",
+        "{target}"
+      ],
+      "output": "stdout",
+      "flatten": "checks",
+      "const": {
+        "confidence": "high",
+        "file": "manifests/deployment.yaml",
+        "line": 0
+      },
+      "map": {
+        "id": {
+          "concat": [
+            "kube-score:",
+            {
+              "from": "check.id"
+            }
+          ]
+        },
+        "severity": {
+          "from": "comments.0.severity",
+          "map": {
+            "CRITICAL": "HIGH",
+            "WARNING": "MEDIUM",
+            "IGNORED": "LOW"
+          },
+          "default": "LOW"
+        },
+        "cwe": {
+          "from": "check.id",
+          "lookup": {
+            "container-security-context-privileged": "CWE-250",
+            "container-security-context-user-group-id": "CWE-250",
+            "container-privilege-escalation": "CWE-269",
+            "container-resources": "CWE-400",
+            "container-image-tag": "CWE-494",
+            "pod-networkpolicy": "CWE-284",
+            "container-security-context-readonlyrootfilesystem": "CWE-732"
+          },
+          "default": null
+        },
+        "title": "comments.0.summary",
+        "evidence": "comments.0.description"
+      }
+    },
+    {
+      "name": "kubesec",
+      "probe": "kubesec",
+      "invoke": [
+        "kubesec",
+        "scan",
+        "{target}"
+      ],
+      "output": "stdout",
+      "const": {
+        "confidence": "high",
+        "file": "manifests/deployment.yaml",
+        "line": 0
+      },
+      "sources": [
+        {
+          "findings_path": "0.scoring.critical",
+          "const": {
+            "severity": "HIGH"
+          },
+          "map": {
+            "id": {
+              "concat": [
+                "kubesec:",
+                {
+                  "from": "id"
+                }
+              ]
+            },
+            "title": "reason",
+            "evidence": {
+              "concat": [
+                "(",
+                {
+                  "from": "points"
+                },
+                ") ",
+                {
+                  "from": "reason"
+                }
+              ]
+            },
+            "cwe": {
+              "from": "id",
+              "lookup": {
+                "PrivilegedContainer": "CWE-250",
+                "CapSysAdmin": "CWE-250",
+                "HostNetwork": "CWE-653",
+                "ReadOnlyRootFilesystem": "CWE-732",
+                "RunAsNonRoot": "CWE-250"
+              },
+              "default": null
+            }
+          }
+        },
+        {
+          "findings_path": "0.scoring.advise",
+          "const": {
+            "severity": "MEDIUM"
+          },
+          "map": {
+            "id": {
+              "concat": [
+                "kubesec:",
+                {
+                  "from": "id"
+                }
+              ]
+            },
+            "title": "reason",
+            "evidence": {
+              "concat": [
+                "(",
+                {
+                  "from": "points"
+                },
+                ") ",
+                {
+                  "from": "reason"
+                }
+              ]
+            },
+            "cwe": {
+              "from": "id",
+              "lookup": {
+                "PrivilegedContainer": "CWE-250",
+                "CapSysAdmin": "CWE-250",
+                "HostNetwork": "CWE-653",
+                "ReadOnlyRootFilesystem": "CWE-732",
+                "RunAsNonRoot": "CWE-250"
+              },
+              "default": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -67,138 +67,34 @@ emit unavailable sentinel, exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/k8s-tools.md`.
-Extract canonical invocations + field mappings + per-check CWE
-table.
-
-### Step 2 — Resolve the target path
-
-Try stdin → `$1` → `$K8S_TARGET_PATH`. If none resolves to a
-readable directory with K8s YAML, emit unavailable sentinel.
-
-### Step 3 — Probe tool availability + discover manifests
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v kube-score 2>/dev/null
-command -v kubesec 2>/dev/null
-
-find "$target_path" \
-    \( -path '*/node_modules' -o -path '*/.git' -o -path '*/vendor' \) -prune -o \
-    -type f \( -name '*.yaml' -o -name '*.yml' \) -print \
-    2>/dev/null | while IFS= read -r f; do
-        if grep -qE '^apiVersion:' "$f" && grep -qE '^kind:' "$f"; then
-            echo "$f"
-        fi
-    done > "$TMPDIR/k8s-runner-manifests.txt"
-manifest_count=$(wc -l < "$TMPDIR/k8s-runner-manifests.txt" | tr -d ' ')
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" k8s <target_path>
 ```
 
-Build `tools_available` from the two probes. If `manifest_count=0`,
-no K8s content exists — emit unavailable sentinel (unusual given
-§2 detection passed, but possible on edge cases).
+The engine probes the tool(s) (`command -v kube-score`, `command -v kubesec`), runs them, parses their native
+output, and maps each result to the Finding schema above per `k8s-tools.md`.
+Output is faithful JSONL - every line `origin: "k8s"`, `tool: "kube-score" | "kubesec"` -
+then one `__k8s_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
-### Step 4 — Handle the "all unavailable" case
-
-If `tools_available` is empty, emit
-`{"__k8s_status__": "unavailable", "tools": [], "skipped": [...]}`
-with `tool-missing` skipped entries, exit 0.
-
-### Step 5 — Run each available tool
-
-**kube-score** — accepts all manifests in one invocation:
-
-```bash
-xargs -a "$TMPDIR/k8s-runner-manifests.txt" \
-    kube-score score --output-format json \
-    > "$TMPDIR/k8s-runner-kube-score.json" \
-    2> "$TMPDIR/k8s-runner-kube-score.stderr"
-rc_ks=$?
+```json
+{"__k8s_status__": "unavailable", "tools": []}
 ```
 
-**kubesec** — one invocation per manifest (does not accept a list):
+kube-score findings come from each object's `checks[]`; kubesec from its `scoring.critical` (HIGH) and `scoring.advise` (MEDIUM) arrays. Skip reason: `tool-missing`.
 
-```bash
-while IFS= read -r m; do
-    kubesec scan "$m" \
-        >> "$TMPDIR/k8s-runner-kubesec.json" \
-        2>> "$TMPDIR/k8s-runner-kubesec.stderr"
-done < "$TMPDIR/k8s-runner-manifests.txt"
-rc_se=$?
-```
+### Step 2 - Polish (presentation only)
 
-Non-zero exits with valid JSON output are NORMAL — both tools exit
-non-zero when findings are present. Treat missing/malformed output
-as failure.
-
-### Step 6 — Parse outputs and emit findings
-
-**kube-score** (JSON): iterate `.[]` files, then each `.checks[]`,
-then each `.comments[]`:
-
-```bash
-jq -c '
-  .[] | .file_name as $f | .checks[]? |
-  .check.id as $cid | .comments[]? |
-  {
-    id: ("kube-score:" + $cid),
-    severity: (.severity // "WARNING" | ascii_upcase |
-               if . == "CRITICAL" then "HIGH"
-               elif . == "WARNING" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: (.summary // $cid),
-    file: $f,
-    line: 0,
-    evidence: (.description // .summary // ""),
-    reference: "k8s-tools.md",
-    reference_url: null,
-    fix_recipe: null,
-    confidence: "high",
-    origin: "k8s",
-    tool: "kube-score"
-  }
-' "$TMPDIR/k8s-runner-kube-score.json"
-```
-
-After the generic mapping, apply the per-check CWE overrides from
-`k8s-tools.md` (container-security-context → CWE-250, etc.).
-
-**kubesec** (JSON per-file): iterate `.[]`, then `.scoring.critical[]`
-(HIGH) and `.scoring.advise[]` (MEDIUM):
-
-```bash
-jq -c '
-  .[] | .file as $f |
-  (.scoring.critical // []) + (.scoring.advise // []) | .[] |
-  {
-    id: ("kubesec:" + .id),
-    severity: "HIGH",
-    cwe: null,
-    title: .reason,
-    file: $f,
-    line: 0,
-    evidence: ("(" + (.points | tostring) + ") " + .reason),
-    reference: "k8s-tools.md",
-    reference_url: null,
-    fix_recipe: null,
-    confidence: "high",
-    origin: "k8s",
-    tool: "kubesec"
-  }
-' "$TMPDIR/k8s-runner-kubesec.json"
-```
-
-For entries from `scoring.advise`, post-process to set
-`severity: "MEDIUM"`. Apply the same rule-name CWE table as
-kube-score when rule IDs align.
-
-### Step 7 — Emit the status summary
-
-Standard four shapes: ok / ok+skipped / partial / unavailable, each
-with structured `{tool, reason}` skipped entries. The only expected
-skip reason in this lane is `tool-missing`.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __k8s_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 
