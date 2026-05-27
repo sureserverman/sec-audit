@@ -1,0 +1,1 @@
+{"matches":[{"vulnerability":{"id":"GHSA-fghv-69vj-qj49","severity":"Medium","description":"Werkzeug debugger PIN enumeration weakness in earlier versions allowed local attackers to brute-force the debug PIN.","dataSource":"https://github.com/advisories/GHSA-fghv-69vj-qj49","fix":{"versions":["2.2.3"]}},"artifact":{"name":"werkzeug","version":"2.0.0"}}]}

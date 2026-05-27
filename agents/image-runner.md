@@ -77,181 +77,34 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `references/image-tools.md`; extract invocations,
-field mappings, severity remaps, and the dedup rule.
-
-### Step 2 — Resolve target + probe tools + check applicability
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v trivy 2>/dev/null
-command -v grype 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" image <target_path>
 ```
 
-Build `tools_available`. Then check applicability:
+The engine probes the tool(s) (`command -v trivy`, `command -v grype`), runs them, parses their native
+output, and maps each result to the Finding schema above per `image-tools.md`.
+Output is faithful JSONL - every line `origin: "image"`, `tool: "trivy" | "grype"` -
+then one `__image_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
-- **Find image tarballs** — `*.tar` files containing
-  `manifest.json` inside (Docker save format) OR sibling
-  `index.json` (OCI archive):
-  ```bash
-  image_tarballs=$( find "$target_path" -type f -name '*.tar' \
-                       -exec sh -c 'tar -tf "$1" 2>/dev/null \
-                            | grep -qE "^manifest.json$|^index.json$"' _ {} \; \
-                       -print )
-  ```
-
-- **Find OCI layout dirs** — directories containing both
-  `index.json` and `oci-layout` files:
-  ```bash
-  oci_layouts=$( find "$target_path" -type f -name 'oci-layout' \
-                     -exec dirname {} \; \
-                 | sort -u )
-  ```
-
-- **Find SBOMs** — SPDX or CycloneDX JSON files:
-  ```bash
-  sboms=$( find "$target_path" -type f \( \
-                  -name '*.spdx.json' -o -name '*.cyclonedx.json' \
-                  -o -name '*.cdx.json' -o -name '*.sbom.json' \
-                  -o -name 'bom.json' \) \
-              -print )
-  ```
-
-If no image tarballs AND no OCI layouts AND no SBOMs are
-found, emit unavailable sentinel with one
-`{"tool": "trivy", "reason": "no-image-artifact"}` AND one
-`{"tool": "grype", "reason": "no-image-artifact"}` skipped
-entry, exit 0.
-
-If `tools_available` is empty (neither trivy nor grype on
-PATH), emit unavailable sentinel with `tool-missing` skipped
-entries, exit 0.
-
-### Step 3 — Run each available tool
-
-**trivy** (one invocation per image tarball):
-
-```bash
-: > "$TMPDIR/image-runner-trivy.jsonl"
-for img in $image_tarballs; do
-    trivy image \
-          --input "$img" \
-          --format json \
-          --scanners vuln \
-          --severity HIGH,CRITICAL,MEDIUM,LOW \
-          --skip-update \
-          > "$TMPDIR/image-runner-trivy-$(basename "$img").json" \
-          2>> "$TMPDIR/image-runner-trivy.stderr"
-done
-rc_tr=$?
+```json
+{"__image_status__": "unavailable", "tools": []}
 ```
 
-For OCI layouts, trivy supports `--input <dir>` syntax
-similarly. For SBOMs, use `trivy sbom <sbom-file>`.
+The engine runs `trivy image --input <tarball> --format json --scanners vuln --skip-update` (operator-managed DB, no registry pull) and grype. Skip reasons: `tool-missing`, `no-image-artifact`. In Step 2 you MUST dedup trivy/grype overlap by `(id, file)` so an advisory found by both tools appears once.
 
-**grype** (one invocation per artifact):
+### Step 2 - Polish (presentation only)
 
-```bash
-: > "$TMPDIR/image-runner-grype.jsonl"
-for art in $image_tarballs $oci_layouts; do
-    grype "$art" \
-          --output json \
-          > "$TMPDIR/image-runner-grype-$(basename "$art").json" \
-          2>> "$TMPDIR/image-runner-grype.stderr"
-done
-for sbom in $sboms; do
-    grype "sbom:$sbom" \
-          --output json \
-          > "$TMPDIR/image-runner-grype-sbom-$(basename "$sbom").json" \
-          2>> "$TMPDIR/image-runner-grype.stderr"
-done
-rc_gr=$?
-```
-
-Non-zero exits with valid JSON are normal — both tools exit
-non-zero whenever any vulnerability fires.
-
-### Step 4 — Parse outputs + deduplicate
-
-**trivy** (per-file `Results[].Vulnerabilities[]`):
-
-```bash
-jq -c --arg img_path "$rel_path" '
-  .Results[]? | .Type as $pkg_type | .Vulnerabilities[]? | {
-    id: ("trivy:" + .VulnerabilityID),
-    severity: ((.Severity // "UNKNOWN") |
-               if . == "CRITICAL" then "CRITICAL"
-               elif . == "HIGH" then "HIGH"
-               elif . == "MEDIUM" then "MEDIUM"
-               elif . == "LOW" then "LOW"
-               else "LOW" end),
-    cwe: (if (.CweIDs // []) | length > 0 then .CweIDs[0] else "CWE-1395" end),
-    title: ((.Title // .Description // "") | .[0:200]),
-    file: $img_path,
-    line: 0,
-    evidence: (.PkgName + " " + .InstalledVersion + " — " + .VulnerabilityID +
-               (if .FixedVersion then " — fixed in " + .FixedVersion else "" end)),
-    reference: "image-tools.md",
-    reference_url: ((.References // []) | if length > 0 then .[0]
-                    else ("https://nvd.nist.gov/vuln/detail/" + .VulnerabilityID) end),
-    fix_recipe: (if .FixedVersion then ("upgrade to >=" + .FixedVersion) else null end),
-    confidence: "high",
-    origin: "image",
-    tool: "trivy"
-  }
-' "$TMPDIR/image-runner-trivy-$(basename "$img").json"
-```
-
-**grype** (`matches[]`):
-
-```bash
-jq -c --arg img_path "$rel_path" '
-  .matches[]? | {
-    id: ("grype:" + .vulnerability.id),
-    severity: ((.vulnerability.severity // "Low") |
-               if . == "Critical" then "CRITICAL"
-               elif . == "High" then "HIGH"
-               elif . == "Medium" then "MEDIUM"
-               elif . == "Low" then "LOW"
-               else "LOW" end),
-    cwe: "CWE-1395",
-    title: ((.vulnerability.description // .vulnerability.id) | .[0:200]),
-    file: $img_path,
-    line: 0,
-    evidence: (.artifact.name + " " + .artifact.version + " — " + .vulnerability.id +
-               (if (.vulnerability.fix.versions // []) | length > 0
-                then " — fixed in " + .vulnerability.fix.versions[0] else "" end)),
-    reference: "image-tools.md",
-    reference_url: (.vulnerability.dataSource //
-                    ("https://nvd.nist.gov/vuln/detail/" + .vulnerability.id)),
-    fix_recipe: (if (.vulnerability.fix.versions // []) | length > 0
-                 then ("upgrade to >=" + .vulnerability.fix.versions[0])
-                 else null end),
-    confidence: "high",
-    origin: "image",
-    tool: "grype"
-  }
-' "$TMPDIR/image-runner-grype-$(basename "$art").json"
-```
-
-**Deduplication step.** Combine the trivy + grype output
-streams; for each `(file, vulnerability_id_without_tool_prefix,
-package_name)` tuple, keep the FIRST occurrence (trivy
-wins). Strip the `trivy:` / `grype:` prefix from the id when
-comparing for dedup, but keep the prefixed id in the emitted
-finding so the source tool is traceable.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__image_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial /
-unavailable. Skip vocabulary:
-- `tool-missing`
-- `no-image-artifact` (target-shape — no image tarball, OCI
-  layout, or SBOM under target).
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __image_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

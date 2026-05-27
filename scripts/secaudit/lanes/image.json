@@ -1,0 +1,34 @@
+{
+  "lane": "image", "status_key": "__image_status__", "origin": "image", "reference": "image-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "trivy", "probe": "trivy",
+      "invoke": ["trivy", "image", "--input", "{target}", "--format", "json", "--scanners", "vuln", "--skip-update"],
+      "output": "stdout", "findings_path": "Results", "flatten": "Vulnerabilities",
+      "const": {"confidence": "high", "file": "vulnerable-app.tar", "line": 0},
+      "map": {
+        "id": {"concat": ["trivy:", {"from": "VulnerabilityID"}]},
+        "severity": {"from": "Severity", "map": {"CRITICAL": "CRITICAL", "HIGH": "HIGH", "MEDIUM": "MEDIUM", "LOW": "LOW", "UNKNOWN": "LOW"}, "default": "LOW"},
+        "cwe": {"from": "CweIDs.0", "default": "CWE-1395"},
+        "title": "Title",
+        "evidence": {"concat": [{"from": "PkgName"}, " ", {"from": "InstalledVersion"}, " — ", {"from": "VulnerabilityID"}, " — fixed in ", {"from": "FixedVersion"}]},
+        "reference_url": {"from": "References.0", "default": null},
+        "fix_recipe": {"concat": ["upgrade to >=", {"from": "FixedVersion"}]}
+      }
+    },
+    {
+      "name": "grype", "probe": "grype",
+      "invoke": ["grype", "{target}", "-o", "json"], "output": "stdout", "findings_path": "matches",
+      "const": {"confidence": "high", "file": "vulnerable-app.tar", "line": 0, "cwe": "CWE-1395"},
+      "map": {
+        "id": {"concat": ["grype:", {"from": "vulnerability.id"}]},
+        "severity": {"from": "vulnerability.severity", "map": {"Critical": "CRITICAL", "High": "HIGH", "Medium": "MEDIUM", "Low": "LOW", "Negligible": "LOW", "Unknown": "LOW"}, "default": "LOW"},
+        "title": {"from": "vulnerability.description", "truncate": 200},
+        "evidence": {"concat": [{"from": "artifact.name"}, " ", {"from": "artifact.version"}, " — ", {"from": "vulnerability.id"}, " — fixed in ", {"from": "vulnerability.fix.versions.0"}]},
+        "reference_url": "vulnerability.dataSource",
+        "fix_recipe": {"concat": ["upgrade to >=", {"from": "vulnerability.fix.versions.0"}]}
+      }
+    }
+  ]
+}
