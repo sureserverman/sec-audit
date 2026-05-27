@@ -71,171 +71,34 @@ surface the signal and let the reviewer decide.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+This agent is a **thin wrapper over the deterministic runner engine**
+(`scripts/secaudit/runner.py` driven by `scripts/secaudit/lanes/sast.json`).
+Do NOT map tool output by hand.
 
-Load `<plugin-root>/skills/sec-audit/references/sast-tools.md`. From it,
-extract and store:
+1. Run the engine against the target:
 
-- The canonical **semgrep** invocation (gating form with `--error`, and
-  non-gating form without it).
-- The canonical **bandit** invocation (`bandit -r <target> -f json -o
-  <out.json>`; add `--exit-zero` in non-gating mode).
-- The **Semgrep JSON → sec-audit finding** field mapping table.
-- The **Bandit JSON → sec-audit finding** field mapping table,
-  including the plugin-to-CWE lookup (B602→CWE-78, B303→CWE-327,
-  B105→CWE-798, B201→CWE-94, B608→CWE-89; anything not in the table
-  maps to `cwe: null`).
-- The unavailable-tool sentinel recipe and the status-summary recipe.
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" sast <target_path>
+   ```
 
-Do not proceed until these are in hand.
+   The engine probes the tools (`command -v semgrep`, `command -v bandit`),
+   runs them with the flags pinned in `sast-tools.md` / the lane config, parses
+   each tool's native JSON, maps every result to the **Finding schema** above
+   (every line `origin: "sast"`, `tool: "semgrep" | "bandit"`), and emits JSONL
+   on stdout followed by exactly one `__sast_status__` record.
+2. Emit the engine's stdout **verbatim** — do not add, drop, or reformat
+   findings.
+3. Degrade contract (enforced by the engine, not by prose): when neither tool
+   is on PATH the only stdout line is the unavailable sentinel, exit 0:
 
-### Step 2 — Probe tool availability
+   ```json
+   {"__sast_status__": "unavailable", "tools": []}
+   ```
 
-Run:
-
-```bash
-command -v semgrep 2>/dev/null && semgrep --version 2>/dev/null || echo "SEMGREP_MISSING"
-command -v bandit  2>/dev/null && bandit  --version 2>/dev/null || echo "BANDIT_MISSING"
-```
-
-Write one stderr line per tool naming what you found, e.g.:
-
-```
-sast-runner: semgrep 1.160.0 available
-sast-runner: bandit 1.9.4 available
-sast-runner: semgrep MISSING — skipped
-```
-
-Track which tools are present in a `tools_available` list.
-
-### Step 3 — Handle the "both missing" case
-
-If `tools_available` is empty (neither `semgrep` nor `bandit` is on
-`PATH`), emit **exactly one** line on stdout:
-
-```json
-{"__sast_status__": "unavailable", "tools": []}
-```
-
-Exit with code 0. Do not emit any finding lines. Do not emit a trailing
-`"ok"` status line — `unavailable` is the only status record in this
-case.
-
-### Step 4 — Run semgrep (if available)
-
-Invocation (non-gating is the sec-audit default — findings are surfaced,
-they do not gate the run):
-
-```bash
-semgrep scan \
-  --config=p/owasp-top-ten \
-  --json \
-  --metrics=off \
-  "$target_path" \
-  > "$TMPDIR/sast-runner-semgrep.json" \
-  2> "$TMPDIR/sast-runner-semgrep.stderr"
-rc=$?
-```
-
-Interpret the exit code (from `sast-tools.md`):
-- `0` — scan completed, no findings or findings without `--error`: parse JSON, emit findings.
-- `1` — findings present in `--error` mode: also parse JSON, emit findings.
-- `3`, `4`, `5`, `7` — configuration/language/registry failure: do NOT
-  emit findings for this tool. Write a stderr line like
-  `sast-runner: semgrep failed rc=<n>` and mark this run as failed.
-  (The tool was on PATH, but the run did not produce a usable result.)
-- Any other non-zero code: treat as failure, same as above.
-
-If semgrep ran successfully, parse `$TMPDIR/sast-runner-semgrep.json`.
-Its top-level shape is `{"results": [...], "errors": [...], "paths": {...},
-"skipped_rules": [...], "version": "..."}`. For each element of
-`results`, map to a sec-audit finding per the Semgrep recipe in
-`sast-tools.md`:
-
-| Semgrep field                   | sec-audit field  |
-|---------------------------------|-------------------|
-| `check_id`                      | `id`              |
-| `extra.severity` (`ERROR` → `HIGH`, `WARNING` → `MEDIUM`, `INFO` → `LOW`) | `severity` |
-| `extra.metadata.cwe[0]`         | `cwe` (or `null`) |
-| `extra.message`                 | `title` AND `evidence` |
-| `path`                          | `file`            |
-| `start.line`                    | `line`            |
-| `extra.metadata.references[0]`  | `reference_url` (or `null`) |
-
-Constants on every semgrep finding: `origin: "sast"`, `tool: "semgrep"`,
-`reference: "sast-tools.md"`, `fix_recipe: null`, `confidence: "medium"`.
-
-Emit one JSON object per finding as a single line on stdout.
-
-### Step 5 — Run bandit (if available)
-
-Invocation (Python-only: skip bandit when the target has no `.py` files
-— check with `find "$target_path" -name '*.py' -print -quit 2>/dev/null`
-and if the output is empty, emit
-`sast-runner: bandit skipped — no Python files in target` to stderr
-and move on):
-
-```bash
-bandit -r "$target_path" \
-  -f json \
-  -o "$TMPDIR/sast-runner-bandit.json" \
-  --exit-zero \
-  2> "$TMPDIR/sast-runner-bandit.stderr"
-rc=$?
-```
-
-With `--exit-zero`, bandit always returns 0 when the scan completes;
-non-zero means bandit itself crashed. If `rc != 0`, do NOT emit findings
-for bandit. Write a stderr line and mark this run as failed.
-
-Parse `$TMPDIR/sast-runner-bandit.json`. Top-level shape is `{"results":
-[...], "metrics": {...}, "errors": [...]}`. For each element of
-`results`, map per the Bandit recipe in `sast-tools.md`:
-
-| Bandit field       | sec-audit field                  |
-|--------------------|-----------------------------------|
-| `test_id`          | `id`                              |
-| `issue_severity`   | `severity` (verbatim `HIGH`/`MEDIUM`/`LOW`) |
-| `test_id`          | `cwe` via the plugin-to-CWE table; `null` if unmapped |
-| `issue_text`       | `title` AND `evidence`            |
-| `filename`         | `file`                            |
-| `line_number`      | `line`                            |
-| `more_info`        | `reference_url` (or `null`)       |
-| `issue_confidence` | `confidence` (`HIGH`→`high`, `MEDIUM`→`medium`, `LOW`→`low`) |
-
-Constants on every bandit finding: `origin: "sast"`, `tool: "bandit"`,
-`reference: "sast-tools.md"`, `fix_recipe: null`.
-
-Emit one JSON object per finding as a single line on stdout.
-
-### Step 6 — Emit the status summary
-
-After all available tools have run and all findings are on stdout,
-append exactly one final line:
-
-```json
-{"__sast_status__": "ok", "tools": ["semgrep","bandit"], "runs": 2, "findings": 17}
-```
-
-- `tools` — the list of tools that actually executed successfully this
-  run. Omit any tool that was missing from PATH or whose run failed.
-- `runs` — length of `tools`.
-- `findings` — total count of finding lines emitted across all tools in
-  this run.
-
-This status line is mandatory — its absence means the agent crashed
-mid-run and the finding set must be treated as untrusted.
-
-If at least one tool was on PATH but ALL of them failed during
-execution (i.e., `tools_available` was non-empty but `tools` ended up
-empty), emit this status line instead and exit 0:
-
-```json
-{"__sast_status__": "unavailable", "tools": []}
-```
-
-This matches the "both missing" sentinel so downstream consumers have
-one uniform failure case to handle.
+   A tool absent from PATH (or inapplicable, e.g. bandit with no `*.py`) is
+   recorded as a `tool-missing` skip, never a fabricated clean scan. Because
+   the mapping is deterministic, the "never fabricate" guarantees in
+   **Hard rules** are enforced structurally by the engine.
 
 ## Output discipline
 

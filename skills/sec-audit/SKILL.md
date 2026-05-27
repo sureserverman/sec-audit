@@ -2016,9 +2016,9 @@ per-package `malicious` array with `kind: "malicious_package"`. Treat every
 such entry as a **CRITICAL top-level finding unconditionally** — a known-bad
 package already in the dependency set is not a "maybe reachable"
 vulnerability. These carry no CVSS (`cvss: null`) and no KEV (`kev: null`);
-in the §5 rubric give them the `CRITICAL=36` CVSS-tier score, `+25` exposure
-(the dependency executes in the build/runtime), and `0` exploit/auth
-modifiers — they always land in the CRITICAL bucket. Render them under a
+`score.py` pins any `kind: "malicious_package"` finding to score 100 /
+CRITICAL (a confirmed malicious dependency is known active malware, not a
+CVSS-scored vulnerability — the additive rubric does not apply). Render them under a
 `Malicious dependency` sub-header so they are not visually merged with
 ordinary CVEs. This is the package-feed half of supply-chain detection; the
 code-heuristic half is the `supply-chain` lane (§3.27).
@@ -2070,18 +2070,30 @@ them — not in the §3 parallel fan-out. Skill-level invariants:
 - **Cost bound.** Opt-in flag + `deep_deps_max` cap + sonnet pin; per-run token
   accounting (§6 metadata) records the deep-deps cost separately.
 
-**Scoring (§5).** A `malicious` verdict scores as CRITICAL (CVSS-tier 36, +25
-exposure — the dependency executes in build/runtime); a `suspicious` verdict
-scores as its HIGH/MEDIUM severity. Render `deep-deps` findings under a
+**Scoring (§5).** `score.py` pins a `malicious` verdict to 100 / CRITICAL
+(same rule as `kind: "malicious_package"`); a `suspicious` verdict scores via
+the normal additive rubric off its HIGH/MEDIUM severity. Render `deep-deps` findings under a
 `Deep-dependency diff` sub-header, deduplicated against §4's `Malicious
 dependency` entries by `(ecosystem, name, version)` — a package flagged by the
 feed AND confirmed by the diff appears once, annotated with both signals.
 
 ## 5. Prioritize
 
-Compute a numeric score 0–100 per finding and bucket it.
+Compute a numeric score 0–100 per finding and bucket it. This is
+**deterministic arithmetic — run the script, don't do it by hand**:
 
-**Scoring rubric** (deterministic — show the math in the report):
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/score.py" < findings.json
+```
+
+`score.py` reads the finding array (each finding carrying the `severity`/
+`cvss`/`kev` from cve-enricher plus the `exposure` and `auth_required`
+annotations the sec-expert/triager assign) and returns each finding with an
+integer `score`, its `bucket`, and a `score_breakdown` (the per-component math
+to render in the report). The rubric below is that script's authoritative
+spec — keep them in sync.
+
+**Scoring rubric** (deterministic — `score.py` implements this; show the math in the report):
 
 - **CVSS** (0–40 pts): `min(40, cvss_base * 4)` if CVE-enriched; else use
   the sec-expert severity mapped to `CRITICAL=36 / HIGH=28 / MEDIUM=16 /

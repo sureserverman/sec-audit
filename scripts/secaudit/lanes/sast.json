@@ -1,0 +1,46 @@
+{
+  "lane": "sast",
+  "status_key": "__sast_status__",
+  "origin": "sast",
+  "reference": "sast-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "semgrep",
+      "probe": "semgrep",
+      "invoke": ["semgrep", "scan", "--config=p/owasp-top-ten", "--json", "--metrics=off", "{target}"],
+      "output": "stdout",
+      "findings_path": "results",
+      "const": {"confidence": "medium"},
+      "map": {
+        "id": "check_id",
+        "severity": {"from": "extra.severity", "map": {"ERROR": "HIGH", "WARNING": "MEDIUM", "INFO": "LOW"}},
+        "cwe": {"from": "extra.metadata.cwe", "index": 0, "default": null},
+        "title": "extra.message",
+        "evidence": "extra.message",
+        "file": "path",
+        "line": "start.line",
+        "reference_url": {"from": "extra.metadata.references", "index": 0, "default": null}
+      }
+    },
+    {
+      "name": "bandit",
+      "probe": "bandit",
+      "applicable_glob": "*.py",
+      "invoke": ["bandit", "-r", "{target}", "-f", "json", "-o", "{tmp}/bandit.json", "--exit-zero"],
+      "output": "file:{tmp}/bandit.json",
+      "findings_path": "results",
+      "map": {
+        "id": "test_id",
+        "severity": "issue_severity",
+        "cwe": {"from": "test_id", "lookup": {"B602": "CWE-78", "B303": "CWE-327", "B105": "CWE-798", "B201": "CWE-94", "B608": "CWE-89"}, "default": null},
+        "title": "issue_text",
+        "evidence": "issue_text",
+        "file": "filename",
+        "line": "line_number",
+        "reference_url": {"from": "more_info", "default": null},
+        "confidence": {"from": "issue_confidence", "map": {"HIGH": "high", "MEDIUM": "medium", "LOW": "low"}}
+      }
+    }
+  ]
+}
