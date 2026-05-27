@@ -85,6 +85,21 @@ header block so the review is reproducible.
 
 Detect the technology stack. Read only — do not install or execute.
 
+**Deterministic pre-pass (run this first):**
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/inventory.py" <target_path>
+```
+
+`inventory.py` does the unambiguous file-glob / content-grep detection
+(dependency `ecosystems` + the file-shape `lanes`: python, go, shell, rust,
+iac, gh-actions, virt, image, webext, k8s, ai-tools, supply-chain) and emits
+`{"ecosystems":[...], "lanes":{...}}`. Treat its output as the baseline
+inventory. The LLM still owns the **judgemental** detections the script
+deliberately omits — macOS-vs-iOS Info.plist disambiguation, framework-signal
+nuance, Android/Apple module shape, and the Uncovered-technology second pass
+below — layering them on top of the script's baseline.
+
 - **Manifests**: `package.json`, `requirements.txt`, `pyproject.toml`,
   `poetry.lock`, `Gemfile(.lock)`, `go.mod`/`go.sum`, `pom.xml`,
   `build.gradle(.kts)`, `Cargo.toml`/`Cargo.lock`, `composer.json`,

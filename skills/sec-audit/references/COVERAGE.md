@@ -742,6 +742,42 @@ Dispatch discipline.
   entries by `(ecosystem, name, version)`.
 - **Shipped in:** v1.16.0.
 
+## Deterministic scripts vs LLM agents (v1.17)
+
+As of v1.17 the **deterministic** parts of the pipeline run as stdlib-Python
+scripts under `scripts/secaudit/` (no third-party deps), invoked via
+`${CLAUDE_PLUGIN_ROOT}`. The corresponding agents are **thin wrappers** that
+run the script and (for runner lanes) apply a presentation-only **polish** pass
+— they never re-implement the deterministic logic, so the JSONL/sentinel/origin
+contract, `contract-check`, drills, and e2e are unchanged.
+
+**Tier 1 — fully script-backed (no per-finding LLM):**
+- `cve_enricher.py` — OSV/NVD/GHSA/KEV + `MAL-` classification (cve-enricher agent).
+- `score.py` — the §5 prioritization rubric (deterministic arithmetic).
+- `inventory.py` — the §2 deterministic file-glob/content-grep detection pre-pass.
+
+**Tier 2 — config-driven runner engine** (`runner.py` + `lanes/<lane>.json`).
+Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
+severity/evidence from tool output); the agent polishes title/severity only.
+Script-backed lanes (9): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
+`python`, `iac`, `image`, `dast`. Parity is proven per lane by
+`tests/script-runner.sh <lane>` (byte-equal to the golden for clean lanes; to
+an `expected.jsonl` faithful-output fixture for editorial lanes).
+
+**Still agent-backed (LLM runner agents, unchanged):**
+- *Pending an engine feature:* `k8s` (deep object→checks→comments nesting +
+  dual-array kubesec), `webext` (errors/warnings/notices multi-array),
+  `webapp` (3 tools, mixed shapes), `supply-chain` (guarddog's bespoke
+  per-package shape + osv-scanner deep-nest with `MAL-` filter).
+- *Non-JSON tools — agent by design:* `android` (android-lint XML), `rust`
+  (cargo-geiger table; cargo-audit/deny are JSON), `ai-tools` (jq structural
+  validation + mcp-scan), `netcfg`/`virt` (validators), and the desktop lanes
+  `linux`/`macos`/`ios`/`windows` (command-output parsing, host-OS-gated).
+
+The `sec-expert`, `finding-triager`, `dep-diff-analyst`, and `report-writer`
+agents remain LLM by design — they perform irreducible judgement, not
+deterministic mapping.
+
 ## Ecosystems
 
 CVE enrichment routing by inventory-detected ecosystem. OSV
