@@ -770,27 +770,21 @@ list-valued `applicable_glob` + multi-glob `{files:a|b}`, a per-file pass/fail
 `validator` mode (exit-code → synthesized finding, with `line_regex` and
 `dedupe_by`), and per-tool `env`.
 
-**Still agent-backed (LLM runner agents).** These split into three groups by
+**Still agent-backed (LLM runner agents).** These split into two groups by
 whether engine conversion is actually worthwhile:
-
-- **Planned Tier-1 hybrid conversion** (a JSON-emitting primary tool + a
-  pass/fail companion validator — conversion is beneficial and tracked):
-  - `ai-tools` — `mcp-scan inspect --json` emits mappable JSON findings; `jq`
-    is an exit-code validator (a finding is synthesised on malformed config).
-    The `validator` mode now exists (shipped with `virt`); still needs a field
-    `coalesce` op (`.id // .rule_id // .check_id`) and a `vulnerable-ai-tools`
-    golden fixture before conversion.
-  - `virt` — **converted** (`lanes/virt.json`): `hadolint --format json` maps
-    with existing engine features; `virt-xml-validate` runs through the new
-    `validator` mode. (Moved to the script-backed list above.)
 
 - **Parked** (convert only if the engine later grows a text/table mapping mode):
   - `linux` — `systemd-analyze security` (table) + `checksec` (text) are not
     JSON; `lintian` has JSON but `systemd-analyze` is host-gated. Low payoff
     until a table-parsing mode exists.
 
-- **Permanently agent-backed by design** (engine conversion is *not* beneficial —
-  these are not residual/pending work):
+- **Permanently agent-backed by design** (engine conversion is *not* worthwhile —
+  not residual/pending work):
+  - `ai-tools` — `mcp-scan inspect --json` is mappable and the `validator` mode
+    now exists, but mcp-scan is rarely installed (in practice only the trivial
+    `jq` structural check runs) and its golden fixture would have to be
+    fabricated — low realized benefit, mostly motion. Revisit only if mcp-scan
+    joins the standard toolchain.
   - `macos` / `ios` / `windows` — signing/notarization binaries (`codesign`,
     `spctl`, `notarytool`, `sigcheck`, `pkgutil`, `stapler`) are **host-OS-gated**;
     on the common Linux CI/dev host they clean-skip, so there is no per-finding
