@@ -1,0 +1,18 @@
+{
+  "lane": "shell", "status_key": "__shell_status__", "origin": "shell", "reference": "shell-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [{
+    "name": "shellcheck", "probe": "shellcheck",
+    "applicable_glob": "*.sh", "inapplicable_reason": "no-shell-source",
+    "invoke": ["shellcheck", "-f", "json", "{files:*.sh}"], "output": "stdout",
+    "const": {"confidence": "high"},
+    "map": {
+      "id": {"concat": ["shellcheck:SC", {"from": "code"}]},
+      "severity": {"from": "level", "map": {"error": "HIGH", "warning": "MEDIUM", "info": "LOW", "style": "LOW"}, "default": "LOW"},
+      "cwe": {"from": "code", "lookup": {"2086": "CWE-78", "2046": "CWE-78", "2068": "CWE-78", "2294": "CWE-94", "2156": "CWE-78", "2038": "CWE-78", "2129": "CWE-377", "2162": "CWE-117", "2148": "CWE-1188", "1090": "CWE-829", "1091": "CWE-829", "2317": "CWE-754", "3040": "CWE-754"}, "default": null},
+      "title": "message", "file": "file", "line": "line",
+      "evidence": {"from": "message", "truncate": 200},
+      "reference_url": {"concat": ["https://www.shellcheck.net/wiki/SC", {"from": "code"}]}
+    }
+  }]
+}

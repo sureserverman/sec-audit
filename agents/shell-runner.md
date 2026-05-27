@@ -62,132 +62,39 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: a deterministic engine **extracts** findings; you (the LLM) then
+**polish** presentation only. Do NOT hand-map shellcheck JSON, and do NOT
+invent, drop, or re-rank findings.
 
-Load `references/shell-tools.md`; extract invocations, field
-mapping, and the per-`code` CWE table.
-
-### Step 2 — Resolve target + probe tool + check applicability
-
-```bash
-command -v shellcheck 2>/dev/null
-```
-
-If absent, emit unavailable sentinel with
-`{"tool": "shellcheck", "reason": "tool-missing"}`, exit 0.
-
-Find shell-shaped files:
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-files=$( find "$target_path" -type f \( \
-            -name '*.sh' -o -name '*.bash' \
-            -o -name '*.zsh' -o -name '*.ksh' \) \
-         -not -path '*/node_modules/*' \
-         -not -path '*/.venv/*' \
-         -not -path '*/vendor/*' \
-         -not -path '*/dist/*' \
-         -not -path '*/build/*' \
-         -not -path '*/target/*' \
-         -print )
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" shell <target_path>
 ```
 
-Optionally extend with shebang-detected files (more expensive
-but more accurate):
-
-```bash
-shebang_files=$( find "$target_path" -type f \
-                    -not -path '*/node_modules/*' \
-                    -not -path '*/.venv/*' \
-                    -not -path '*/vendor/*' \
-                    -not -path '*/dist/*' \
-                    -not -path '*/build/*' \
-                    -not -path '*/target/*' \
-                    -exec sh -c 'head -c 64 "$1" 2>/dev/null \
-                        | grep -lE "^#!(/bin/(ba)?sh|/bin/(da|k|z)sh|/usr/bin/env (ba)?sh)" \
-                        > /dev/null 2>&1' _ {} \; -print )
-```
-
-If no shell-shaped files found, emit unavailable sentinel
-with `{"tool": "shellcheck", "reason": "no-shell-source"}`,
-exit 0.
-
-### Step 3 — Run shellcheck
-
-```bash
-shellcheck -f json $files \
-    > "$TMPDIR/shell-runner-shellcheck.json" \
-    2> "$TMPDIR/shell-runner-shellcheck.stderr"
-rc_sh=$?
-```
-
-shellcheck exits non-zero whenever any rule fires (exit
-code = highest severity level: 0/1/2/3/4 ↔ none/info/style/
-warning/error). NOT a crash — parse JSON regardless. Empty
-result is `[]`.
-
-### Step 4 — Parse output
-
-```bash
-jq -c '
-  .[]? | {
-    id: ("shellcheck:SC" + (.code | tostring)),
-    severity: ((.level // "info") |
-               if . == "error" then "HIGH"
-               elif . == "warning" then "MEDIUM"
-               elif . == "info" then "LOW"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: .file,
-    line: (.line // 0),
-    evidence: ((.message // "") | .[0:200]),
-    reference: "shell-tools.md",
-    reference_url: ("https://www.shellcheck.net/wiki/SC" + (.code | tostring)),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "shell",
-    tool: "shellcheck"
-  }
-' "$TMPDIR/shell-runner-shellcheck.json"
-```
-
-Apply per-`code` CWE overrides per `shell-tools.md` mapping
-table (security-relevant subset; non-listed → null):
-- `2086` (unquoted variable) → CWE-78
-- `2046` (unquoted command substitution) → CWE-78
-- `2068` (unquoted array expansion) → CWE-78
-- `2294` (eval array) → CWE-94
-- `2156` (find -exec sh -c with `{}`) → CWE-78
-- `2038` (find pipe to xargs no -print0/-0) → CWE-78
-- `2129` (predictable temp file via `$$`) → CWE-377
-- `2162` (read without -r) → CWE-117
-- `2148` (missing/incorrect shebang) → CWE-1188
-- `1090` / `1091` (unsourced source) → CWE-829
-- `2317` (set -e in subshell ineffective) → CWE-754
-- `3040` (pipefail not in POSIX sh) → CWE-754
-- everything else → null.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__shell_status__": "unavailable", "tools": []}`.
-
-Two shapes for this single-tool lane: ok / unavailable.
-There is no `partial` state — shellcheck either ran and the
-result parsed, or it did not.
-
-Emit:
+The engine probes the tool (`command -v shellcheck`), runs it over the shell
+scripts under the target, parses shellcheck's JSON array, and maps each comment
+to the Finding schema above per `shell-tools.md` (id `shellcheck:SC<code>`,
+severity from `.level`, cwe via the per-code table, url template). Output is
+faithful JSONL - every line `origin: "shell"`, `tool: "shellcheck"` - then one
+`__shell_status__` record. When shellcheck is absent the only line is the
+unavailable sentinel:
 
 ```json
-{"__shell_status__":"ok","tools":["shellcheck"],"runs":1,"findings":<n>,"skipped":[]}
+{"__shell_status__": "unavailable", "tools": []}
 ```
 
-OR for unavailable:
+Skip reasons: `tool-missing` (shellcheck not on PATH), `no-shell-source` (no
+shell scripts under the target).
 
-```json
-{"__shell_status__":"unavailable","tools":[],"skipped":[{"tool":"shellcheck","reason":"tool-missing"}]}
-{"__shell_status__":"unavailable","tools":[],"skipped":[{"tool":"shellcheck","reason":"no-shell-source"}]}
-```
+### Step 2 - Polish (presentation only)
+
+You MAY refine `severity` with project context (e.g. an unquoted variable in a
+privileged install path is more than the engine's level-derived default) and
+tighten `title` wording. You MUST NOT change `id`, `file`, `line`, `cwe`,
+`tool`, or `origin`, MUST NOT add or remove findings, and MUST relay the
+`__shell_status__` sentinel verbatim. Extraction is deterministic, so the
+"never fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

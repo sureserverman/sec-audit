@@ -76,7 +76,12 @@ def _field(spec, item):
     if "map" in spec:
         return spec["map"].get(val, default)
     if "lookup" in spec:
-        return spec["lookup"].get(val, default)
+        # JSON lookup keys are strings; coerce numeric tool codes (e.g. shellcheck
+        # code 2129) so they match "2129".
+        tbl = spec["lookup"]
+        if val in tbl:
+            return tbl[val]
+        return tbl.get(str(val), default)
     if val is None:
         return default
     if spec.get("int"):
@@ -109,8 +114,29 @@ def map_raw(lane, toolcfg, raw_text):
         arr = [json.loads(l) for l in raw_text.splitlines() if l.strip()]
     else:
         data = json.loads(raw_text)
-        arr = _get(data, toolcfg["findings_path"]) or []
+        fp = toolcfg.get("findings_path")
+        if fp:
+            arr = _get(data, fp) or []
+        else:
+            arr = data if isinstance(data, list) else []  # tool emits a root array
     return [map_item(lane, toolcfg, it) for it in arr]
+
+
+def _build_argv(invoke, target, tmp):
+    """Substitute {target}/{tmp}; expand a `{files:GLOB}` arg into the matching
+    files under target (for tools that take a file list, e.g. shellcheck)."""
+    import fnmatch
+    argv = []
+    for a in invoke:
+        if a.startswith("{files:") and a.endswith("}"):
+            glob = a[len("{files:"):-1]
+            for root, _d, files in os.walk(target):
+                for fn in sorted(files):
+                    if fnmatch.fnmatch(fn, glob):
+                        argv.append(os.path.join(root, fn))
+        else:
+            argv.append(a.replace("{target}", target).replace("{tmp}", tmp))
+    return argv
 
 
 def _applicable(toolcfg, target):
@@ -134,9 +160,10 @@ def run_live(lane, target):
             skipped.append({"tool": tc["name"], "reason": "tool-missing"})
             continue
         if not _applicable(tc, target):
-            skipped.append({"tool": tc["name"], "reason": "tool-missing"})
+            skipped.append({"tool": tc["name"],
+                            "reason": tc.get("inapplicable_reason", "tool-missing")})
             continue
-        argv = [a.replace("{target}", target).replace("{tmp}", tmp) for a in tc["invoke"]]
+        argv = _build_argv(tc["invoke"], target, tmp)
         env = os.environ.copy()
         env.update(tc.get("env", {}))
         try:

@@ -21,10 +21,18 @@ runner="scripts/secaudit/runner.py"
 rawdir="tests/fixtures/raw-tool-output/$lane"
 [ -d "$rawdir" ] || { echo "script-runner($lane): FAIL — no raw fixtures at $rawdir" >&2; exit 1; }
 
-# Golden mapped output: sast lives in sample-stack; others in vulnerable-<lane>.
-if [ "$lane" = "sast" ]; then golden="tests/fixtures/sample-stack/.pipeline/sast.jsonl"
-else golden="tests/fixtures/vulnerable-$lane/.pipeline/$lane.jsonl"; fi
-[ -f "$golden" ] || { echo "script-runner($lane): FAIL — no golden $golden" >&2; exit 1; }
+# Comparison target. Editorial lanes (whose .pipeline golden carries LLM-polished
+# titles/severity the deterministic engine can't reproduce) ship an explicit
+# expected.jsonl = the engine's faithful output. Clean lanes compare to the
+# golden directly (the engine reproduces it byte-for-byte).
+if [ -f "$rawdir/expected.jsonl" ]; then
+  golden="$rawdir/expected.jsonl"
+elif [ "$lane" = "sast" ]; then
+  golden="tests/fixtures/sample-stack/.pipeline/sast.jsonl"
+else
+  golden="tests/fixtures/vulnerable-$lane/.pipeline/$lane.jsonl"
+fi
+[ -f "$golden" ] || { echo "script-runner($lane): FAIL — no comparison target $golden" >&2; exit 1; }
 
 scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
 : > "$scratch/mapped.jsonl"
