@@ -95,146 +95,34 @@ to stderr, emit the unavailable sentinel, and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/dast-tools.md`.
-Extract: the canonical docker invocation
-(`docker run -t zaproxy/zap-stable zap-baseline.py -t <URL> -J /zap/wrk/report.json -I`),
-the local fallback (`zap-baseline.py -t <URL> -J report.json -I`),
-the ZAP-alert-to-sec-audit field mapping table under `## Fix
-recipes` (including the `riskcode` map `"0"`→INFO, `"1"`→LOW,
-`"2"`→MEDIUM, `"3"`→HIGH, and `cweid` → `CWE-<n>` with empty or
-`"-1"` → `null`), the unavailable-tool sentinel recipe, and the
-status-summary recipe. Do not proceed until these are in hand.
-
-### Step 2 — Resolve the target URL
-
-Try the three input sources from `## Inputs` in order: stdin JSON,
-then the `$1` file path, then `$DAST_TARGET_URL`.
-
-If none yields a URL, emit `{"__dast_status__": "unavailable",
-"tools": []}` on stdout, log `dast-runner: no target_url supplied —
-skipped` to stderr, and exit 0.
-
-If the URL does not match `^https?://`, emit the unavailable sentinel
-and the rejection stderr line from `## Inputs`, then exit 0.
-
-### Step 3 — Probe tool availability
-
-Run `command -v docker 2>/dev/null` and
-`command -v zap-baseline.py 2>/dev/null`. Write one stderr line per
-tool naming what you found, e.g.
-`dast-runner: docker available at /usr/bin/docker` or
-`dast-runner: docker MISSING — skipped`.
-
-Track which tools are present in a `tools_available` list with the
-preference order **docker > local**. Docker is the ZAP team's
-recommended invocation (packaged engine, pinned rules, no host Java
-or Python dependency), so when both are present, prefer docker.
-
-### Step 4 — Handle the "both missing" case
-
-If `tools_available` is empty (neither `docker` nor `zap-baseline.py`
-is on `PATH`), emit **exactly one** line on stdout —
-`{"__dast_status__": "unavailable", "tools": []}` — and exit 0. Do
-not emit any finding lines. Do not emit a trailing `"ok"` status
-line; `unavailable` is the only status record in this case.
-
-### Step 5 — Run zap-baseline
-
-Prefer docker. Write the report to `$TMPDIR/dast-runner-zap.json`
-(use `/tmp` if `TMPDIR` is unset). When using docker, mount a
-writable workspace with `-v "$TMPDIR":/zap/wrk` so the report lands
-on the host, and pass `--user "$(id -u):$(id -g)"` so the file is
-owned by the current user rather than root. Cap runtime with `-m 5`
-(five minutes is enough for a baseline on a small app); override via
-`DAST_MAX_MINUTES` if set.
-
-Docker form:
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-docker run --rm -t --user "$(id -u):$(id -g)" \
-  -v "$TMPDIR":/zap/wrk zaproxy/zap-stable \
-  zap-baseline.py -t "$target_url" \
-    -J /zap/wrk/dast-runner-zap.json -I \
-    -m "${DAST_MAX_MINUTES:-5}" \
-  2> "$TMPDIR/dast-runner-zap.stderr"
-rc=$?
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" dast <target_path>
 ```
 
-Local fallback (docker missing, `zap-baseline.py` on PATH):
-
-```bash
-( cd "$TMPDIR" && zap-baseline.py -t "$target_url" \
-    -J dast-runner-zap.json -I \
-    -m "${DAST_MAX_MINUTES:-5}" ) \
-  2> "$TMPDIR/dast-runner-zap.stderr"
-rc=$?
-```
-
-Interpret the exit code (from `dast-tools.md`):
-
-- `0` — scan clean: parse JSON, emit findings.
-- `1` — warnings present (`-I` normalises this to `0`, but some ZAP
-  versions still emit `1`): treat as success, parse JSON.
-- `2` — failure-level rules fired: still a valid scan, parse JSON.
-- Any other non-zero code with `-I` passed — tool failure. Log
-  `dast-runner: zap-baseline failed rc=<n>` to stderr, do NOT emit
-  findings, and mark the DAST lane as failed (see Step 7).
-
-### Step 6 — Parse ZAP JSON and emit findings
-
-Parse `$TMPDIR/dast-runner-zap.json`. Its top-level shape is
-`{"site": [{"@name": "...", "@host": "...", "alerts": [...]}]}`.
-Iterate every alert across every site — use `jq` via `Bash`:
-
-```bash
-jq -c '.site[] as $s | $s.alerts[] | {s: $s, a: .}' \
-  "$TMPDIR/dast-runner-zap.json"
-```
-
-For each alert `a` on site `s`, build a finding per the mapping
-table derived from `dast-tools.md` in Step 1:
-
-| ZAP field                    | sec-audit field                                           |
-|------------------------------|------------------------------------------------------------|
-| `a.pluginid`                    | `id` (string, verbatim)                                |
-| `a.riskcode`                    | `severity` (`"3"`→HIGH, `"2"`→MEDIUM, `"1"`→LOW, `"0"`→INFO) |
-| `a.cweid`                       | `cwe` → `CWE-<n>`; `null` when empty or `"-1"`         |
-| `a.alert` (or `a.name`)         | `title` (fall back to `name` when `alert` is empty)    |
-| `a.instances[0].uri`            | `file`; fall back to `s["@host"]` when no instances    |
-| (constant)                      | `line`: `0`                                            |
-| `a.desc` + `a.instances[0].evidence` | `evidence` (space-concatenated)                   |
-| `a.reference`                   | `reference_url` (first URL of newline-split, or `null`)|
-| `a.instances[0].method` + `" "` + `.uri` | `notes`                                       |
-
-Constants on every finding: `origin: "dast"`, `tool: "zap-baseline"`,
-`reference: "dast-tools.md"`, `fix_recipe: null`, `confidence: "medium"`.
-
-Emit one JSON object per alert as a single line on stdout. Never
-invent a CWE number when ZAP did not supply one — if `a.cweid` is
-missing, empty, or `"-1"`, emit `"cwe": null`.
-
-### Step 7 — Emit the status summary
-
-After all findings have been emitted, append exactly one final line:
+The engine probes the tool(s) (`command -v zap-baseline`), runs them, parses their native
+output, and maps each result to the Finding schema above per `dast-tools.md`.
+Output is faithful JSONL - every line `origin: "dast"`, `tool: "zap-baseline"` -
+then one `__dast_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
 ```json
-{"__dast_status__": "ok", "tools": ["zap-baseline"], "runs": 1, "findings": N}
+{"__dast_status__": "unavailable", "tools": []}
 ```
 
-`tools` is always `["zap-baseline"]` on success (launcher — docker
-vs local — is not material to downstream consumers). `runs` is `1`
-on success, `0` otherwise. `findings` is the total count emitted.
+The engine probes the ZAP runner via `command -v docker` (containerised ZAP) or `command -v zap-baseline.py` (local), runs a baseline scan against the supplied target URL, parses ZAP JSON (`site[].alerts[]`), and maps each alert. Skip reason: `tool-missing`.
 
-This line is mandatory — its absence means the agent crashed
-mid-run and the finding set must be treated as untrusted.
+### Step 2 - Polish (presentation only)
 
-If `zap-baseline` was on PATH (directly or via docker) but the run
-failed (exit code outside `{0, 1, 2}`), emit
-`{"__dast_status__": "unavailable", "tools": []}` instead and exit 0.
-This matches the "both missing" recipe so consumers have one
-uniform failure case.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __dast_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

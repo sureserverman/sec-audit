@@ -1,0 +1,20 @@
+{
+  "lane": "dast", "status_key": "__dast_status__", "origin": "dast", "reference": "dast-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [{
+    "name": "zap-baseline", "probe": "zap-baseline.py",
+    "invoke": ["zap-baseline.py", "-J", "-"], "output": "stdout",
+    "findings_path": "site", "flatten": "alerts",
+    "const": {"confidence": "medium", "line": 0},
+    "map": {
+      "id": "pluginid",
+      "severity": {"from": "riskcode", "map": {"3": "HIGH", "2": "MEDIUM", "1": "LOW", "0": "INFO"}, "default": "INFO"},
+      "cwe": {"concat": ["CWE-", {"from": "cweid"}], "default": null},
+      "title": "alert",
+      "file": "instances.0.uri",
+      "evidence": {"from": "instances.0.evidence", "default": ""},
+      "reference_url": {"from": "reference", "default": null},
+      "notes": {"concat": [{"from": "instances.0.method"}, " ", {"from": "instances.0.uri"}]}
+    }
+  }]
+}
