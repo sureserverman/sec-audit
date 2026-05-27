@@ -1,0 +1,31 @@
+{
+  "lane": "webext", "status_key": "__webext_status__", "origin": "webext", "reference": "webext-tools.md",
+  "finding_const": {"fix_recipe": null, "reference_url": null},
+  "tools": [
+    {
+      "name": "addons-linter", "probe": "addons-linter",
+      "invoke": ["addons-linter", "--output=json", "{target}"], "output": "stdout",
+      "const": {"confidence": "medium"},
+      "sources": [
+        {"findings_path": "errors", "const": {"severity": "HIGH"}, "map": {"id": "code", "title": "message", "evidence": "description", "fix_recipe": "description", "file": "file", "line": {"from": "line", "default": 0}, "cwe": {"from": "code", "lookup": {"MANIFEST_CSP_UNSAFE_DIRECTIVE": "CWE-95", "DANGEROUS_EVAL": "CWE-95", "UNSAFE_VAR_ASSIGNMENT": "CWE-79"}, "default": null}}},
+        {"findings_path": "warnings", "const": {"severity": "MEDIUM"}, "map": {"id": "code", "title": "message", "evidence": "description", "fix_recipe": "description", "file": "file", "line": {"from": "line", "default": 0}, "cwe": {"from": "code", "lookup": {"MANIFEST_CSP_UNSAFE_DIRECTIVE": "CWE-95", "DANGEROUS_EVAL": "CWE-95", "UNSAFE_VAR_ASSIGNMENT": "CWE-79"}, "default": null}}},
+        {"findings_path": "notices", "const": {"severity": "LOW"}, "map": {"id": "code", "title": "message", "evidence": "description", "fix_recipe": "description", "file": "file", "line": {"from": "line", "default": 0}, "cwe": {"from": "code", "default": null}}}
+      ]
+    },
+    {
+      "name": "retire", "probe": "retire",
+      "invoke": ["retire", "--outputformat", "json", "--path", "{target}"], "output": "stdout",
+      "flatten": "vulnerabilities",
+      "const": {"confidence": "medium", "cwe": null, "line": 0},
+      "map": {
+        "id": {"from": "identifiers.CVE.0", "default": null},
+        "severity": {"from": "severity", "map": {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM", "low": "LOW"}, "default": "MEDIUM"},
+        "title": {"concat": ["Vulnerable ", {"from": "_parent.component"}, " ", {"from": "_parent.version"}]},
+        "evidence": "identifiers.summary",
+        "file": "_parent.file",
+        "reference_url": {"from": "info.0", "default": null},
+        "fix_recipe": {"concat": ["Upgrade ", {"from": "_parent.component"}, " beyond ", {"from": "below"}]}
+      }
+    }
+  ]
+}

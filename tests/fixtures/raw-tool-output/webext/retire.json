@@ -1,0 +1,4 @@
+[{"component":"jquery","version":"1.12.4","file":"lib/jquery-1.12.4.min.js","vulnerabilities":[
+{"severity":"medium","below":"3.0.0","identifiers":{"CVE":["CVE-2015-9251"],"summary":"jQuery before 3.0.0 is vulnerable to Cross-site Scripting (XSS) attacks when a cross-domain Ajax request is performed without the dataType option."},"info":["https://nvd.nist.gov/vuln/detail/CVE-2015-9251"]},
+{"severity":"medium","below":"3.4.0","identifiers":{"CVE":["CVE-2019-11358"],"summary":"jQuery before 3.4.0 mishandles jQuery.extend(true, {}, ...) because of Object.prototype pollution."},"info":["https://nvd.nist.gov/vuln/detail/CVE-2019-11358"]}
+]}]

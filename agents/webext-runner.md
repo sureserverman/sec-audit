@@ -106,206 +106,34 @@ stderr, emit the unavailable sentinel, and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/webext-tools.md`.
-Extract, for each of the three tools:
-
-- The canonical invocation (exact flags and output-format options);
-- The exit-code semantics (what codes indicate success vs. findings
-  vs. tool failure — in particular, retire.js uses exit code 13 to
-  mean "vulnerabilities found," which is NOT a crash);
-- The field-mapping table from tool-JSON to finding-schema;
-- The rule-code → CWE table (for addons-linter security rules).
-
-Also extract the three-state sentinel contract
-(`__webext_status__` ∈ {`"ok"`, `"partial"`, `"unavailable"`}). Do not
-proceed until these are in hand.
-
-### Step 2 — Resolve the target path
-
-Try the three input sources from `## Inputs` in order: stdin JSON, then
-the `$1` file path, then `$WEBEXT_TARGET_PATH`.
-
-If none yields a readable directory with a `manifest.json` at its root,
-emit `{"__webext_status__": "unavailable", "tools": []}` on stdout, log
-the rejection reason to stderr, and exit 0.
-
-### Step 3 — Probe tool availability
-
-Run each of:
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v addons-linter 2>/dev/null
-command -v web-ext        2>/dev/null
-command -v retire         2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" webext <target_path>
 ```
 
-Write one stderr line per tool naming what you found, e.g.
-`webext-runner: addons-linter available at /usr/bin/addons-linter` or
-`webext-runner: addons-linter MISSING — skipped`.
-
-Build a `tools_available` list (in the order addons-linter, web-ext,
-retire) containing only the binaries that resolved.
-
-### Step 4 — Handle the "all missing" case
-
-If `tools_available` is empty, emit **exactly one** line on stdout —
-`{"__webext_status__": "unavailable", "tools": []}` — and exit 0. Do
-not emit any finding lines. Do not emit a trailing `"ok"` or
-`"partial"` status; `unavailable` is the only status record in this
-case.
-
-### Step 5 — Run each available tool
-
-For each tool in `tools_available`, run it against `target_path` with
-the canonical invocation from `webext-tools.md`. Report paths go to
-`$TMPDIR` (or `/tmp`); never to `target_path`.
-
-**addons-linter** (when available):
-
-```bash
-addons-linter --output json "$target_path" \
-  > "$TMPDIR/webext-runner-addons-linter.json" \
-  2> "$TMPDIR/webext-runner-addons-linter.stderr"
-rc_al=$?
-```
-
-Exit code 0 means "no errors or warnings found"; non-zero exit with
-a valid JSON report means "findings present" — that is the normal
-case. Only treat as tool failure if the JSON file is missing or
-unparseable.
-
-**web-ext lint** (when available):
-
-```bash
-web-ext lint --source-dir "$target_path" \
-  --output json --no-config-discovery \
-  > "$TMPDIR/webext-runner-web-ext.json" \
-  2> "$TMPDIR/webext-runner-web-ext.stderr"
-rc_we=$?
-```
-
-Same exit-code semantics as addons-linter (web-ext wraps it).
-
-**retire.js** (when available):
-
-```bash
-retire --path "$target_path" \
-  --outputformat json \
-  --outputpath "$TMPDIR/webext-runner-retire.json" \
-  2> "$TMPDIR/webext-runner-retire.stderr"
-rc_re=$?
-```
-
-Retire exit codes per upstream: `0` means clean, `13` means
-vulnerabilities found (NOT a crash), anything else means tool failure.
-Treat `0` and `13` as success and parse the JSON; treat any other
-non-zero as tool failure for retire (remove it from the effective
-`tools_ran` list).
-
-### Step 6 — Parse each tool's JSON and emit findings
-
-For each tool whose run succeeded (valid JSON report present), parse
-per the field-mapping table derived from `webext-tools.md` in Step 1
-and emit one JSON line per finding on stdout.
-
-**addons-linter / web-ext lint** (identical schema — web-ext wraps
-addons-linter):
-
-```bash
-jq -c '
-  (.errors // []) + (.warnings // []) + (.notices // []) | .[] |
-  {
-    id: .code,
-    severity: (if (.type // "notice") == "error"   then "HIGH"
-               elif (.type // "notice") == "warning" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: (.file // "manifest.json"),
-    line: (.line // 0),
-    evidence: (.description // .message),
-    reference: "webext-tools.md",
-    reference_url: null,
-    fix_recipe: .description,
-    confidence: "medium",
-    origin: "webext",
-    tool: "addons-linter"
-  }
-' "$TMPDIR/webext-runner-addons-linter.json"
-```
-
-For the `web-ext lint` output, substitute `"tool": "web-ext"`.
-
-After the generic mapping, apply the rule-code → CWE overrides
-documented in `webext-tools.md` `## Output-field mapping`. The table
-lists specific security rules (e.g. `MANIFEST_CSP_UNSAFE_EVAL` → CWE-95,
-`UNSAFE_VAR_ASSIGNMENT` → CWE-79, `DANGEROUS_EVAL` → CWE-95). For any
-rule code not in that table, leave `cwe: null` — do NOT invent.
-
-**retire.js**:
-
-```bash
-jq -c '
-  .data[]? | .file as $f | .results[]? | . as $r | .vulnerabilities[]? |
-  {
-    id: (.identifiers.CVE[0] // .identifiers.summary // ("retire:" + $r.component + ":" + $r.version)),
-    severity: (.severity | ascii_upcase |
-               if . == "CRITICAL" or . == "HIGH" or . == "MEDIUM" or . == "LOW"
-                 then . else "MEDIUM" end),
-    cwe: null,
-    title: ("Vulnerable " + $r.component + " " + $r.version),
-    file: $f,
-    line: 0,
-    evidence: (.identifiers.summary // (.info | join(" "))),
-    reference: "webext-tools.md",
-    reference_url: (.info[0] // null),
-    fix_recipe: ("Upgrade " + $r.component + " beyond " + ($r.atOrAbove // $r.below // "vulnerable range")),
-    confidence: "medium",
-    origin: "webext",
-    tool: "retire"
-  }
-' "$TMPDIR/webext-runner-retire.json"
-```
-
-For retire findings where the vulnerability entry lists a CVE in
-`identifiers.CVE[]`, pass the CVE through as the `id`; the downstream
-cve-enricher will pick it up. When the advisory lists no CVE and no
-CWE, default to `cwe: null` — do NOT default to CWE-1104 here (that
-value is a report-writer convenience, not a runner one; inventing it
-in the runner would be fabrication).
-
-### Step 7 — Emit the status summary
-
-After all findings have been emitted, append exactly one final line.
-
-If every tool in `tools_available` ran and parsed successfully:
-
-```json
-{"__webext_status__": "ok", "tools": [...], "runs": <N>, "findings": <M>}
-```
-
-If at least one tool ran successfully but at least one in
-`tools_available` failed (missing JSON, malformed JSON, non-documented
-non-zero exit):
-
-```json
-{"__webext_status__": "partial", "tools": [...successful ones...], "runs": <N>, "findings": <M>, "failed": [...failed ones...]}
-```
-
-If every tool in `tools_available` failed (tools were on PATH but all
-three runs crashed), fall back to:
+The engine probes the tool(s) (`command -v addons-linter`, `command -v web-ext`, `command -v retire`), runs them, parses their native
+output, and maps each result to the Finding schema above per `webext-tools.md`.
+Output is faithful JSONL - every line `origin: "webext"`, `tool: "addons-linter" | "web-ext" | "retire"` -
+then one `__webext_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
 ```json
 {"__webext_status__": "unavailable", "tools": []}
 ```
 
-This matches the behaviour when no tool was on PATH, so consumers have
-one uniform "could not analyse" case.
+addons-linter / web-ext emit `errors`/`warnings`/`notices` arrays (mapped to HIGH/MEDIUM/LOW); retire.js findings come from each component's `vulnerabilities[]`. Skip reason: `tool-missing`.
 
-This line is mandatory — its absence means the agent crashed mid-run
-and the finding set must be treated as untrusted.
+### Step 2 - Polish (presentation only)
+
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __webext_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

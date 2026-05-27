@@ -66,9 +66,13 @@ if m != g:
 print(f"  parity: {len(mapped)} mapped findings == golden")
 PY
 
-echo "=== no-tools sentinel (live, tools absent) ==="
+echo "=== no-tools sentinel (live, PATH scrubbed) ==="
 empty="$scratch/empty"; mkdir -p "$empty"
-last="$(python3 "$runner" "$lane" "$empty" 2>/dev/null | tail -n1)"
+# Scrub PATH to a python3-only stub so the engine's `command -v <tool>` probes
+# all fail — guaranteeing the degrade path regardless of what's installed
+# locally (some lane tools, e.g. addons-linter/retire, may be present here).
+stub="$scratch/stub"; mkdir -p "$stub"; ln -sf "$(command -v python3)" "$stub/python3"
+last="$(PATH="$stub" python3 "$runner" "$lane" "$empty" 2>/dev/null | tail -n1)"
 python3 - "$lane" "$last" <<'PY'
 import json, sys
 o = json.loads(sys.argv[2])
