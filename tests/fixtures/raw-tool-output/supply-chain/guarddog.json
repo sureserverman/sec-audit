@@ -1,0 +1,4 @@
+[
+{"package":"vulnerable-supply-chain-fixture","version":"1.0.0","issues":[{"detector":"npm-install-script","message":"package declares a postinstall script that pipes a remote payload to sh"}]},
+{"package":"reqeusts","version":"2.0.0","issues":[{"detector":"typosquatting","message":"dependency name 'reqeusts' is one edit-distance from the popular package 'requests'"}]}
+]

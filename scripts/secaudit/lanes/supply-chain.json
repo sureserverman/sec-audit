@@ -1,0 +1,30 @@
+{
+  "lane": "supply-chain", "status_key": "__supply_chain_status__", "origin": "supply-chain", "reference": "supply-chain-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "guarddog", "probe": "guarddog", "applicable_glob": "package.json", "inapplicable_reason": "no-supply-chain-source",
+      "invoke": ["guarddog", "npm", "verify", "{target}/package.json", "--output-format", "json"], "output": "stdout",
+      "flatten": "issues",
+      "const": {"line": 1, "confidence": "medium", "reference_url": "https://github.com/DataDog/guarddog"},
+      "map": {
+        "id": "detector",
+        "severity": {"from": "detector", "lookup": {"npm-install-script": "HIGH", "exec-base64": "HIGH", "code-execution": "HIGH", "download-executable": "HIGH", "obfuscation": "HIGH", "steganography": "HIGH", "shady-links": "HIGH", "cmd-overwrite": "HIGH", "bidirectional-characters": "HIGH"}, "default": "MEDIUM"},
+        "cwe": {"from": "detector", "lookup": {"exec-base64": "CWE-94", "code-execution": "CWE-94", "npm-install-script": "CWE-506", "cmd-overwrite": "CWE-506", "download-executable": "CWE-494", "obfuscation": "CWE-506", "steganography": "CWE-506", "shady-links": "CWE-200", "typosquatting": "CWE-1357", "dependency-confusion": "CWE-1357", "bidirectional-characters": "CWE-1007"}, "default": null},
+        "title": "message", "evidence": "message",
+        "file": {"concat": [{"from": "_parent.package"}, "@", {"from": "_parent.version"}]}
+      }
+    },
+    {
+      "name": "osv-scanner", "probe": "osv-scanner", "applicable_glob": "package.json", "inapplicable_reason": "no-supply-chain-source",
+      "invoke": ["osv-scanner", "--format", "json", "-r", "{target}"], "output": "stdout",
+      "findings_path": "results", "flatten": ["packages", "vulnerabilities"],
+      "filter": {"field": "id", "startswith": "MAL-"},
+      "const": {"line": 1, "confidence": "high", "severity": "CRITICAL", "cwe": "CWE-506", "reference_url": "https://github.com/ossf/malicious-packages"},
+      "map": {
+        "id": "id", "title": "summary", "evidence": "summary",
+        "file": {"concat": [{"from": "_parent.package.name"}, "@", {"from": "_parent.package.version"}]}
+      }
+    }
+  ]
+}

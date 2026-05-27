@@ -94,42 +94,79 @@ def _field(spec, item):
     return val
 
 
-def map_item(lane, toolcfg, item):
-    out = dict(lane.get("finding_const", {}))  # lane defaults (a tool's map/const may override)
-    for fld, spec in toolcfg["map"].items():
-        out[fld] = _field(spec, item)
+def map_item(lane, toolcfg, block, ctx):
+    out = dict(lane.get("finding_const", {}))  # lane defaults
+    for fld, spec in block["map"].items():
+        out[fld] = _field(spec, ctx)
     if out.get("line") is None:
         out["line"] = 1
-    out.update(toolcfg.get("const", {}))
+    out.update(toolcfg.get("const", {}))    # tool-wide const
+    out.update(block.get("const", {}))      # per-source const (e.g. kubesec critical->HIGH) wins
     out["reference"] = lane["reference"]
     out["origin"] = lane["origin"]
     out["tool"] = toolcfg["name"]
     return out
 
 
+def _flatten(arr, flatten):
+    """Walk `flatten` (None | key | [keys...]) producing (leaf, immediate_parent)
+    pairs. Nested keys (e.g. ["packages","vulnerabilities"]) descend levels;
+    the leaf's immediate parent is exposed to the map as `_parent`."""
+    if not flatten:
+        return [(it, None) for it in arr]
+    keys = [flatten] if isinstance(flatten, str) else list(flatten)
+    level = [(it, None) for it in arr]
+    for k in keys:
+        nxt = []
+        for parent, _gp in level:
+            if isinstance(parent, dict):
+                for child in (parent.get(k) or []):
+                    nxt.append((child, parent))
+        level = nxt
+    return level
+
+
+def _passes_filter(filt, ctx):
+    if not filt:
+        return True
+    val = _get(ctx, filt["field"])
+    if "startswith" in filt:
+        return isinstance(val, str) and val.startswith(filt["startswith"])
+    if "equals" in filt:
+        return val == filt["equals"]
+    if "in" in filt:
+        return val in filt["in"]
+    return True
+
+
+def _blocks(toolcfg):
+    """A tool is either a single block (top-level findings_path/flatten/map/const)
+    or a list of `sources` (each its own findings_path/flatten/filter/map/const),
+    whose findings are unioned. Multi-source covers tools that emit several
+    independent arrays (kubesec critical/advise; addons-linter errors/warnings/notices)."""
+    return toolcfg.get("sources") or [toolcfg]
+
+
 def map_raw(lane, toolcfg, raw_text):
     if toolcfg.get("input_format") == "jsonl":
-        # one JSON object per line (e.g. staticcheck -f json)
-        arr = [json.loads(l) for l in raw_text.splitlines() if l.strip()]
+        lines = [json.loads(l) for l in raw_text.splitlines() if l.strip()]
+        data = None
     else:
         data = json.loads(raw_text)
-        fp = toolcfg.get("findings_path")
-        if fp:
-            arr = _get(data, fp) or []
+    out = []
+    for block in _blocks(toolcfg):
+        if toolcfg.get("input_format") == "jsonl":
+            base = lines
         else:
-            arr = data if isinstance(data, list) else []  # tool emits a root array
-    flatten = toolcfg.get("flatten")
-    if flatten:
-        # one finding per child in parent[flatten] (e.g. pip-audit deps[].vulns[]);
-        # the map can reference child fields directly and parent via "_parent.*".
-        out = []
-        for parent in arr:
-            for child in (parent.get(flatten) or []):
-                ctx = dict(child)
-                ctx["_parent"] = parent
-                out.append(map_item(lane, toolcfg, ctx))
-        return out
-    return [map_item(lane, toolcfg, it) for it in arr]
+            fp = block.get("findings_path")
+            base = (_get(data, fp) or []) if fp else (data if isinstance(data, list) else [])
+        filt = block.get("filter")
+        for leaf, parent in _flatten(base, block.get("flatten")):
+            ctx = leaf if parent is None else {**leaf, "_parent": parent}
+            if not _passes_filter(filt, ctx):
+                continue
+            out.append(map_item(lane, toolcfg, block, ctx))
+    return out
 
 
 def _build_argv(invoke, target, tmp):

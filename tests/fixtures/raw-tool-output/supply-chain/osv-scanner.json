@@ -1,0 +1,4 @@
+{"results":[{"packages":[
+{"package":{"name":"electron-native-notify","version":"1.1.6"},"vulnerabilities":[{"id":"MAL-2024-0001","summary":"electron-native-notify exfiltrates cryptocurrency wallet seed phrases at install time"}]},
+{"package":{"name":"lodash","version":"4.17.21"},"vulnerabilities":[{"id":"CVE-2021-23337","summary":"lodash command injection (NOT a MAL- advisory — must be filtered out)"}]}
+]}]}

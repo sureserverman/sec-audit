@@ -75,107 +75,34 @@ prefer sec-expert's quoted recipes from
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/supply-chain-tools.md`. From
-it extract and store: the canonical **guarddog** `verify` invocations (PyPI +
-npm) with `--output-format json`; the canonical **osv-scanner** `--format
-json -r` invocation and the `MAL-`-only jq filter; the **detector→CWE** table
-and the malware-class vs. metadata-class **severity** split; the
-**OSV-Scanner MAL- → finding** mapping; the sentinel and status-summary
-recipes. Do not proceed until these are in hand.
-
-### Step 2 — Detect the dependency manifests in scope
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-find "$target_path" -maxdepth 3 \
-  \( -name requirements.txt -o -name pyproject.toml -o -name setup.py \
-     -o -name poetry.lock -o -name Pipfile.lock \
-     -o -name package.json -o -name package-lock.json \) \
-  -not -path '*/node_modules/*' -not -path '*/.venv/*' -print 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" supply-chain <target_path>
 ```
 
-Record which ecosystems are present: PyPI (any Python manifest) and/or npm
-(`package.json`/`package-lock.json`). If NEITHER is present, this target has
-no supply-chain-scannable manifest — go to Step 3 (the no-source skip).
-
-### Step 3 — Probe tool availability
-
-```bash
-command -v guarddog     2>/dev/null && guarddog --version     2>/dev/null || echo "GUARDDOG_MISSING"
-command -v osv-scanner  2>/dev/null && osv-scanner --version  2>/dev/null || echo "OSVSCANNER_MISSING"
-```
-
-Write one stderr line per tool naming what you found. Track present tools in
-`tools_available`.
-
-If `tools_available` is empty, OR no PyPI/npm manifest was found in Step 2,
-emit **exactly one** line on stdout and exit 0:
+The engine probes the tool(s) (`command -v guarddog`, `command -v osv-scanner`), runs them, parses their native
+output, and maps each result to the Finding schema above per `supply-chain-tools.md`.
+Output is faithful JSONL - every line `origin: "supply-chain"`, `tool: "guarddog" | "osv-scanner"` -
+then one `__supply_chain_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
 ```json
 {"__supply_chain_status__": "unavailable", "tools": []}
 ```
 
-Do not emit findings. (Record the reason — `tool-missing` vs
-`no-supply-chain-source` — only in the richer status line when at least one
-tool ran; the bare sentinel above is the uniform downstream failure case.)
+The engine keeps ONLY osv-scanner results whose id starts with `MAL-` (a filter spec) — ordinary CVEs are cve-enricher's job and are dropped here. Skip reasons: `tool-missing`, `no-supply-chain-source`.
 
-### Step 4 — Run guarddog (if available, per present ecosystem)
+### Step 2 - Polish (presentation only)
 
-For each present ecosystem, run the `verify` invocation from the reference
-file against the manifest, writing JSON to `$TMPDIR`:
-
-```bash
-guarddog pypi verify "$req_manifest"  --output-format json > "$TMPDIR/sc-guarddog-pypi.json" 2>"$TMPDIR/sc-guarddog-pypi.err"
-guarddog npm  verify "$pkg_manifest"  --output-format json > "$TMPDIR/sc-guarddog-npm.json"  2>"$TMPDIR/sc-guarddog-npm.err"
-```
-
-guarddog exits non-zero when it finds issues; that is success, not failure.
-Treat a missing/empty/unparseable JSON file as a failed run for that
-ecosystem (stderr line; do not emit findings for it). For each triggered
-detector on each verified package, map per the reference file's GuardDog
-recipe: detector name → `id`; message → `title`+`evidence`; package
-coordinate → `file`; detector → `cwe` via the table (`null` if unmapped);
-malware-class detectors → `severity: "HIGH"`, metadata-class →
-`severity: "MEDIUM"`. Constants: `origin: "supply-chain"`,
-`tool: "guarddog"`, `reference: "supply-chain-tools.md"`, `fix_recipe: null`,
-`confidence: "medium"`. Emit one JSON object per finding.
-
-### Step 5 — Run osv-scanner (if available)
-
-```bash
-osv-scanner --format json -r "$target_path" > "$TMPDIR/sc-osv.json" 2>"$TMPDIR/sc-osv.err"
-```
-
-Exit code 1 = vulnerabilities found (success); branch only on documented
-error codes (≥127) as failure. Parse the JSON and, per the reference file's
-OSV-Scanner recipe, keep ONLY `results[].packages[].vulnerabilities[]` whose
-`id` starts with `MAL-`. For each: `id` verbatim; `summary` →
-`title`+`evidence`; package name+version → `file`; `cwe: "CWE-506"`;
-`severity: "CRITICAL"`; `confidence: "high"`. Constants: `origin:
-"supply-chain"`, `tool: "osv-scanner"`, `reference: "supply-chain-tools.md"`,
-`fix_recipe: null`. Drop every non-`MAL-` result silently. Emit one JSON
-object per kept finding.
-
-### Step 6 — Emit the status summary
-
-After all available tools have run and all findings are on stdout, append
-exactly one final line:
-
-```json
-{"__supply_chain_status__": "ok", "tools": ["guarddog","osv-scanner"], "runs": 2, "findings": 3, "skipped": []}
-```
-
-- `tools` — tools that executed successfully (omit missing/failed ones).
-- `runs` — length of `tools`.
-- `findings` — total finding lines emitted this run.
-- `skipped` — list of `{"tool": "<name>", "reason": "<reason>"}` for tools
-  on PATH but not run: `no-supply-chain-source` (no PyPI/npm manifest),
-  `tool-missing` (binary absent). Each entry MUST have both keys.
-
-Status value: `"ok"` when every available tool ran; `"partial"` when some ran
-and others were missing/inapplicable; `"unavailable"` (the bare sentinel from
-Step 3) when none could run.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __supply_chain_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 
