@@ -63,114 +63,38 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only (ansible-lint rule messages are terse, so polish
+adds the most value here - readable titles, severity context). Do NOT hand-map,
+and do NOT invent, drop, or re-rank findings.
 
-Load `references/ansible-tools.md`; extract invocation
-flags, the per-rule severity table, and the per-rule CWE
-table.
-
-### Step 2 — Resolve target + probe tool + check applicability
-
-```bash
-command -v ansible-lint 2>/dev/null
-```
-
-If absent, emit unavailable sentinel with
-`{"tool": "ansible-lint", "reason": "tool-missing"}`,
-exit 0.
-
-Check Ansible-shape applicability:
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-has_ansible=$(
-    # Playbook shape: yml/yaml with both `hosts:` and `tasks:` keys
-    find "$target_path" -type f \( -name '*.yml' -o -name '*.yaml' \) \
-        -exec sh -c 'grep -lE "^hosts:" "$1" >/dev/null 2>&1 && \
-                     grep -qE "^tasks:|^  tasks:" "$1" 2>/dev/null && \
-                     echo found' _ {} \; -quit 2>/dev/null
-    # Role shape: roles/<name>/tasks/main.yml
-    find "$target_path" -type d -path '*/roles/*/tasks' -print -quit 2>/dev/null
-    # ansible.cfg
-    find "$target_path" -maxdepth 3 -type f -name 'ansible.cfg' -print -quit 2>/dev/null
-    # collections/
-    find "$target_path" -maxdepth 3 -type d -name 'collections' -print -quit 2>/dev/null
-)
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" ansible <target_path>
 ```
 
-If `$has_ansible` is empty, emit unavailable sentinel with
-`{"tool": "ansible-lint", "reason": "no-playbook"}`,
-exit 0.
-
-### Step 3 — Run ansible-lint
-
-```bash
-ansible-lint --format=json \
-             --offline \
-             "$target_path" \
-    > "$TMPDIR/ansible-runner-ansible-lint.json" \
-    2> "$TMPDIR/ansible-runner-ansible-lint.stderr"
-rc_al=$?
-```
-
-ansible-lint exits non-zero whenever any rule fires. NOT a
-crash — parse JSON regardless. Empty result is `[]` with
-exit 0.
-
-### Step 4 — Parse output
-
-```bash
-jq -c '
-  .[]? | {
-    id: ("ansible-lint:" + (.check_name // "lint")),
-    severity: ((.check_name // "") |
-               if . == "risky-shell-pipe" or . == "no-log-password" or . == "partial-become" then "HIGH"
-               elif . == "no-changed-when" or . == "command-instead-of-shell" or . == "command-instead-of-module" or . == "package-latest" or . == "risky-file-permissions" or . == "risky-octal" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: (.location.path // .filename // ""),
-    line: ((.location.lines.begin.line // .line // 0) | tonumber? // 0),
-    evidence: ((.message // "") | .[0:200]),
-    reference: "ansible-tools.md",
-    reference_url: ("https://ansible.readthedocs.io/projects/lint/rules/" + (.check_name // "") + "/"),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "ansible",
-    tool: "ansible-lint"
-  }
-' "$TMPDIR/ansible-runner-ansible-lint.json"
-```
-
-Apply per-`check_name` CWE overrides per `ansible-tools.md`
-mapping table:
-- `risky-shell-pipe` → CWE-78
-- `command-instead-of-shell` → CWE-78
-- `no-log-password` → CWE-532
-- `partial-become` → CWE-269
-- `package-latest` → CWE-1104
-- `risky-file-permissions` → CWE-732
-- `risky-octal` → CWE-732
-- `var-spacing` / `jinja[invalid]` → CWE-94
-- everything else → null.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__ansible_status__": "unavailable", "tools": []}`.
-
-Two shapes for this single-tool lane: ok / unavailable.
-There is no `partial` state.
+The engine probes the tool (`command -v ansible-lint`), runs it with `--offline`
+(no Galaxy fetch), parses the codeclimate JSON, and maps each issue per
+`ansible-tools.md` (id `ansible-lint:<check_name>`, per-rule severity + CWE
+tables, url template). Output is faithful JSONL - every line `origin: "ansible"`,
+`tool: "ansible-lint"` - then one `__ansible_status__` record. When ansible-lint
+is absent the only line is the unavailable sentinel:
 
 ```json
-{"__ansible_status__":"ok","tools":["ansible-lint"],"runs":1,"findings":<n>,"skipped":[]}
+{"__ansible_status__": "unavailable", "tools": []}
 ```
 
-OR for unavailable:
+Skip reasons: `tool-missing` (ansible-lint not on PATH), `no-playbook` (no
+Ansible-shaped files under the target).
 
-```json
-{"__ansible_status__":"unavailable","tools":[],"skipped":[{"tool":"ansible-lint","reason":"tool-missing"}]}
-{"__ansible_status__":"unavailable","tools":[],"skipped":[{"tool":"ansible-lint","reason":"no-playbook"}]}
-```
+### Step 2 - Polish (presentation only)
+
+You MAY rewrite `title` to a readable sentence and refine `severity` with
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, or `origin`,
+MUST NOT add or remove findings, and MUST relay the `__ansible_status__`
+sentinel verbatim. Extraction is deterministic; the "never fabricate" guarantees
+in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

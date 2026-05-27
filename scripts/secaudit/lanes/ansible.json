@@ -1,0 +1,20 @@
+{
+  "lane": "ansible", "status_key": "__ansible_status__", "origin": "ansible", "reference": "ansible-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [{
+    "name": "ansible-lint", "probe": "ansible-lint",
+    "applicable_glob": "*.yml", "inapplicable_reason": "no-playbook",
+    "invoke": ["ansible-lint", "-f", "codeclimate", "--offline", "{target}"], "output": "stdout",
+    "const": {"confidence": "high"},
+    "map": {
+      "id": {"concat": ["ansible-lint:", {"from": "check_name"}]},
+      "severity": {"from": "check_name", "lookup": {"risky-shell-pipe": "HIGH", "no-log-password": "HIGH", "partial-become": "HIGH", "no-changed-when": "MEDIUM", "command-instead-of-shell": "MEDIUM", "command-instead-of-module": "MEDIUM", "package-latest": "MEDIUM"}, "default": "LOW"},
+      "cwe": {"from": "check_name", "lookup": {"risky-shell-pipe": "CWE-78", "command-instead-of-shell": "CWE-78", "no-log-password": "CWE-532", "partial-become": "CWE-269", "package-latest": "CWE-1104", "risky-file-permissions": "CWE-732", "risky-octal": "CWE-732"}, "default": null},
+      "title": "message",
+      "file": "location.path",
+      "line": "location.lines.begin.line",
+      "evidence": {"from": "message", "truncate": 200},
+      "reference_url": {"concat": ["https://ansible.readthedocs.io/projects/lint/rules/", {"from": "check_name"}, "/"]}
+    }
+  }]
+}

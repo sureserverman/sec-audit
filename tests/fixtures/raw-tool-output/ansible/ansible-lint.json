@@ -1,0 +1,8 @@
+[
+{"check_name":"partial-become","message":"become should be scoped to specific tasks rather than the whole play","location":{"path":"playbook.yml","lines":{"begin":{"line":12}}}},
+{"check_name":"package-latest","message":"Package installs should not use latest","location":{"path":"playbook.yml","lines":{"begin":{"line":21}}}},
+{"check_name":"risky-shell-pipe","message":"Shells that use pipes should set the pipefail option","location":{"path":"playbook.yml","lines":{"begin":{"line":24}}}},
+{"check_name":"command-instead-of-module","message":"Use the ansible.builtin.systemd module instead of running systemctl","location":{"path":"playbook.yml","lines":{"begin":{"line":27}}}},
+{"check_name":"no-changed-when","message":"Commands should not change things if nothing needs doing","location":{"path":"playbook.yml","lines":{"begin":{"line":27}}}},
+{"check_name":"no-log-password","message":"password value should use no_log: true to avoid leaking secrets","location":{"path":"playbook.yml","lines":{"begin":{"line":33}}}}
+]
