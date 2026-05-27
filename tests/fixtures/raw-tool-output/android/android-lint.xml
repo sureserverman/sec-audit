@@ -1,0 +1,6 @@
+<issues format="6" by="lint 8.0.0">
+  <issue id="HardcodedDebugMode" severity="Error" message="Avoid hardcoding the debug mode; leave it out of the manifest"><location file="app/src/main/AndroidManifest.xml" line="22"/></issue>
+  <issue id="AllowBackup" severity="Warning" message="On SDK version 23 and up, your app data will be automatically backed up"><location file="app/src/main/AndroidManifest.xml" line="10"/></issue>
+  <issue id="ExportedReceiver" severity="Warning" message="Exported receiver does not require permission"><location file="app/src/main/AndroidManifest.xml" line="15"/></issue>
+  <issue id="SetJavaScriptEnabled" severity="Warning" message="Using setJavaScriptEnabled can introduce XSS vulnerabilities"><location file="app/src/main/java/com/example/MainActivity.java" line="60"/></issue>
+</issues>

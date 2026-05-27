@@ -1,0 +1,4 @@
+{"results":{
+"android_hardcoded":{"metadata":{"severity":"ERROR","cwe":"CWE-312: Cleartext Storage of Sensitive Information","description":"Hardcoded secret stored in source","reference":"https://github.com/MobSF/mobsfscan"},"files":[{"file_path":"app/src/main/java/com/example/MainActivity.java","match_lines":[42,42],"match_string":"String apiKey = \"sk_live_4242\";"}]},
+"android_webview_js_bridge":{"metadata":{"severity":"WARNING","cwe":"CWE-749: Exposed Dangerous Method or Function","description":"WebView addJavascriptInterface exposes a JS bridge"},"files":[{"file_path":"app/src/main/java/com/example/MainActivity.java","match_lines":[55,55],"match_string":"webView.addJavascriptInterface(new Bridge(), \"android\");"}]}
+}}

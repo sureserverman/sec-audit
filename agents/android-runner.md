@@ -100,184 +100,34 @@ unavailable sentinel.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
-Extract, for each of the three tools:
-
-- The canonical invocation (exact flags, output format, output path).
-- The exit-code semantics (mobsfscan exits 0 even with findings;
-  apkleaks exits 0 on clean scan and 0 or non-zero with findings —
-  parse JSON regardless; gradle `lint` exits non-zero by default when
-  Errors are present — this is NOT a crash).
-- The field-mapping table from tool output to finding-schema.
-- The android-lint `id` → CWE lookup table.
-
-Also extract the four-state sentinel contract (`__android_status__` ∈
-{`"ok"`, `"partial"`, `"unavailable"`} with the `"skipped"` list).
-
-### Step 2 — Resolve the target path
-
-Try stdin → `$1` → `$ANDROID_TARGET_PATH`. If none yields a valid
-Android project directory, emit the unavailable sentinel and exit 0.
-
-### Step 3 — Probe tool availability + APK presence
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v mobsfscan 2>/dev/null
-command -v apkleaks 2>/dev/null
-command -v lint 2>/dev/null
-[ -x "$target_path/gradlew" ] && echo "gradle-wrapper present"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" android <target_path>
 ```
 
-Also discover APKs:
+The engine probes the tool(s) (`command -v mobsfscan`, `command -v apkleaks`, `command -v lint`), runs them, parses their native
+output, and maps each result to the Finding schema above per `mobile-tools.md`.
+Output is faithful JSONL - every line `origin: "android"`, `tool: "mobsfscan" | "apkleaks" | "lint"` -
+then one `__android_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
-```bash
-find "$target_path" -type f \( -name '*.apk' -o -name '*.aab' \) \
-  -not -path '*/node_modules/*' -not -path '*/.git/*' \
-  | head -n 10 > "$TMPDIR/android-runner-apks.txt"
+```json
+{"__android_status__": "unavailable", "tools": []}
 ```
 
-Write one stderr line per tool + per APK found (or "no APKs found").
+mobsfscan is a rule-keyed object; android-lint emits XML (parsed into findings); apkleaks needs a compiled APK. Skip reasons: `tool-missing`, `no-apk` (apkleaks — CLEAN SKIP when no .apk/.aab is present).
 
-Build `tools_available` in order: mobsfscan, apkleaks, android-lint.
-An entry in `tools_available` means the binary is reachable; for
-android-lint, prefer the gradle-wrapper path when present (runs
-`./gradlew :app:lintDebug`), else standalone `lint`, else mark the
-tool as missing.
+### Step 2 - Polish (presentation only)
 
-For apkleaks: if it is on PATH but zero APKs were found, move it to
-`tools_clean_skipped` with reason `"no-apk"`. It is NOT in
-`tools_available` for purposes of running, but it is also NOT in
-`failed`.
-
-### Step 4 — Handle the "all unavailable" case
-
-If `tools_available` is empty AND `tools_clean_skipped` is empty,
-emit `{"__android_status__": "unavailable", "tools": []}` on stdout
-and exit 0. Do NOT emit any finding lines.
-
-If `tools_available` is empty but apkleaks was clean-skipped (APK-
-absent with apkleaks on PATH and no other tool available), this is
-still unavailable from the reporting perspective — the caller learns
-nothing. Emit `unavailable` with `"skipped": [{"tool": "apkleaks",
-"reason": "no-apk"}]` for transparency.
-
-### Step 5 — Run each available tool
-
-Report paths go to `$TMPDIR`; working dir when running gradle is
-`target_path`.
-
-**mobsfscan**:
-
-```bash
-mobsfscan --json --output - "$target_path" \
-  > "$TMPDIR/android-runner-mobsfscan.json" \
-  2> "$TMPDIR/android-runner-mobsfscan.stderr"
-rc_mob=$?
-```
-
-Non-zero exit with valid JSON is normal. Treat missing/malformed JSON
-or exit >= 127 as tool failure.
-
-**apkleaks** (only when at least one APK was found in Step 3):
-
-For each discovered APK, write a separate output file and emit
-findings per-APK. If multiple APKs, iterate.
-
-```bash
-apk="$target_path/app/build/outputs/apk/debug/app-debug.apk"  # example
-apkleaks -f "$apk" --json --output "$TMPDIR/android-runner-apkleaks-$(basename "$apk").json" \
-  2> "$TMPDIR/android-runner-apkleaks.stderr"
-rc_apk=$?
-```
-
-Treat exit >= 127 OR missing JSON as failure.
-
-**android-lint** (prefer gradle path):
-
-```bash
-if [ -x "$target_path/gradlew" ]; then
-    ( cd "$target_path" && ./gradlew :app:lintDebug --offline --no-daemon ) \
-      2> "$TMPDIR/android-runner-gradle-lint.stderr"
-    rc_lint=$?
-    lint_xml="$target_path/app/build/reports/lint-results-debug.xml"
-elif command -v lint >/dev/null 2>&1; then
-    lint --xml "$TMPDIR/android-runner-lint.xml" "$target_path/app" \
-      2> "$TMPDIR/android-runner-lint.stderr"
-    rc_lint=$?
-    lint_xml="$TMPDIR/android-runner-lint.xml"
-else
-    rc_lint=127
-fi
-```
-
-Exit-code non-zero from gradle lint is normal when Errors were found.
-Read `$lint_xml` regardless. If the file is missing, treat as failed.
-
-### Step 6 — Parse each tool's output and emit findings
-
-**mobsfscan** (JSON): iterate `results` keyed by rule id. For each
-rule, iterate `files[]` and emit one finding per match per the
-mapping table. Use `jq` via `Bash`:
-
-```bash
-jq -c '
-  .results // {} | to_entries[] |
-  .key as $rid | .value as $v |
-  ($v.metadata // {}) as $m |
-  ($v.files // []) | .[] as $hit |
-  {
-    id: $rid,
-    severity: (($m.severity // "INFO") | ascii_upcase |
-               if . == "ERROR" then "HIGH"
-               elif . == "WARNING" then "MEDIUM"
-               else "LOW" end),
-    cwe: ($m.cwe // "" | capture("CWE-(?<n>[0-9]+)"; "g") | if . then "CWE-\(.n)" else null end),
-    title: ($m.description // $rid),
-    file: $hit.file_path,
-    line: (($hit.match_lines // [0]) | .[0] | tonumber? // 0),
-    evidence: ($hit.match_string // ""),
-    reference: "mobile-tools.md",
-    reference_url: ($m.reference // null),
-    fix_recipe: null,
-    confidence: "medium",
-    origin: "android",
-    tool: "mobsfscan"
-  }
-' "$TMPDIR/android-runner-mobsfscan.json"
-```
-
-**apkleaks** (JSON): iterate `results[].matches[]` and emit one
-finding per match. The `id` is synthesised:
-`"apkleaks:" + rule + ":" + (first 8 chars of SHA-256 of the match)`.
-Severity is uniform MEDIUM; CWE split by rule — URL/endpoint rules
-(e.g. `LinkFinder`) map to `CWE-200`, credential rules (AWS Access
-Key, Firebase URL containing credentials, JWT, PKCS private-key
-pattern) map to `CWE-312`. When the rule name is ambiguous, emit
-`CWE-312` (safer default).
-
-**android-lint** (XML): parse with `xmllint --xpath` or python
-`xml.etree.ElementTree`. For each `<issue>` where `category="Security"`
-OR `id` appears in the lint→CWE lookup table, emit one finding. Map
-per the table in `mobile-tools.md`. Issues outside the Security
-category are skipped (lint has many non-security rules that are not
-in scope for this runner).
-
-### Step 7 — Emit the status summary
-
-After all findings:
-
-- If every available tool ran cleanly AND no tool failed AND there
-  were no clean-skips: `{"__android_status__": "ok", "tools": [...], "runs": N, "findings": M}`.
-- If some tools ran and none failed but some were cleanly skipped:
-  `{"__android_status__": "ok", "tools": [...ran...], "runs": N, "findings": M, "skipped": [{"tool": "apkleaks", "reason": "no-apk"}]}`.
-- If some tools ran successfully and others failed (missing JSON,
-  crashed, non-documented non-zero): `{"__android_status__": "partial", "tools": [...ran...], "runs": N, "findings": M, "failed": [...], "skipped": [...if any...]}`.
-- If every tool in `tools_available` failed OR `tools_available` was
-  empty: `{"__android_status__": "unavailable", "tools": [], "skipped": [...if any...]}`.
-
-The trailing status line is mandatory.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __android_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

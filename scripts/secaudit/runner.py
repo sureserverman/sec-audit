@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 LANES = os.path.join(os.path.dirname(__file__), "lanes")
 
@@ -156,16 +157,35 @@ def _blocks(toolcfg):
     return toolcfg.get("sources") or [toolcfg]
 
 
+def _xml_items(text, tag):
+    """Parse XML (e.g. android-lint) into dicts: each `<tag attr=..>` element's
+    attributes become keys; each child element's attributes become a nested dict
+    under the child's tag (first child per tag wins)."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return []
+    items = []
+    for el in root.iter(tag):
+        d = dict(el.attrib)
+        for child in el:
+            d.setdefault(child.tag, dict(child.attrib))
+        items.append(d)
+    return items
+
+
 def map_raw(lane, toolcfg, raw_text):
-    if toolcfg.get("input_format") == "jsonl":
-        lines = [json.loads(l) for l in raw_text.splitlines() if l.strip()]
-        data = None
+    fmt = toolcfg.get("input_format")
+    if fmt == "jsonl":
+        preitems, data = [json.loads(l) for l in raw_text.splitlines() if l.strip()], None
+    elif fmt == "xml":
+        preitems, data = _xml_items(raw_text, toolcfg.get("xml_item", "issue")), None
     else:
-        data = json.loads(raw_text)
+        preitems, data = None, json.loads(raw_text)
     out = []
     for block in _blocks(toolcfg):
-        if toolcfg.get("input_format") == "jsonl":
-            base = lines
+        if preitems is not None:
+            base = preitems
         else:
             fp = block.get("findings_path")
             base = (_get(data, fp) or []) if fp else (data if isinstance(data, list) else [])
