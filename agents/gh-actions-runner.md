@@ -63,116 +63,35 @@ emit unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, and do NOT invent, drop, or
+re-rank findings.
 
-Load `references/gh-actions-tools.md`; extract invocations, field
-mappings, and per-rule CWE tables.
-
-### Step 2 — Resolve target + probe tools
-
-```bash
-command -v actionlint 2>/dev/null
-command -v zizmor 2>/dev/null
-```
-
-Build `tools_available`. If empty, emit unavailable sentinel with
-`tool-missing` skipped entries, exit 0.
-
-### Step 3 — Run each available tool
-
-**actionlint** (cwd = target_path so reported paths are relative):
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-( cd "$target_path" && actionlint -format '{{json .}}' ) \
-    > "$TMPDIR/gh-actions-runner-actionlint.json" \
-    2> "$TMPDIR/gh-actions-runner-actionlint.stderr"
-rc_al=$?
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" gh-actions <target_path>
 ```
 
-Non-zero exits with valid JSON are normal.
+The engine probes both tools (`command -v actionlint`, `command -v zizmor`),
+runs them, parses actionlint's JSON array and zizmor's JSON, and maps each per
+`gh-actions-tools.md` (id `actionlint:<kind>` / `zizmor:<ident>`, kind/ident
+severity + CWE tables, url templates). Output is faithful JSONL - every line
+`origin: "gh-actions"`, `tool: "actionlint" | "zizmor"` - then one
+`__gh_actions_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when neither is present the only line is the unavailable sentinel:
 
-**zizmor**:
-
-```bash
-zizmor --format json "$target_path" \
-    > "$TMPDIR/gh-actions-runner-zizmor.json" \
-    2> "$TMPDIR/gh-actions-runner-zizmor.stderr"
-rc_zz=$?
+```json
+{"__gh_actions_status__": "unavailable", "tools": []}
 ```
 
-Same normal-non-zero behaviour.
+### Step 2 - Polish (presentation only)
 
-### Step 4 — Parse outputs
-
-**actionlint** (top-level array):
-
-```bash
-jq -c '
-  .[]? | {
-    id: ("actionlint:" + (.kind // "lint")),
-    severity: ((.kind // "") |
-               if . == "expression" then "HIGH"
-               elif . == "syntax-check" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: .filepath,
-    line: (.line // 0),
-    evidence: ((.snippet // "") | .[0:200]),
-    reference: "gh-actions-tools.md",
-    reference_url: ("https://github.com/rhysd/actionlint/blob/main/docs/checks.md#" + (.kind // "")),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "gh-actions",
-    tool: "actionlint"
-  }
-' "$TMPDIR/gh-actions-runner-actionlint.json"
-```
-
-Apply per-`kind` CWE overrides per `gh-actions-tools.md` mapping
-table — `expression` → CWE-94, `permissions` → CWE-732,
-`shellcheck` → CWE-78.
-
-**zizmor** (`.findings[]`):
-
-```bash
-jq -c '
-  .findings[]? | (.locations[0] // {}) as $loc | {
-    id: ("zizmor:" + .ident),
-    severity: ((.severity // "Low") |
-               if . == "High" then "HIGH"
-               elif . == "Medium" then "MEDIUM"
-               else "LOW" end),
-    cwe: null,
-    title: .desc,
-    file: ($loc.symbolic.path // ""),
-    line: ($loc.concrete.location.start_point.row // 0),
-    evidence: (.desc // ""),
-    reference: "gh-actions-tools.md",
-    reference_url: ("https://woodruffw.github.io/zizmor/audits/#" + .ident),
-    fix_recipe: null,
-    confidence: ((.confidence // "Medium") |
-                 if . == "High" then "high"
-                 elif . == "Low" then "low"
-                 else "medium" end),
-    origin: "gh-actions",
-    tool: "zizmor"
-  }
-' "$TMPDIR/gh-actions-runner-zizmor.json"
-```
-
-Apply per-`ident` CWE overrides — `template-injection` → CWE-94,
-`dangerous-triggers` → CWE-94, `unpinned-uses` → CWE-829,
-`excessive-permissions` → CWE-732, `artipacked` → CWE-522,
-`secrets-inherit` → CWE-200.
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__gh_actions_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial / unavailable. The
-only expected skip reason in this lane is `tool-missing`.
+You MAY tighten `title` wording and refine `severity` with context. You MUST
+NOT change `id`, `file`, `line`, `cwe`, `tool`, or `origin`, MUST NOT add or
+remove findings, and MUST relay the `__gh_actions_status__` sentinel verbatim.
+Extraction is deterministic; the "never fabricate" guarantees in **Hard rules**
+are enforced by the engine.
 
 ## Output discipline
 

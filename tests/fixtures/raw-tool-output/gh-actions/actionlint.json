@@ -1,0 +1,5 @@
+[
+{"kind":"expression","message":"object \"github\" has no attribute \"event.pull_request.title\" used in expression context — likely script-injection if expanded into shell","filepath":".github/workflows/release.yml","line":28,"snippet":"echo \"Title: ${{ github.event.pull_request.title }}\""},
+{"kind":"events","message":"use of pull_request_target with checkout of PR head ref is dangerous (Poisoned Pipeline Execution)","filepath":".github/workflows/release.yml","line":19,"snippet":"ref: ${{ github.event.pull_request.head.sha }}"},
+{"kind":"shellcheck","message":"shellcheck reported issue in this script: the expression interpolated into the shell is attacker-controlled","filepath":".github/workflows/release.yml","line":28,"snippet":"echo \"Title: ${{ github.event.pull_request.title }}\""}
+]

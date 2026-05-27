@@ -1,0 +1,33 @@
+{
+  "lane": "gh-actions", "status_key": "__gh_actions_status__", "origin": "gh-actions", "reference": "gh-actions-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "actionlint", "probe": "actionlint",
+      "invoke": ["actionlint", "-format", "{{json .}}"], "output": "stdout",
+      "const": {"confidence": "high"},
+      "map": {
+        "id": {"concat": ["actionlint:", {"from": "kind"}]},
+        "severity": {"from": "kind", "lookup": {"expression": "HIGH", "syntax-check": "MEDIUM"}, "default": "LOW"},
+        "cwe": {"from": "kind", "lookup": {"expression": "CWE-94", "permissions": "CWE-732", "events": "CWE-94", "shellcheck": "CWE-78"}, "default": null},
+        "title": "message", "file": "filepath", "line": "line",
+        "evidence": {"from": "snippet", "truncate": 200},
+        "reference_url": {"concat": ["https://github.com/rhysd/actionlint/blob/main/docs/checks.md#", {"from": "kind"}]}
+      }
+    },
+    {
+      "name": "zizmor", "probe": "zizmor",
+      "invoke": ["zizmor", "--format", "json", "{target}"], "output": "stdout",
+      "map": {
+        "id": {"concat": ["zizmor:", {"from": "ident"}]},
+        "severity": {"from": "severity", "map": {"High": "HIGH", "Medium": "MEDIUM", "Low": "LOW", "Informational": "LOW", "Unknown": "LOW"}, "default": "LOW"},
+        "cwe": {"from": "ident", "lookup": {"template-injection": "CWE-94", "dangerous-triggers": "CWE-94", "unpinned-uses": "CWE-829", "excessive-permissions": "CWE-732", "artipacked": "CWE-522", "secrets-inherit": "CWE-200"}, "default": null},
+        "title": "desc", "file": "locations.0.symbolic.path",
+        "line": "locations.0.concrete.location.start_point.row",
+        "evidence": {"from": "desc", "truncate": 200},
+        "reference_url": {"concat": ["https://woodruffw.github.io/zizmor/audits/#", {"from": "ident"}]},
+        "confidence": {"from": "confidence", "map": {"High": "high", "Medium": "medium", "Low": "low"}, "default": "medium"}
+      }
+    }
+  ]
+}
