@@ -759,25 +759,45 @@ contract, `contract-check`, drills, and e2e are unchanged.
 **Tier 2 — config-driven runner engine** (`runner.py` + `lanes/<lane>.json`).
 Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
 severity/evidence from tool output); the agent polishes title/severity only.
-Script-backed lanes (15): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
+Script-backed lanes (16): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
 `python`, `iac`, `image`, `dast`, `supply-chain`, `k8s`, `webext`, `webapp`,
-`rust`, `android`. Parity is proven per lane by `tests/script-runner.sh
+`rust`, `android`, `virt`. Parity is proven per lane by `tests/script-runner.sh
 <lane>`. The config-driven engine (`runner.py` + `lanes/<lane>.json`) supports:
 dotted/numeric paths, `concat`, `map`/`lookup`, `int`/`truncate`/`before`/
 `cvss_band` transforms, single- and nested-`flatten` (`_parent`), multi-
 `sources` per tool, dict `iterate: values`, `filter`, `input_format: jsonl|xml`,
-and per-tool `env`.
+list-valued `applicable_glob` + multi-glob `{files:a|b}`, a per-file pass/fail
+`validator` mode (exit-code → synthesized finding, with `line_regex` and
+`dedupe_by`), and per-tool `env`.
 
-**Still agent-backed (LLM runner agents — different paradigm, by design):**
-- `ai-tools` — `jq` is an exit-code **validator** (a finding is synthesised on
-  malformed config, not mapped from JSON output); the threat model needs
-  judgement. (mcp-scan JSON could be partially engine-backed later.)
-- `netcfg` / `virt` — core tools are pass/fail **validators** (`sing-box
-  check`, `xray test`, `virt-xml-validate`). (`virt`'s `hadolint` is JSON — a
-  future partial conversion.)
-- `linux` / `macos` / `ios` / `windows` — command-output binaries
-  (`systemd-analyze`, `lintian`, `checksec`, `codesign`, `spctl`, `notarytool`,
-  `sigcheck`), host-OS-gated. (`ios`/`macos` `mobsfscan` is JSON — future.)
+**Still agent-backed (LLM runner agents).** These split into three groups by
+whether engine conversion is actually worthwhile:
+
+- **Planned Tier-1 hybrid conversion** (a JSON-emitting primary tool + a
+  pass/fail companion validator — conversion is beneficial and tracked):
+  - `ai-tools` — `mcp-scan inspect --json` emits mappable JSON findings; `jq`
+    is an exit-code validator (a finding is synthesised on malformed config).
+    The `validator` mode now exists (shipped with `virt`); still needs a field
+    `coalesce` op (`.id // .rule_id // .check_id`) and a `vulnerable-ai-tools`
+    golden fixture before conversion.
+  - `virt` — **converted** (`lanes/virt.json`): `hadolint --format json` maps
+    with existing engine features; `virt-xml-validate` runs through the new
+    `validator` mode. (Moved to the script-backed list above.)
+
+- **Parked** (convert only if the engine later grows a text/table mapping mode):
+  - `linux` — `systemd-analyze security` (table) + `checksec` (text) are not
+    JSON; `lintian` has JSON but `systemd-analyze` is host-gated. Low payoff
+    until a table-parsing mode exists.
+
+- **Permanently agent-backed by design** (engine conversion is *not* beneficial —
+  these are not residual/pending work):
+  - `macos` / `ios` / `windows` — signing/notarization binaries (`codesign`,
+    `spctl`, `notarytool`, `sigcheck`, `pkgutil`, `stapler`) are **host-OS-gated**;
+    on the common Linux CI/dev host they clean-skip, so there is no per-finding
+    LLM cost to remove, and their pass/fail + free-text output needs human
+    interpretation when they do run.
+  - `netcfg` — `sing-box check` / `xray test` are config validators whose value
+    is interpreting *why* a config failed; low volume, interpretive output.
 
 The `sec-expert`, `finding-triager`, `dep-diff-analyst`, and `report-writer`
 agents remain LLM by design — they perform irreducible judgement, not

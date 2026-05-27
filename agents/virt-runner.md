@@ -63,150 +63,47 @@ exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `references/virt-tools.md`; extract invocations, field
-mappings, and per-rule CWE tables for hadolint.
-
-### Step 2 — Resolve target + probe tools + check applicability
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-command -v hadolint 2>/dev/null
-command -v virt-xml-validate 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" virt <target_path>
 ```
 
-Build `tools_available`. Then check applicability:
+The engine probes the two tools (`command -v hadolint`, `command -v virt-xml-validate`),
+checks applicability, runs each, and maps results to the Finding schema above
+per `virt-tools.md`:
 
-- **hadolint applicable** iff `tools_available` contains
-  `hadolint` AND `find "$target_path" -type f \( -iname
-  'Dockerfile' -o -iname 'Dockerfile.*' -o -iname '*.dockerfile'
-  -o -iname 'Containerfile' -o -iname '*.containerfile' \)`
-  yields ≥ 1 result. If hadolint is on PATH but no
-  Containerfile-shaped file exists, record skipped entry
-  `{"tool": "hadolint", "reason": "no-containerfile"}`.
+- **hadolint** (`hadolint --format json` over `Dockerfile` / `Containerfile`-shaped
+  files): each entry → one finding. `level` maps `error→HIGH`, `warning→MEDIUM`,
+  `info`/`style`→`LOW`; `id` is `hadolint:<code>`; per-`code` CWE overrides come
+  from the `virt-tools.md` table (`DL3002→CWE-250`, `DL3004→CWE-269`,
+  `DL3007→CWE-829`, `DL3020`/`DL3021→CWE-22`, `DL4006→CWE-754`,
+  `SC2086`/`SC2046→CWE-78`, else `null`).
+- **virt-xml-validate** (per-file pass/fail **validator** over `*.xml` files
+  containing a libvirt `<domain>` / `<network>` / `<pool>` / `<volume>` root): a
+  non-zero exit synthesizes one `virt-xml:invalid` finding (`CWE-1284`, MEDIUM)
+  from the validator's diagnostic message — one finding per failing file.
 
-- **virt-xml-validate applicable** iff `tools_available` contains
-  `virt-xml-validate` AND `find "$target_path" -type f -name
-  '*.xml' -exec grep -l '<domain\b\|<network\b\|<pool\b\|<volume\b' {} +`
-  yields ≥ 1 result. If validator is on PATH but no libvirt-XML
-  file exists, record skipped entry
-  `{"tool": "virt-xml-validate", "reason": "no-libvirt-xml"}`.
-
-If `tools_available` is empty AND no applicability matched, emit
-unavailable sentinel with `tool-missing` skipped entries for
-absent tools, exit 0.
-
-### Step 3 — Run each available + applicable tool
-
-**hadolint** (cwd = target_path so reported paths are relative):
-
-```bash
-files_hl=$( find "$target_path" -type f \
-    \( -iname 'Dockerfile' -o -iname 'Dockerfile.*' \
-       -o -iname '*.dockerfile' -o -iname 'Containerfile' \
-       -o -iname '*.containerfile' \) -print )
-if [ -n "$files_hl" ]; then
-    ( cd "$target_path" && \
-      hadolint --format json $files_hl ) \
-        > "$TMPDIR/virt-runner-hadolint.json" \
-        2> "$TMPDIR/virt-runner-hadolint.stderr"
-    rc_hl=$?
-fi
-```
-
-Non-zero exits with valid JSON output are normal. Empty result is `[]`.
-
-**virt-xml-validate** (per-file loop):
-
-```bash
-: > "$TMPDIR/virt-runner-virtxml.tsv"
-while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    out=$( virt-xml-validate "$f" 2>&1 )
-    rc=$?
-    rel="${f#$target_path/}"
-    printf '%s\t%d\t%s\n' "$rel" "$rc" "$out" \
-        >> "$TMPDIR/virt-runner-virtxml.tsv"
-done < <(find "$target_path" -type f -name '*.xml' \
-            -exec grep -l '<domain\b\|<network\b\|<pool\b\|<volume\b' {} +)
-rc_vx=0
-```
-
-### Step 4 — Parse outputs
-
-**hadolint** (top-level array):
-
-```bash
-jq -c '
-  .[]? | {
-    id: ("hadolint:" + (.code // "lint")),
-    severity: ((.level // "info") |
-               if . == "error" then "HIGH"
-               elif . == "warning" then "MEDIUM"
-               elif . == "info" then "LOW"
-               elif . == "style" then "LOW"
-               else "LOW" end),
-    cwe: null,
-    title: .message,
-    file: .file,
-    line: (.line // 0),
-    evidence: ((.message // "") | .[0:200]),
-    reference: "virt-tools.md",
-    reference_url: ("https://github.com/hadolint/hadolint/wiki/" + (.code // "")),
-    fix_recipe: null,
-    confidence: "high",
-    origin: "virt",
-    tool: "hadolint"
-  }
-' "$TMPDIR/virt-runner-hadolint.json"
-```
-
-Apply per-`code` CWE overrides per `virt-tools.md` mapping table:
-- `DL3002` (root user) → CWE-250
-- `DL3004` (sudo) → CWE-269
-- `DL3007` (latest tag) → CWE-829
-- `DL3020` / `DL3021` (ADD/COPY misuse) → CWE-22
-- `DL4006` (set -o pipefail) → CWE-754
-- `SC2086` (unquoted variable) → CWE-78
-- `SC2046` (unquoted command substitution) → CWE-78
-- everything else → null.
-
-**virt-xml-validate** (TSV walk; one line per file):
-
-```bash
-awk -F '\t' '
-  $2 != 0 {
-    rel=$1; msg=$3;
-    line=0;
-    if (match(msg, /line[[:space:]]+([0-9]+)/, arr)) line=arr[1];
-    gsub(/"/, "\\\"", msg);
-    snippet=substr(msg, 1, 200);
-    printf "{\"id\":\"virt-xml:invalid\",\"severity\":\"MEDIUM\",\"cwe\":\"CWE-1284\",\"title\":\"%s\",\"file\":\"%s\",\"line\":%d,\"evidence\":\"%s\",\"reference\":\"virt-tools.md\",\"reference_url\":\"https://libvirt.org/format.html\",\"fix_recipe\":null,\"confidence\":\"high\",\"origin\":\"virt\",\"tool\":\"virt-xml-validate\"}\n", snippet, rel, line, snippet
-  }
-' "$TMPDIR/virt-runner-virtxml.tsv"
-```
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__virt_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial / unavailable.
-The skip-reason vocabulary for this lane is:
-`tool-missing`, `no-containerfile`, `no-libvirt-xml`.
-
-Emit one trailing JSONL record like:
+Output is faithful JSONL — every line `origin: "virt"`, `tool: "hadolint" |
+"virt-xml-validate"` — then one `__virt_status__` record. A tool absent from PATH
+is a `tool-missing` skip; a tool present with no applicable input is a
+`no-containerfile` (hadolint) or `no-libvirt-xml` (virt-xml-validate) skip. When
+neither tool ran, the only line is the unavailable sentinel:
 
 ```json
-{"__virt_status__":"ok","tools":["hadolint","virt-xml-validate"],"runs":2,"findings":<n>,"skipped":[]}
+{"__virt_status__": "unavailable", "tools": []}
 ```
 
-Or, for partial / unavailable:
+### Step 2 — Polish (presentation only)
 
-```json
-{"__virt_status__":"partial","tools":["hadolint"],"runs":1,"findings":<n>,"skipped":[{"tool":"virt-xml-validate","reason":"no-libvirt-xml"}]}
-{"__virt_status__":"unavailable","tools":[],"skipped":[{"tool":"hadolint","reason":"tool-missing"},{"tool":"virt-xml-validate","reason":"tool-missing"}]}
-```
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__virt_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

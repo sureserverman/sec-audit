@@ -36,9 +36,9 @@ fi
 
 scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
 : > "$scratch/mapped.jsonl"
-for raw in "$rawdir"/*.json "$rawdir"/*.xml; do
+for raw in "$rawdir"/*.json "$rawdir"/*.xml "$rawdir"/*.tsv; do
   [ -e "$raw" ] || continue
-  tool="$(basename "$raw")"; tool="${tool%.*}"   # strip .json / .xml; tool == config tool name
+  tool="$(basename "$raw")"; tool="${tool%.*}"   # strip .json / .xml / .tsv; tool == config tool name
   python3 "$runner" "$lane" --map-only "$raw" --tool "$tool" >> "$scratch/mapped.jsonl"
 done
 

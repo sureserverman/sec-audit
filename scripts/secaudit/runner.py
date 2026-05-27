@@ -174,7 +174,57 @@ def _xml_items(text, tag):
     return items
 
 
+def _validator_items(lane, toolcfg, tsv_text):
+    r"""Synthesize one finding per failing (rc != 0) per-file validator row.
+    Input is TSV: <relpath>\t<rc>\t<message>. For pass/fail validators
+    (virt-xml-validate, and later sing-box/xray/jq) that emit no findings
+    array — a finding is synthesized from the validator's diagnostic, never
+    mapped from JSON. `dedupe_by: "file"` keeps the first failing diagnostic
+    per file; `line_regex` lifts a line number from the message."""
+    import re
+    synth = toolcfg["synth"]
+    line_re = toolcfg.get("line_regex")
+    dedupe = toolcfg.get("dedupe_by")
+    seen = set()
+    out = []
+    for row in tsv_text.splitlines():
+        if not row.strip():
+            continue
+        parts = row.split("\t", 2)
+        if len(parts) < 2:
+            continue
+        rel, rc = parts[0], parts[1]
+        msg = parts[2] if len(parts) > 2 else ""
+        try:
+            if int(rc) == 0:
+                continue
+        except ValueError:
+            continue
+        if dedupe == "file":
+            if rel in seen:
+                continue
+            seen.add(rel)
+        line = 0
+        if line_re:
+            m = re.search(line_re, msg)
+            if m:
+                line = int(m.group(1))
+        snippet = msg[:200]
+        f = dict(lane.get("finding_const", {}))
+        for k, v in synth.items():
+            f[k] = v.replace("{msg}", snippet) if isinstance(v, str) else v
+        f["file"] = rel
+        f["line"] = line
+        f["reference"] = lane["reference"]
+        f["origin"] = lane["origin"]
+        f["tool"] = toolcfg["name"]
+        out.append(f)
+    return out
+
+
 def map_raw(lane, toolcfg, raw_text):
+    if toolcfg.get("mode") == "validator":
+        return _validator_items(lane, toolcfg, raw_text)
     fmt = toolcfg.get("input_format")
     if fmt == "jsonl":
         preitems, data = [json.loads(l) for l in raw_text.splitlines() if l.strip()], None
@@ -209,10 +259,10 @@ def _build_argv(invoke, target, tmp):
     argv = []
     for a in invoke:
         if a.startswith("{files:") and a.endswith("}"):
-            glob = a[len("{files:"):-1]
-            for root, _d, files in os.walk(target):
+            globs = a[len("{files:"):-1].split("|")    # any-of, for tools that
+            for root, _d, files in os.walk(target):    # match several name shapes
                 for fn in sorted(files):
-                    if fnmatch.fnmatch(fn, glob):
+                    if any(fnmatch.fnmatch(fn, g) for g in globs):
                         argv.append(os.path.join(root, fn))
         else:
             argv.append(a.replace("{target}", target).replace("{tmp}", tmp))
@@ -223,12 +273,38 @@ def _applicable(toolcfg, target):
     glob = toolcfg.get("applicable_glob")
     if not glob:
         return True
+    globs = [glob] if isinstance(glob, str) else list(glob)
     import fnmatch
     for root, _dirs, files in os.walk(target):
         for fn in files:
-            if fnmatch.fnmatch(fn, glob):
+            if any(fnmatch.fnmatch(fn, g) for g in globs):
                 return True
     return False
+
+
+def _select_files(target, fsel):
+    """Files a validator should check: name-glob match, optional content grep
+    (e.g. *.xml containing a libvirt root element). Mirrors the agent's
+    `find ... -exec grep -l` precondition."""
+    import fnmatch
+    import re
+    glob = fsel.get("glob", "*")
+    rx = re.compile(fsel["grep"]) if fsel.get("grep") else None
+    sel = []
+    for root, _d, files in os.walk(target):
+        for fn in sorted(files):
+            if not fnmatch.fnmatch(fn, glob):
+                continue
+            p = os.path.join(root, fn)
+            if rx is not None:
+                try:
+                    with open(p, encoding="utf-8", errors="replace") as fh:
+                        if not rx.search(fh.read()):
+                            continue
+                except OSError:
+                    continue
+            sel.append(p)
+    return sel
 
 
 def run_live(lane, target):
@@ -238,6 +314,29 @@ def run_live(lane, target):
     for tc in lane["tools"]:
         if not shutil.which(tc["probe"]):
             skipped.append({"tool": tc["name"], "reason": "tool-missing"})
+            continue
+        if tc.get("mode") == "validator":
+            files = _select_files(target, tc.get("file_select", {}))
+            if not files:
+                skipped.append({"tool": tc["name"],
+                                "reason": tc.get("inapplicable_reason", "tool-missing")})
+                continue
+            rows = []
+            for fp in files:
+                argv = [a.replace("{file}", fp) for a in tc["invoke"]]
+                try:
+                    proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
+                except Exception as e:
+                    sys.stderr.write(f"runner: {tc['name']} failed on {fp}: {e}\n")
+                    continue
+                rel = os.path.relpath(fp, target)
+                combined = (proc.stdout + proc.stderr).replace("\t", " ").replace("\n", " ").strip()
+                rows.append(f"{rel}\t{proc.returncode}\t{combined}")
+            try:
+                findings.extend(map_raw(lane, tc, "\n".join(rows)))
+                ran.append(tc["name"])
+            except Exception as e:
+                sys.stderr.write(f"runner: {tc['name']} parse failed: {e}\n")
             continue
         if not _applicable(tc, target):
             skipped.append({"tool": tc["name"],

@@ -1,0 +1,48 @@
+{
+  "lane": "virt",
+  "status_key": "__virt_status__",
+  "origin": "virt",
+  "reference": "virt-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "hadolint",
+      "probe": "hadolint",
+      "applicable_glob": ["Dockerfile", "Dockerfile.*", "*.dockerfile", "Containerfile", "*.containerfile"],
+      "inapplicable_reason": "no-containerfile",
+      "invoke": ["hadolint", "--format", "json", "{files:Dockerfile|Dockerfile.*|*.dockerfile|Containerfile|*.containerfile}"],
+      "output": "stdout",
+      "const": {"confidence": "high"},
+      "map": {
+        "id": {"concat": ["hadolint:", {"from": "code", "default": "lint"}]},
+        "severity": {"from": "level", "map": {"error": "HIGH", "warning": "MEDIUM", "info": "LOW", "style": "LOW"}, "default": "LOW"},
+        "cwe": {"from": "code", "lookup": {"DL3002": "CWE-250", "DL3004": "CWE-269", "DL3007": "CWE-829", "DL3020": "CWE-22", "DL3021": "CWE-22", "DL4006": "CWE-754", "SC2086": "CWE-78", "SC2046": "CWE-78"}, "default": null},
+        "title": "message",
+        "file": "file",
+        "line": {"from": "line", "default": 0},
+        "evidence": {"from": "message", "truncate": 200},
+        "reference_url": {"concat": ["https://github.com/hadolint/hadolint/wiki/", {"from": "code", "default": ""}]}
+      }
+    },
+    {
+      "name": "virt-xml-validate",
+      "probe": "virt-xml-validate",
+      "mode": "validator",
+      "file_select": {"glob": "*.xml", "grep": "<domain\\b|<network\\b|<pool\\b|<volume\\b"},
+      "invoke": ["virt-xml-validate", "{file}"],
+      "inapplicable_reason": "no-libvirt-xml",
+      "dedupe_by": "file",
+      "line_regex": "line\\s+([0-9]+)",
+      "synth": {
+        "id": "virt-xml:invalid",
+        "severity": "MEDIUM",
+        "cwe": "CWE-1284",
+        "title": "{msg}",
+        "evidence": "{msg}",
+        "reference_url": "https://libvirt.org/format.html",
+        "fix_recipe": null,
+        "confidence": "high"
+      }
+    }
+  ]
+}
