@@ -1,0 +1,43 @@
+{
+  "lane": "webapp", "status_key": "__webapp_status__", "origin": "webapp", "reference": "webapp-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "bearer", "probe": "bearer",
+      "invoke": ["bearer", "scan", "--report", "security", "--format", "json", "{target}"], "output": "stdout",
+      "sources": [
+        {"findings_path": "critical", "const": {"severity": "CRITICAL", "confidence": "high"}, "map": {"id": {"concat": ["bearer:", {"from": "id"}]}, "cwe": {"concat": ["CWE-", {"from": "cwe_ids.0"}], "default": null}, "title": "title", "file": "filename", "line": "line_number", "evidence": {"from": "code_extract", "truncate": 200}, "reference_url": "documentation_url"}},
+        {"findings_path": "high", "const": {"severity": "HIGH", "confidence": "high"}, "map": {"id": {"concat": ["bearer:", {"from": "id"}]}, "cwe": {"concat": ["CWE-", {"from": "cwe_ids.0"}], "default": null}, "title": "title", "file": "filename", "line": "line_number", "evidence": {"from": "code_extract", "truncate": 200}, "reference_url": "documentation_url"}},
+        {"findings_path": "medium", "const": {"severity": "MEDIUM", "confidence": "medium"}, "map": {"id": {"concat": ["bearer:", {"from": "id"}]}, "cwe": {"concat": ["CWE-", {"from": "cwe_ids.0"}], "default": null}, "title": "title", "file": "filename", "line": "line_number", "evidence": {"from": "code_extract", "truncate": 200}, "reference_url": "documentation_url"}},
+        {"findings_path": "low", "const": {"severity": "LOW", "confidence": "low"}, "map": {"id": {"concat": ["bearer:", {"from": "id"}]}, "cwe": {"concat": ["CWE-", {"from": "cwe_ids.0"}], "default": null}, "title": "title", "file": "filename", "line": "line_number", "evidence": {"from": "code_extract", "truncate": 200}, "reference_url": "documentation_url"}}
+      ]
+    },
+    {
+      "name": "njsscan", "probe": "njsscan", "applicable_glob": "*.js", "inapplicable_reason": "no-node-source",
+      "invoke": ["njsscan", "--json", "{target}"], "output": "stdout",
+      "findings_path": "nodejs", "iterate": "values", "flatten": "files",
+      "const": {"fix_recipe": null},
+      "map": {
+        "id": {"concat": ["njsscan:", {"from": "_parent._key"}]},
+        "severity": {"from": "_parent.metadata.severity", "map": {"ERROR": "HIGH", "WARNING": "MEDIUM", "INFO": "LOW"}, "default": "MEDIUM"},
+        "cwe": {"from": "_parent.metadata.cwe", "before": ":", "default": null},
+        "title": "_parent.metadata.description", "file": "file_path", "line": "match_lines.0",
+        "evidence": {"from": "match_string", "truncate": 200},
+        "reference_url": {"from": "_parent.metadata.owasp-web", "default": null},
+        "confidence": "medium"
+      }
+    },
+    {
+      "name": "brakeman", "probe": "brakeman", "applicable_glob": "Gemfile", "inapplicable_reason": "no-rails-source",
+      "invoke": ["brakeman", "-f", "json", "--no-progress", "{target}"], "output": "stdout", "findings_path": "warnings",
+      "map": {
+        "id": {"concat": ["brakeman:", {"from": "warning_code"}, ":", {"from": "check_name"}]},
+        "severity": {"from": "confidence", "map": {"High": "HIGH", "Medium": "MEDIUM", "Weak": "LOW"}, "default": "MEDIUM"},
+        "cwe": {"concat": ["CWE-", {"from": "cwe_id.0"}], "default": null},
+        "title": {"from": "message", "truncate": 200}, "file": "file", "line": {"from": "line", "default": 0},
+        "evidence": "message", "reference_url": "link",
+        "confidence": {"from": "confidence", "map": {"High": "high", "Medium": "medium", "Weak": "low"}, "default": "medium"}
+      }
+    }
+  ]
+}

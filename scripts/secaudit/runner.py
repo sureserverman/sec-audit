@@ -91,6 +91,8 @@ def _field(spec, item):
             return default
     if spec.get("truncate"):
         val = str(val)[:spec["truncate"]]
+    if "before" in spec:                       # substring before a delimiter
+        val = str(val).split(spec["before"])[0]
     return val
 
 
@@ -160,6 +162,10 @@ def map_raw(lane, toolcfg, raw_text):
         else:
             fp = block.get("findings_path")
             base = (_get(data, fp) or []) if fp else (data if isinstance(data, list) else [])
+            if block.get("iterate") == "values" and isinstance(base, dict):
+                # tool emits a rule-keyed object (e.g. njsscan {"nodejs":{rule:{...}}});
+                # iterate the values, exposing the key as `_key`.
+                base = [{**v, "_key": k} for k, v in base.items() if isinstance(v, dict)]
         filt = block.get("filter")
         for leaf, parent in _flatten(base, block.get("flatten")):
             ctx = leaf if parent is None else {**leaf, "_parent": parent}

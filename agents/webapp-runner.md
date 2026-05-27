@@ -94,260 +94,34 @@ unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/webapp-tools.md`.
-From it extract:
-
-- The canonical **bearer**, **njsscan**, and **brakeman**
-  invocations with exact flag combinations.
-- The three field-mapping tables (bearer → finding, njsscan →
-  finding, brakeman → finding).
-- The applicability rules (bearer: any web-framework signal;
-  njsscan: ≥1 `*.js`/`*.ts`/`*.jsx`/`*.tsx`; brakeman: Rails
-  app shape).
-- The sentinel recipes for unavailable / partial / ok.
-
-Do not proceed until these are in hand.
-
-### Step 2 — Resolve target + probe tools + check applicability
+### Step 1 - Extract (deterministic engine)
 
 ```bash
-command -v bearer 2>/dev/null
-command -v njsscan 2>/dev/null
-command -v brakeman 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" webapp <target_path>
 ```
 
-Build `tools_available` (the subset of `{bearer, njsscan,
-brakeman}` whose `command -v` succeeded).
+The engine probes the tool(s) (`command -v bearer`, `command -v njsscan`, `command -v brakeman`), runs them, parses their native
+output, and maps each result to the Finding schema above per `webapp-tools.md`.
+Output is faithful JSONL - every line `origin: "webapp"`, `tool: "bearer" | "njsscan" | "brakeman"` -
+then one `__webapp_status__` record. A tool absent from PATH is a `tool-missing`
+skip; when none are present the only line is the unavailable sentinel:
 
-Then check applicability against `target_path`:
-
-- **bearer applicable** iff `tools_available` contains
-  `bearer` AND at least one of these signals is present:
-  - `requirements.txt` / `pyproject.toml` / `setup.py` (Python)
-  - `package.json` (Node)
-  - `Gemfile` (Ruby)
-  - `pom.xml` / `build.gradle` (Java)
-  - `composer.json` (PHP)
-  - `go.mod` (Go)
-
-  If bearer is on PATH but no manifest exists, record skipped
-  entry `{"tool": "bearer", "reason": "no-webapp-source"}`.
-
-- **njsscan applicable** iff `tools_available` contains
-  `njsscan` AND `find "$target_path" -maxdepth 5 -type f \(
-  -name '*.js' -o -name '*.ts' -o -name '*.jsx' -o -name
-  '*.tsx' \) ! -path '*/node_modules/*' ! -path '*/dist/*'
-  ! -path '*/build/*'` yields ≥ 1 result. Otherwise record
-  `{"tool": "njsscan", "reason": "no-node-source"}`.
-
-- **brakeman applicable** iff `tools_available` contains
-  `brakeman` AND `[ -f "$target_path/Gemfile" ]` AND `grep -q
-  "rails" "$target_path/Gemfile"` AND
-  `[ -f "$target_path/config/application.rb" ] || [ -d
-  "$target_path/app" ]`. Otherwise record `{"tool":
-  "brakeman", "reason": "no-rails-source"}`.
-
-If `tools_available` is empty AND no applicability matched,
-emit unavailable sentinel with `tool-missing` skipped entries
-for absent tools, exit 0.
-
-### Step 3 — Run each available + applicable tool
-
-**bearer** (security report, not the default privacy report):
-
-```bash
-bearer scan "$target_path" \
-    --report security \
-    --format json \
-    --output "$TMPDIR/webapp-runner-bearer.json" \
-    --quiet \
-    2> "$TMPDIR/webapp-runner-bearer.stderr"
-rc_be=$?
+```json
+{"__webapp_status__": "unavailable", "tools": []}
 ```
 
-Non-zero exit when findings present is normal — bearer's exit
-code reflects severity-threshold breach, not crash. Parse JSON
-regardless of exit code.
+bearer findings come from its critical/high/medium/low severity buckets; brakeman from `warnings[]`; njsscan from its rule-keyed object. Skip reasons: `tool-missing`, `no-webapp-source`, `no-node-source`, `no-rails-source`.
 
-**njsscan**:
+### Step 2 - Polish (presentation only)
 
-```bash
-njsscan --json \
-        -o "$TMPDIR/webapp-runner-njsscan.json" \
-        "$target_path" \
-        2> "$TMPDIR/webapp-runner-njsscan.stderr"
-rc_nj=$?
-```
-
-Exit 0 = clean, exit 1 = findings, exit ≥2 = crash. Parse JSON
-for both 0 and 1.
-
-**brakeman** (only when applicability check passed — Rails app
-detected):
-
-```bash
-brakeman --format json \
-         --no-progress \
-         --quiet \
-         --no-exit-on-warn \
-         -o "$TMPDIR/webapp-runner-brakeman.json" \
-         "$target_path" \
-         2> "$TMPDIR/webapp-runner-brakeman.stderr"
-rc_br=$?
-```
-
-`--no-exit-on-warn` keeps exit 0 on warnings. Exit non-zero
-indicates parse error or rails-app-not-detected (the latter
-should not happen because applicability check guarded the
-call).
-
-### Step 4 — Parse outputs
-
-**bearer** — top-level severity buckets:
-
-```bash
-jq -c '
-  ([
-    (.critical // [] | map(. + {"_sev": "CRITICAL"})),
-    (.high     // [] | map(. + {"_sev": "HIGH"})),
-    (.medium   // [] | map(. + {"_sev": "MEDIUM"})),
-    (.low      // [] | map(. + {"_sev": "LOW"})),
-    (.warning  // [] | map(. + {"_sev": "INFO"}))
-  ] | flatten)
-  | .[]? | {
-    id: ("bearer:" + (.id // "unknown")),
-    severity: ._sev,
-    cwe: (if (.cwe_ids // []) | length > 0
-          then "CWE-" + (.cwe_ids[0] | tostring)
-          else null end),
-    title: (.title // .description // "untitled"),
-    file: .filename,
-    line: (.line_number // 0),
-    evidence: ((.code_extract // .description // "") | .[0:200]),
-    reference: "webapp-tools.md",
-    reference_url: .documentation_url,
-    fix_recipe: null,
-    confidence: (if ._sev == "CRITICAL" or ._sev == "HIGH" then "high"
-                 elif ._sev == "MEDIUM" then "medium"
-                 else "low" end),
-    origin: "webapp",
-    tool: "bearer"
-  }
-' "$TMPDIR/webapp-runner-bearer.json"
-```
-
-**njsscan** — nested `nodejs.<rule>.{files, metadata}` shape:
-
-```bash
-jq -c '
-  (.nodejs // {}) as $rules
-  | $rules | to_entries[] as $entry
-  | $entry.value.files[]? as $f
-  | {
-    id: ("njsscan:" + $entry.key),
-    severity: (
-      ($entry.value.metadata.severity // "INFO") |
-      if . == "ERROR" then "HIGH"
-      elif . == "WARNING" then "MEDIUM"
-      else "LOW" end
-    ),
-    cwe: (
-      $entry.value.metadata.cwe // null |
-      if . == null then null
-      else (capture("CWE-(?<n>[0-9]+)").n // null |
-            if . == null then null else "CWE-" + . end)
-      end
-    ),
-    title: ($entry.value.metadata.description // $entry.key),
-    file: $f.file_path,
-    line: ($f.match_lines[0] // 0),
-    evidence: (($f.match_string // "") | .[0:200]),
-    reference: "webapp-tools.md",
-    reference_url: ($entry.value.metadata."owasp-web" // null),
-    fix_recipe: null,
-    confidence: (
-      ($entry.value.metadata.severity // "INFO") |
-      if . == "ERROR" then "high"
-      elif . == "WARNING" then "medium"
-      else "low" end
-    ),
-    origin: "webapp",
-    tool: "njsscan"
-  }
-' "$TMPDIR/webapp-runner-njsscan.json"
-```
-
-Also iterate over `.templates` entries (same shape) when
-present — njsscan reports template-related issues there.
-
-**brakeman** — flat `warnings[]` array:
-
-```bash
-jq -c '
-  .warnings[]? | {
-    id: ("brakeman:" + (.warning_code | tostring) + ":" + .check_name),
-    severity: (
-      .confidence |
-      if . == "High" then "HIGH"
-      elif . == "Medium" then "MEDIUM"
-      else "LOW" end
-    ),
-    cwe: (if (.cwe_id // []) | length > 0
-          then "CWE-" + (.cwe_id[0] | tostring)
-          else null end),
-    title: ((.message // "") | .[0:200]),
-    file: .file,
-    line: (.line // 0),
-    evidence: (.message // ""),
-    reference: "webapp-tools.md",
-    reference_url: .link,
-    fix_recipe: null,
-    confidence: (
-      .confidence |
-      if . == "High" then "high"
-      elif . == "Medium" then "medium"
-      else "low" end
-    ),
-    origin: "webapp",
-    tool: "brakeman"
-  }
-' "$TMPDIR/webapp-runner-brakeman.json"
-```
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__webapp_status__": "unavailable", "tools": []}`.
-
-Build the trailing `__webapp_status__` record. Four canonical
-shapes:
-
-- **ok** — every available tool ran AND was applicable AND
-  produced parseable output. `tools` lists the runners that
-  fired; `skipped` is empty or contains only inapplicable
-  tools (e.g. brakeman skipped on a non-Rails project even
-  when the binary was on PATH).
-- **partial** — at least one tool ran successfully AND at
-  least one tool was unavailable / crashed / inapplicable.
-  Both `tools` and `skipped` are populated.
-- **unavailable** — no tool could run (all three missing,
-  OR none applicable to the target shape, OR every available
-  tool crashed). `tools` is empty; `skipped` documents why.
-
-Emit on its own line, last:
-
-```
-{"__webapp_status__": "ok", "tools": ["bearer", "njsscan"], "skipped": [{"tool": "brakeman", "reason": "no-rails-source"}]}
-```
-
-Skip vocabulary:
-
-- `tool-missing` — binary not on PATH
-- `no-webapp-source` — bearer has no manifest signal
-- `no-node-source` — njsscan has no `*.js`/`*.ts` files
-- `no-rails-source` — brakeman has no Rails app shape
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the __webapp_status__
+sentinel verbatim. Extraction is deterministic; the "never fabricate"
+guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

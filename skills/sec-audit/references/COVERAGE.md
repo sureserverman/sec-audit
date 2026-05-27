@@ -759,16 +759,12 @@ contract, `contract-check`, drills, and e2e are unchanged.
 **Tier 2 — config-driven runner engine** (`runner.py` + `lanes/<lane>.json`).
 Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
 severity/evidence from tool output); the agent polishes title/severity only.
-Script-backed lanes (9): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
-`python`, `iac`, `image`, `dast`. Parity is proven per lane by
+Script-backed lanes (13): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
+`python`, `iac`, `image`, `dast`, `supply-chain`, `k8s`, `webext`, `webapp`. Parity is proven per lane by
 `tests/script-runner.sh <lane>` (byte-equal to the golden for clean lanes; to
 an `expected.jsonl` faithful-output fixture for editorial lanes).
 
 **Still agent-backed (LLM runner agents, unchanged):**
-- *Pending an engine feature:* `k8s` (deep object→checks→comments nesting +
-  dual-array kubesec), `webext` (errors/warnings/notices multi-array),
-  `webapp` (3 tools, mixed shapes), `supply-chain` (guarddog's bespoke
-  per-package shape + osv-scanner deep-nest with `MAL-` filter).
 - *Non-JSON tools — agent by design:* `android` (android-lint XML), `rust`
   (cargo-geiger table; cargo-audit/deny are JSON), `ai-tools` (jq structural
   validation + mcp-scan), `netcfg`/`virt` (validators), and the desktop lanes

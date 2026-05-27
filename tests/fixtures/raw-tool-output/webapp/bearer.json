@@ -1,0 +1,5 @@
+{"critical":[],"high":[
+{"id":"python_lang_sql_injection","title":"SQL injection via tainted query string interpolation","cwe_ids":["89"],"filename":"app.py","line_number":11,"code_extract":"conn.execute(f\"SELECT * FROM users WHERE name = '{name}'\").fetchall()","documentation_url":"https://docs.bearer.com/reference/rules/python_lang_sql_injection/"}
+],"medium":[
+{"id":"python_lang_open_redirect","title":"Open redirect — user-controlled URL passed to redirect()","cwe_ids":["601"],"filename":"app.py","line_number":16,"code_extract":"return redirect(next_url)","documentation_url":"https://docs.bearer.com/reference/rules/python_lang_open_redirect/"}
+],"low":[]}
