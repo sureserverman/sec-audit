@@ -318,6 +318,9 @@ jq -c '
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__webapp_status__": "unavailable", "tools": []}`.
+
 Build the trailing `__webapp_status__` record. Four canonical
 shapes:
 

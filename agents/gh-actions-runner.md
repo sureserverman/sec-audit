@@ -168,6 +168,9 @@ Apply per-`ident` CWE overrides — `template-injection` → CWE-94,
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__gh_actions_status__": "unavailable", "tools": []}`.
+
 Standard four shapes: ok / ok+skipped / partial / unavailable. The
 only expected skip reason in this lane is `tool-missing`.
 

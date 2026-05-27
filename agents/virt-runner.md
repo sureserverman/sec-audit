@@ -188,6 +188,9 @@ awk -F '\t' '
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__virt_status__": "unavailable", "tools": []}`.
+
 Standard four shapes: ok / ok+skipped / partial / unavailable.
 The skip-reason vocabulary for this lane is:
 `tool-missing`, `no-containerfile`, `no-libvirt-xml`.

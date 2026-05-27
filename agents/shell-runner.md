@@ -169,6 +169,9 @@ table (security-relevant subset; non-listed → null):
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__shell_status__": "unavailable", "tools": []}`.
+
 Two shapes for this single-tool lane: ok / unavailable.
 There is no `partial` state — shellcheck either ran and the
 result parsed, or it did not.

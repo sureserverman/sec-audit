@@ -244,6 +244,9 @@ finding so the source tool is traceable.
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__image_status__": "unavailable", "tools": []}`.
+
 Standard four shapes: ok / ok+skipped / partial /
 unavailable. Skip vocabulary:
 - `tool-missing`

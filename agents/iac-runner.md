@@ -146,6 +146,9 @@ Apply checkov-category CWE overrides per the table.
 
 ### Step 6 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__iac_status__": "unavailable", "tools": []}`.
+
 Standard four shapes: ok / ok+skipped / partial / unavailable.
 
 ## What you MUST NOT do

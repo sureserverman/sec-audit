@@ -179,6 +179,9 @@ awk -F '\t' '
 
 ### Step 5 — Status summary
 
+The unavailable sentinel (no tool ran / preconditions unmet) is exactly
+`{"__netcfg_status__": "unavailable", "tools": []}`.
+
 Standard four shapes: ok / ok+skipped / partial /
 unavailable. Skip vocabulary:
 - `tool-missing`
