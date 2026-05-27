@@ -759,16 +759,25 @@ contract, `contract-check`, drills, and e2e are unchanged.
 **Tier 2 — config-driven runner engine** (`runner.py` + `lanes/<lane>.json`).
 Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
 severity/evidence from tool output); the agent polishes title/severity only.
-Script-backed lanes (13): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
-`python`, `iac`, `image`, `dast`, `supply-chain`, `k8s`, `webext`, `webapp`. Parity is proven per lane by
-`tests/script-runner.sh <lane>` (byte-equal to the golden for clean lanes; to
-an `expected.jsonl` faithful-output fixture for editorial lanes).
+Script-backed lanes (15): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
+`python`, `iac`, `image`, `dast`, `supply-chain`, `k8s`, `webext`, `webapp`,
+`rust`, `android`. Parity is proven per lane by `tests/script-runner.sh
+<lane>`. The config-driven engine (`runner.py` + `lanes/<lane>.json`) supports:
+dotted/numeric paths, `concat`, `map`/`lookup`, `int`/`truncate`/`before`/
+`cvss_band` transforms, single- and nested-`flatten` (`_parent`), multi-
+`sources` per tool, dict `iterate: values`, `filter`, `input_format: jsonl|xml`,
+and per-tool `env`.
 
-**Still agent-backed (LLM runner agents, unchanged):**
-- *Non-JSON tools — agent by design:* `android` (android-lint XML), `rust`
-  (cargo-geiger table; cargo-audit/deny are JSON), `ai-tools` (jq structural
-  validation + mcp-scan), `netcfg`/`virt` (validators), and the desktop lanes
-  `linux`/`macos`/`ios`/`windows` (command-output parsing, host-OS-gated).
+**Still agent-backed (LLM runner agents — different paradigm, by design):**
+- `ai-tools` — `jq` is an exit-code **validator** (a finding is synthesised on
+  malformed config, not mapped from JSON output); the threat model needs
+  judgement. (mcp-scan JSON could be partially engine-backed later.)
+- `netcfg` / `virt` — core tools are pass/fail **validators** (`sing-box
+  check`, `xray test`, `virt-xml-validate`). (`virt`'s `hadolint` is JSON — a
+  future partial conversion.)
+- `linux` / `macos` / `ios` / `windows` — command-output binaries
+  (`systemd-analyze`, `lintian`, `checksec`, `codesign`, `spctl`, `notarytool`,
+  `sigcheck`), host-OS-gated. (`ios`/`macos` `mobsfscan` is JSON — future.)
 
 The `sec-expert`, `finding-triager`, `dep-diff-analyst`, and `report-writer`
 agents remain LLM by design — they perform irreducible judgement, not
