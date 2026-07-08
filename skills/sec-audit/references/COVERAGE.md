@@ -29,6 +29,23 @@ quoted verbatim from primary-source reference packs (vendor docs +
 IETF RFCs + OWASP + CIS + NIST + Mozilla + OpenID + SLSA/Sigstore/
 CISA).
 
+## Orchestration flags (not lanes)
+
+Three opt-in `/sec-audit` flags change *how* the review runs without being lane
+names — they are rejected from `--only`/`--skip`:
+
+- **`--deep-deps[=N]`** (v1.16) — enable the release-diff pass (§4.5).
+- **`--sarif`** (v1.23) — additionally emit a GitHub-code-scanning SARIF 2.1.0
+  log (`sec-audit-report-*.sarif`) via `scripts/secaudit/sarif.py`, from the
+  scored findings array persisted in §5. Deterministic; not part of
+  report-writer (which stays markdown-only).
+- **`--diff[=ref]`** (v1.23) — scope the whole review to changed files.
+  `scripts/secaudit/diffscope.py` computes the changed set (working tree +
+  untracked; plus `<ref>...HEAD` for `--diff=ref`); the list is threaded via
+  `--files` into `inventory.py` and every engine runner, and scopes the
+  sec-expert prompt. Requires a git-repo target. The runner prunes
+  `.git`/vendored dirs so VCS internals are never fed to a tool.
+
 ## v1.10 UX improvements (no new lanes)
 
 v1.10 adds no new lanes. Two ergonomic improvements:

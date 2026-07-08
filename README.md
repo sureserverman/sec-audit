@@ -1661,6 +1661,38 @@ them deliberately. Raw REST `/code-scanning/sarifs` uploads do **not**
 get auto-fingerprinting; compute them yourself on that path. GitHub
 caps a run at 25 000 results / 10 MB gzipped.
 
+## Diff-scoped mode (v1.23.0)
+
+Pass `--diff` to scope the review to changed files only — cheap enough
+for PR-time and pre-commit use instead of a full-tree audit:
+
+```text
+/sec-audit /path/to/repo --diff            # working-tree changes + untracked
+/sec-audit /path/to/repo --diff=main       # everything changed since main
+/sec-audit /path/to/repo --diff=HEAD~5     # since a specific ref
+```
+
+`scripts/secaudit/diffscope.py` computes the changed set (working tree +
+untracked for bare `--diff`; plus a three-dot merge-base diff since the
+ref for `--diff=ref`), excluding deletions. That file list is threaded
+via `--files` into `inventory.py` (only lanes whose signals appear among
+the changed files fire) and into every engine runner (each lane's tool
+sees only the changed files), and the `sec-expert` prompt is scoped to
+the same list. The target must be a git repository; a non-git target
+errors rather than silently scanning everything.
+
+### PR-time audit (`--diff` + `--sarif`)
+
+The two flags compose into a fast, machine-readable pull-request gate:
+
+```text
+/sec-audit . --diff=origin/main --sarif
+```
+
+scans only what the PR changed and writes a SARIF log you can upload to
+the GitHub Security tab with `github/codeql-action/upload-sarif` — a
+scoped, low-cost review on every push rather than a periodic full audit.
+
 ## License
 
 MIT. See `LICENSE`.

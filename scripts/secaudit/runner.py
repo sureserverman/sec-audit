@@ -24,6 +24,19 @@ import xml.etree.ElementTree as ET
 
 LANES = os.path.join(os.path.dirname(__file__), "lanes")
 
+# Never feed tool invocations files from VCS metadata or vendored trees — mirror
+# inventory.py's SKIP_DIRS. Without this, a scan of a git repo (e.g. --diff mode)
+# would pass `.git/**` internals and `node_modules/**` to the lane's tool.
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "vendor",
+             "target", "dist", "build", ".pipeline"}
+
+
+def _walk(target):
+    """os.walk over target, pruning SKIP_DIRS in place."""
+    for root, dirs, files in os.walk(target):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        yield root, dirs, files
+
 
 def load_lane(name):
     with open(os.path.join(LANES, f"{name}.json"), encoding="utf-8") as f:
@@ -275,7 +288,7 @@ def _build_argv(invoke, target, tmp, scope=None):
     for a in invoke:
         if a.startswith("{files:") and a.endswith("}"):
             globs = a[len("{files:"):-1].split("|")    # any-of, for tools that
-            for root, _d, files in os.walk(target):    # match several name shapes
+            for root, _d, files in _walk(target):      # match several name shapes
                 for fn in sorted(files):
                     if any(fnmatch.fnmatch(fn, g) for g in globs):
                         p = os.path.join(root, fn)
@@ -299,7 +312,7 @@ def _applicable(toolcfg, target, scope=None):
         return True
     globs = [glob] if isinstance(glob, str) else list(glob)
     import fnmatch
-    for root, _dirs, files in os.walk(target):
+    for root, _dirs, files in _walk(target):
         for fn in files:
             if any(fnmatch.fnmatch(fn, g) for g in globs):
                 if _in_scope(target, os.path.join(root, fn), scope):
@@ -316,7 +329,7 @@ def _select_files(target, fsel, scope=None):
     glob = fsel.get("glob", "*")
     rx = re.compile(fsel["grep"]) if fsel.get("grep") else None
     sel = []
-    for root, _d, files in os.walk(target):
+    for root, _d, files in _walk(target):
         for fn in sorted(files):
             if not fnmatch.fnmatch(fn, glob):
                 continue
