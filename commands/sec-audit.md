@@ -24,10 +24,11 @@ Parse `$ARGUMENTS` into:
    network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
    not run.
 
-**Canonical lane names (23 total):** `sec-expert`, `sast`, `dast`,
+**Canonical lane names (24 total):** `sec-expert`, `sast`, `dast`,
 `webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
 `k8s`, `iac`, `gh-actions`, `virt`, `go`, `shell`, `python`,
-`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`.
+`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`,
+`secrets`.
 Reject any invocation that names a lane outside this list. (`--deep-deps`
 is a flag, not a lane name, and is not accepted in `--only`/`--skip`.)
 

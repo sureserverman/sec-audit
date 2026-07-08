@@ -1986,6 +1986,77 @@ unchanged.
 contract-check rejects any supply-chain finding tagged with another lane's
 tool — see `tests/contract-check.sh`.
 
+### 3.28 Secrets pass — dispatch secrets-runner
+
+When the inventory emitted by §2 contains `secrets` (any non-empty tree —
+this lane applies to every project), dispatch the `secrets-runner` agent
+(`agents/secrets-runner.md`, pinned to haiku, tools: Read + Bash). The agent
+shells out to up to two secret-scanning tools — `gitleaks` (gitleaks/gitleaks,
+MIT; scans the working tree for committed and uncommitted credentials with
+`--redact` so raw secrets never enter the report) and `trufflehog`
+(trufflesecurity/trufflehog, AGPL/commercial; scans the full git history with
+`--no-verification`, catching secrets deleted from HEAD but alive in a prior
+commit) — parses each tool's native output, and emits sec-expert-compatible
+JSONL on stdout — every line carrying `origin: "secrets"` and
+`tool: "gitleaks" | "trufflehog"`. Every finding is CWE-798 (Use of Hard-coded
+Credentials).
+
+**Two scan surfaces, by design.** gitleaks scans the **working tree**
+(`gitleaks dir`) and is always applicable. trufflehog scans **git history**
+(`trufflehog git`) and is applicable only when the target is a git repository;
+on a non-git target trufflehog cleanly skips with `no-git-history`. Together
+they cover "a secret is in the current files" (gitleaks) and "a secret was
+committed and later deleted but is still recoverable from history" (trufflehog)
+— the latter being exactly what a source-tree regex scan misses.
+
+**Redaction is a hard invariant.** No raw secret is ever emitted. `evidence`
+is mapped from gitleaks' `--redact`ed `Match` or trufflehog's `Redacted`
+field — never trufflehog's `Raw` or gitleaks' `Secret`. `tests/secrets-e2e.sh`
+plants a canary in the raw `Raw` field of the recorded fixture and asserts it
+never appears in the mapped golden.
+
+**Verification stays off.** trufflehog's `--no-verification` flag is mandatory:
+verification would make live network calls to each credential's service to test
+whether it authenticates. sec-audit sends nothing off the machine — a secret's
+presence is the finding, not its liveness.
+
+**Delineation from the secrets/ reference packs (sec-expert).** This lane is
+*detective* (the tools locate leaked credentials in files and history);
+sec-expert's `secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md` packs
+are *prescriptive* (how to store secrets — env vars vs a secrets manager,
+Vault patterns) and supply the quoted fix recipes the report renders. A
+secrets-lane finding lands with `fix_recipe: null`; the triager's domain-pack
+lookup fills in the "rotate, move to a manager, purge from history" recipe.
+
+secrets-runner runs in parallel with every other pass agent; its input is the
+project tree (read-only), so other agents may read the same files without
+conflict. Collect the JSONL into a `secrets_findings` list.
+
+Skill-level invariants the orchestrator enforces:
+
+- **`secrets` always in inventory (non-empty tree)** — unlike other lanes,
+  there is no target-shape gate for the working-tree scan; every project gets
+  gitleaks. Only an empty target skips the lane entirely.
+- **`__secrets_status__: "unavailable"`** — neither tool on PATH, or both
+  crashed. Add the `⚠ Secret-scanning tools unavailable — install gitleaks
+  and/or trufflehog to enable credential-leak detection` banner to Review
+  metadata. Do NOT fabricate findings; do NOT treat absence as a clean scan.
+- **`__secrets_status__: "partial"`** — one tool ran, the other was
+  missing/inapplicable (commonly trufflehog `no-git-history` on a non-git
+  target). Merge findings; note the skip in Review metadata (`Secret tools
+  run: gitleaks; trufflehog skipped — no-git-history`).
+- **`__secrets_status__: "ok"`** — both available tools ran. Merge findings
+  into the triaged stream.
+- **Two skip reasons (secrets lane):**
+  - `tool-missing` — binary absent from PATH.
+  - `no-git-history` — trufflehog on PATH but the target is not a git
+    repository (no `.git`), so there is no history to scan. Target-shape
+    clean-skip; the working-tree scan (gitleaks) still runs.
+
+**Origin-tag isolation:** every secrets finding carries `origin: "secrets"`
+and `tool: "gitleaks" | "trufflehog"`. The contract-check rejects any secrets
+finding tagged with another lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
