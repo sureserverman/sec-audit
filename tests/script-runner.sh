@@ -82,5 +82,30 @@ assert o.get(key) == "unavailable" and o.get("tools") == [], o
 print("  no-tools -> unavailable sentinel: OK")
 PY
 
+# --files scoping (--diff mode): the {files:GLOB} expansion must intersect with
+# the changed-file scope. Run once, on the shell lane ({files:*.sh}).
+if [ "$lane" = "shell" ]; then
+  scoped="$scratch/scoped"; mkdir -p "$scoped"
+  printf 'echo a\n' > "$scoped/a.sh"; printf 'echo b\n' > "$scoped/b.sh"
+  python3 - "$scoped" <<'PY'
+import sys, os
+sys.path.insert(0, "scripts/secaudit")
+import runner
+target = sys.argv[1]
+invoke = ["shellcheck", "-f", "json", "{files:*.sh}"]
+full = runner._build_argv(invoke, target, "/tmp", None)
+scoped = runner._build_argv(invoke, target, "/tmp", {"a.sh"})
+# argv = flags + expanded files; look only at the .sh basenames.
+base = {os.path.basename(x) for x in full if x.endswith(".sh")}
+sbase = {os.path.basename(x) for x in scoped if x.endswith(".sh")}
+assert base == {"a.sh", "b.sh"}, base
+assert sbase == {"a.sh"}, f"scope must limit to a.sh, got {sbase}"
+# applicability also respects scope
+assert runner._applicable({"applicable_glob": "*.sh"}, target, {"a.sh"}) is True
+assert runner._applicable({"applicable_glob": "*.sh"}, target, {"nonexistent"}) is False
+print("  --files scoping: {files:*.sh} limited to changed file; applicability respects scope OK")
+PY
+fi
+
 echo ""
 echo "script-runner($lane): OK"

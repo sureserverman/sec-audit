@@ -259,9 +259,17 @@ def map_raw(lane, toolcfg, raw_text):
     return out
 
 
-def _build_argv(invoke, target, tmp):
+def _in_scope(target, path, scope):
+    """True when `path` is within the --diff changed-file scope (or scope is off)."""
+    if scope is None:
+        return True
+    return os.path.relpath(path, target) in scope
+
+
+def _build_argv(invoke, target, tmp, scope=None):
     """Substitute {target}/{tmp}; expand a `{files:GLOB}` arg into the matching
-    files under target (for tools that take a file list, e.g. shellcheck)."""
+    files under target (for tools that take a file list, e.g. shellcheck). When
+    `scope` is a set of changed relpaths (--diff), only those files are passed."""
     import fnmatch
     argv = []
     for a in invoke:
@@ -270,13 +278,15 @@ def _build_argv(invoke, target, tmp):
             for root, _d, files in os.walk(target):    # match several name shapes
                 for fn in sorted(files):
                     if any(fnmatch.fnmatch(fn, g) for g in globs):
-                        argv.append(os.path.join(root, fn))
+                        p = os.path.join(root, fn)
+                        if _in_scope(target, p, scope):
+                            argv.append(p)
         else:
             argv.append(a.replace("{target}", target).replace("{tmp}", tmp))
     return argv
 
 
-def _applicable(toolcfg, target):
+def _applicable(toolcfg, target, scope=None):
     # Semantic applicability predicate (not a filename glob). "git-repo" mirrors
     # inventory.py's own .git check exactly, so a tool gated on repo-ness (e.g.
     # trufflehog history scan) stays in lockstep with the inventory — including
@@ -292,11 +302,12 @@ def _applicable(toolcfg, target):
     for root, _dirs, files in os.walk(target):
         for fn in files:
             if any(fnmatch.fnmatch(fn, g) for g in globs):
-                return True
+                if _in_scope(target, os.path.join(root, fn), scope):
+                    return True
     return False
 
 
-def _select_files(target, fsel):
+def _select_files(target, fsel, scope=None):
     """Files a validator should check: name-glob match, optional content grep
     (e.g. *.xml containing a libvirt root element). Mirrors the agent's
     `find ... -exec grep -l` precondition."""
@@ -310,6 +321,8 @@ def _select_files(target, fsel):
             if not fnmatch.fnmatch(fn, glob):
                 continue
             p = os.path.join(root, fn)
+            if not _in_scope(target, p, scope):
+                continue
             if rx is not None:
                 try:
                     with open(p, encoding="utf-8", errors="replace") as fh:
@@ -321,7 +334,7 @@ def _select_files(target, fsel):
     return sel
 
 
-def run_live(lane, target):
+def run_live(lane, target, scope=None):
     findings = []
     ran, skipped = [], []
     tmp = tempfile.mkdtemp()
@@ -330,7 +343,7 @@ def run_live(lane, target):
             skipped.append({"tool": tc["name"], "reason": "tool-missing"})
             continue
         if tc.get("mode") == "validator":
-            files = _select_files(target, tc.get("file_select", {}))
+            files = _select_files(target, tc.get("file_select", {}), scope)
             if not files:
                 skipped.append({"tool": tc["name"],
                                 "reason": tc.get("inapplicable_reason", "tool-missing")})
@@ -352,11 +365,11 @@ def run_live(lane, target):
             except Exception as e:
                 sys.stderr.write(f"runner: {tc['name']} parse failed: {e}\n")
             continue
-        if not _applicable(tc, target):
+        if not _applicable(tc, target, scope):
             skipped.append({"tool": tc["name"],
                             "reason": tc.get("inapplicable_reason", "tool-missing")})
             continue
-        argv = _build_argv(tc["invoke"], target, tmp)
+        argv = _build_argv(tc["invoke"], target, tmp, scope)
         env = os.environ.copy()
         env.update(tc.get("env", {}))
         try:
@@ -395,6 +408,7 @@ def main():
     ap.add_argument("target", nargs="?")
     ap.add_argument("--map-only")
     ap.add_argument("--tool")
+    ap.add_argument("--files", help="changed-file list (--diff scoping): one relpath per line")
     args = ap.parse_args()
     lane = load_lane(args.lane)
     if args.map_only:
@@ -405,7 +419,11 @@ def main():
         return
     if not args.target:
         ap.error("target required unless --map-only")
-    run_live(lane, args.target)
+    scope = None
+    if args.files:
+        with open(args.files, encoding="utf-8") as f:
+            scope = {ln.strip() for ln in f if ln.strip()}
+    run_live(lane, args.target, scope)
 
 
 if __name__ == "__main__":
