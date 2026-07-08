@@ -27,26 +27,44 @@ def _level(f):
 
 
 def _security_severity(f):
-    """GitHub's 0.0-10.0 ranking key: CVSS if present, else score/10."""
+    """GitHub's 0.0-10.0 ranking key: CVSS if present, else score/10. Clamped to
+    the documented [0,10] range so a stray out-of-range upstream value can't
+    produce an invalid SARIF."""
     cvss = f.get("cvss")
     if isinstance(cvss, (int, float)):
-        return round(float(cvss), 1)
+        return max(0.0, min(10.0, round(float(cvss), 1)))
     score = f.get("score")
     if isinstance(score, (int, float)):
-        return round(score / 10.0, 1)
+        return max(0.0, min(10.0, round(score / 10.0, 1)))
     return None
 
 
 def _message(f):
-    # title is always safe (never a raw secret); evidence is redacted upstream
-    # for the secrets lane. Never emit a raw credential here.
-    return f.get("title") or f.get("evidence") or f.get("id") or "finding"
+    """Result message. NEVER fall back to `evidence`: `title` is not a required
+    field and some lanes map raw source (and thus possibly a plaintext secret)
+    into `evidence` — a SARIF log is uploaded to GitHub, so it must never carry
+    a credential. A less-informative message beats a leak."""
+    return f.get("title") or f.get("id") or "finding"
+
+
+def _is_sentinel(f):
+    """Pipeline sentinels (the `__dep_inventory__` object, per-lane
+    `__<lane>_status__` records) ride in the findings stream but are not
+    findings — they must never become SARIF results."""
+    if not isinstance(f, dict):
+        return True
+    fid = f.get("id")
+    if isinstance(fid, str) and fid.startswith("__"):
+        return True
+    return any(isinstance(k, str) and k.startswith("__") and k.endswith("_status__") for k in f)
 
 
 def to_sarif(findings):
     rules = {}
     results = []
     for f in findings:
+        if _is_sentinel(f):
+            continue
         rid = f.get("id") or "finding"
         if rid not in rules:
             rule = {"id": rid}
@@ -88,12 +106,17 @@ def to_sarif(findings):
 
 
 def main():
+    # Fail loudly on bad input: a security tool must not turn a broken pipe
+    # (e.g. score.py crashed and its traceback landed on stdin) into a
+    # false-clean, zero-result SARIF. Mirrors score.py's loud json.load.
     try:
         findings = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        findings = []
+    except (json.JSONDecodeError, ValueError) as e:
+        sys.stderr.write(f"sarif.py: invalid JSON on stdin: {e}\n")
+        sys.exit(1)
     if not isinstance(findings, list):
-        findings = []
+        sys.stderr.write("sarif.py: expected a JSON array of findings on stdin\n")
+        sys.exit(1)
     json.dump(to_sarif(findings), sys.stdout, indent=2)
     sys.stdout.write("\n")
 

@@ -20,13 +20,19 @@ for l in open(sys.argv[1]):
     if not l:
         continue
     o = json.loads(l)
-    if any(k.startswith("__") and k.endswith("_status__") for k in o):
+    # drop pipeline sentinels: id-based (__dep_inventory__) and key-based (__*_status__)
+    if o.get("id", "").startswith("__") or any(k.startswith("__") and k.endswith("_status__") for k in o):
         continue
     rows.append(o)
 rows.append({"id": "dast-xcontenttype", "severity": "LOW", "cwe": "CWE-693",
              "title": "Missing X-Content-Type-Options header", "file": "https://app/",
              "line": 0, "evidence": "response lacked header", "origin": "dast",
              "tool": "zap-baseline"})
+# A finding with NO title whose evidence carries a plaintext secret — message.text
+# must fall back to the id, never the raw evidence.
+rows.append({"id": "notitle-secret", "severity": "HIGH", "cwe": "CWE-798",
+             "evidence": "api_key = 'SARIF_CANARY_PLAINTEXT'", "file": "x.py",
+             "line": 5, "origin": "webapp", "tool": "bearer"})
 json.dump(rows, sys.stdout)
 PY
 
@@ -81,12 +87,17 @@ for rid, rr in rules.items():
         v = float(ss)
         assert 0.0 <= v <= 10.0, (rid, v)
 
-# No raw-secret leakage: the synthetic evidence strings never surface verbatim
-# beyond the redacted forms (smoke check — no plaintext canary token in output).
+# Secret-leak safety: a no-title finding's message is its id, and the plaintext
+# canary in its evidence NEVER reaches the SARIF output.
+nt = [r for r in results if r["ruleId"] == "notitle-secret"]
+assert nt and nt[0]["message"]["text"] == "notitle-secret", nt
 raw = open(sys.argv[1]).read()
-assert "CANARY_RAW_SECRET" not in raw, "raw secret canary leaked into SARIF"
+assert "SARIF_CANARY_PLAINTEXT" not in raw, "plaintext secret from evidence leaked into SARIF"
 
-print(f"  SARIF 2.1.0: {len(results)} results, {len(rules)} rules, levels + regions + security-severity OK")
+# No pipeline sentinel ever becomes a result.
+assert not any(r["ruleId"].startswith("__") for r in results), "sentinel ruleId leaked into SARIF"
+
+print(f"  SARIF 2.1.0: {len(results)} results, {len(rules)} rules, levels + regions + security-severity + no-leak OK")
 PY
 
 # e2e cross-check with jq (independent of the python asserts): the SARIF parses
@@ -96,6 +107,51 @@ sarif_n=$(jq '.runs[0].results | length' "$scratch/out.sarif")
 find_n=$(jq 'length' "$scratch/findings.json")
 [ "$sarif_n" = "$find_n" ] || { echo "script-sarif: FAIL — results $sarif_n != findings $find_n" >&2; exit 1; }
 echo "  jq e2e: valid JSON, results ($sarif_n) == findings ($find_n)"
+
+echo "=== edge cases ==="
+# empty array -> valid 0-result SARIF, exit 0
+echo '[]' | python3 scripts/secaudit/sarif.py > "$scratch/empty.sarif"
+python3 - "$scratch/empty.sarif" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert s["version"] == "2.1.0" and s["runs"][0]["results"] == [], s
+print("  empty array -> valid 0-result SARIF OK")
+PY
+
+# malformed JSON stdin -> fail loudly (exit 1), no false-clean SARIF
+if printf 'not json' | python3 scripts/secaudit/sarif.py >/dev/null 2>&1; then
+    echo "script-sarif: FAIL — malformed stdin did not exit non-zero" >&2; exit 1
+fi
+echo "  malformed stdin -> exit 1 OK"
+
+# non-list JSON stdin -> fail loudly (exit 1)
+if printf '{"not":"a list"}' | python3 scripts/secaudit/sarif.py >/dev/null 2>&1; then
+    echo "script-sarif: FAIL — non-list stdin did not exit non-zero" >&2; exit 1
+fi
+echo "  non-list stdin -> exit 1 OK"
+
+# sentinel entries (__dep_inventory__, __*_status__) are dropped, not emitted
+echo '[{"id":"__dep_inventory__","x":1},{"__secrets_status__":"ok","tools":[]},{"id":"real","severity":"LOW","title":"t","file":"a","line":1}]' \
+    | python3 scripts/secaudit/sarif.py > "$scratch/sent.sarif"
+python3 - "$scratch/sent.sarif" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+ids = [r["ruleId"] for r in s["runs"][0]["results"]]
+assert ids == ["real"], ids
+print("  sentinel entries dropped (only real finding emitted) OK")
+PY
+
+# true dedup: two findings share one id -> 2 results, 1 rule
+echo '[{"id":"dup","severity":"HIGH","title":"a","file":"x","line":1},{"id":"dup","severity":"HIGH","title":"b","file":"y","line":2}]' \
+    | python3 scripts/secaudit/sarif.py > "$scratch/dup.sarif"
+python3 - "$scratch/dup.sarif" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+run = s["runs"][0]
+assert len(run["results"]) == 2 and len(run["tool"]["driver"]["rules"]) == 1, \
+    (len(run["results"]), len(run["tool"]["driver"]["rules"]))
+print("  same-id dedup: 2 results, 1 rule OK")
+PY
 
 echo ""
 echo "script-sarif: OK"
