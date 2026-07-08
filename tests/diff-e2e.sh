@@ -74,5 +74,25 @@ assert sf < wf, "scoped must be a strict subset of whole-tree"
 print(f"  scoped findings: {sorted(sf)}  whole-tree: {sorted(wf)}  (scoped ⊂ whole) OK")
 PY
 
+# --- 4. SUBDIR target: the full chain agrees on target-relative paths ---
+# scripts live in src/; target is the src/ subdir (not the repo root).
+mkdir -p "$repo/src"
+printf 'echo $S1\n' > "$repo/src/x.sh"
+printf 'echo $S2\n' > "$repo/src/y.sh"
+git -C "$repo" add -A && git -C "$repo" commit -qm add-src
+printf 'echo $S1_CHANGED\n' > "$repo/src/x.sh"   # change only src/x.sh
+sub="$repo/src"
+python3 scripts/secaudit/diffscope.py "$sub" > "$scratch/subchanged.txt"
+grep -qx 'x.sh' "$scratch/subchanged.txt" || { echo "diff-e2e: FAIL — subdir diff not target-relative"; exit 1; }
+sub_scoped=$(PATH="$stub:$PATH" python3 scripts/secaudit/runner.py shell "$sub" --files "$scratch/subchanged.txt")
+python3 - <<PY
+import json
+blob = '''$sub_scoped'''
+files = {json.loads(l)["file"].split("/")[-1] for l in blob.splitlines()
+         if not any(k.startswith("__") and k.endswith("_status__") for k in json.loads(l))}
+assert files == {"x.sh"}, f"subdir-target scoped run must find only x.sh, got {files}"
+print("  subdir target full chain: scoped findings = {'x.sh'} OK")
+PY
+
 echo ""
 echo "diff-e2e: OK"

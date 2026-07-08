@@ -57,5 +57,34 @@ if python3 "$ds" "$repo" no-such-ref 2>/dev/null; then
 fi
 echo "  bad ref: errored OK"
 
+echo "=== ref that looks like an option -> refused (CWE-88 guard) ==="
+if python3 "$ds" "$repo" -- --output=/tmp/x 2>/dev/null; then :; fi  # arg parsing: 3rd arg is ref
+if python3 "$ds" "$repo" '--output=/tmp/pwned' 2>"$scratch/opt.txt"; then
+    echo "FAIL: option-like ref was accepted"; exit 1
+fi
+grep -qi 'looks like an option' "$scratch/opt.txt" || { echo "FAIL: no option-guard message"; exit 1; }
+echo "  option-like ref refused OK"
+
+echo "=== SUBDIR target: paths are target-relative (not repo-root-relative) ==="
+# a fresh repo with a subdir; change a tracked file inside the subdir; run
+# diffscope with the SUBDIR as target — output must be relative to the subdir.
+sub="$scratch/subrepo"; mkdir -p "$sub/pkg"
+git -C "$sub" init -q
+git -C "$sub" config core.hooksPath /dev/null
+git -C "$sub" config commit.gpgsign false
+git -C "$sub" config user.email t@t.t
+git -C "$sub" config user.name t
+printf 'x\n' > "$sub/pkg/tracked.py"
+printf 'root\n' > "$sub/rootfile.txt"
+git -C "$sub" add -A && git -C "$sub" commit -qm base
+printf 'x-changed\n' > "$sub/pkg/tracked.py"   # tracked change inside subdir
+printf 'new\n' > "$sub/pkg/untracked.py"       # untracked inside subdir
+out=$(python3 "$ds" "$sub/pkg")
+# target = subdir -> paths must be 'tracked.py'/'untracked.py', NOT 'pkg/tracked.py'
+echo "$out" | grep -qx 'tracked.py'    || { echo "FAIL: tracked change not target-relative: [$out]"; exit 1; }
+echo "$out" | grep -qx 'untracked.py'  || { echo "FAIL: untracked not present"; exit 1; }
+echo "$out" | grep -q  'pkg/'          && { echo "FAIL: repo-root-relative path leaked: [$out]"; exit 1; }
+echo "  subdir target: $(echo "$out" | tr '\n' ' ')(target-relative) OK"
+
 echo ""
 echo "script-diffscope: OK"

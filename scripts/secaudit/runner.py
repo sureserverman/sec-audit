@@ -24,11 +24,14 @@ import xml.etree.ElementTree as ET
 
 LANES = os.path.join(os.path.dirname(__file__), "lanes")
 
-# Never feed tool invocations files from VCS metadata or vendored trees — mirror
-# inventory.py's SKIP_DIRS. Without this, a scan of a git repo (e.g. --diff mode)
-# would pass `.git/**` internals and `node_modules/**` to the lane's tool.
+# Never feed tool invocations files from VCS metadata or vendored dependency
+# trees. Without this, a scan of a git repo (e.g. --diff mode) would pass
+# `.git/**` internals and `node_modules/**` to the lane's tool. NOTE: unlike
+# inventory.py's SKIP_DIRS, this deliberately does NOT prune build/dist/target —
+# those hold scannable BUILT ARTIFACTS (android apkleaks reads
+# `build/outputs/apk/*.apk`; the image/windows lanes read tarballs/PEs there).
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "vendor",
-             "target", "dist", "build", ".pipeline"}
+             ".pipeline"}
 
 
 def _walk(target):

@@ -100,6 +100,11 @@ stop rather than silently scanning the whole tree. Pass this file to the
 inventory and to every runner (below) via `--files`. When `diff` is NOT set,
 skip this step and omit `--files` everywhere (whole-tree review, unchanged).
 
+Note: the `secrets` lane's gitleaks working-tree scan and trufflehog git-history
+scan are NOT narrowed by `--files` (they scan the tree / full history by design,
+not a file list). Under `--diff` they still run whole-scope — a leaked secret
+anywhere in the repo is worth surfacing even on a scoped PR review.
+
 **Deterministic pre-pass (run this first):**
 
 ```bash

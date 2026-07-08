@@ -25,22 +25,33 @@ def _lines(text):
 
 
 def changed_files(target, ref=None):
+    # Reject a ref that git would parse as an option (CWE-88 argument injection):
+    # e.g. `--diff=--output=/etc/x` reaches git as an option, not a revspec.
+    if ref is not None and ref.startswith("-"):
+        raise SystemExit(f"diffscope: refusing ref that looks like an option: {ref!r}")
+
     probe = _git(target, "rev-parse", "--is-inside-work-tree")
     if probe.returncode != 0 or probe.stdout.strip() != "true":
         raise SystemExit(f"diffscope: {target} is not a git repository")
 
     files = set()
+    # All paths are made TARGET-relative (`--relative`) so they agree with
+    # `ls-files` and with runner.py's `os.path.relpath(path, target)` even when
+    # <target> is a SUBDIRECTORY of the repo (bare `git diff -C sub` would emit
+    # repo-root-relative paths that never match downstream).
+    #
     # Working-tree changes vs HEAD (staged + unstaged), excluding deletions.
     # Tolerate failure so a repo with no commits (no HEAD) still yields untracked.
-    wt = _git(target, "diff", "--name-only", "--diff-filter=d", "HEAD")
+    wt = _git(target, "diff", "--name-only", "--relative", "--diff-filter=d", "HEAD")
     if wt.returncode == 0:
         files.update(_lines(wt.stdout))
-    # Untracked files (respecting .gitignore).
+    # Untracked files (respecting .gitignore) — already target-relative.
     untracked = _git(target, "ls-files", "--others", "--exclude-standard")
     files.update(_lines(untracked.stdout))
     # Branch changes since <ref> (three-dot merge-base). Fail loudly on a bad ref.
     if ref:
-        br = _git(target, "diff", "--name-only", "--diff-filter=d", f"{ref}...HEAD")
+        br = _git(target, "diff", "--name-only", "--relative", "--diff-filter=d",
+                  f"{ref}...HEAD")
         if br.returncode != 0:
             raise SystemExit(
                 f"diffscope: cannot diff against ref {ref!r}: {br.stderr.strip()}")
