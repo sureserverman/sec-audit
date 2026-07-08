@@ -2187,10 +2187,12 @@ spec — keep them in sync.
 - **Exposure** (0–25 pts): `+25` if the affected file is reachable from an
   unauthenticated HTTP path, `+15` if authenticated, `+5` if internal-only
   (admin, cron, worker), `0` if test/fixture code.
-- **Exploit-in-wild** (0–20 pts): `+20` if `cve.kev == true` (CISA KEV
-  catalog, cross-referenced by `cve-enricher`); `+10` if there's a public
-  PoC reference; `0` otherwise. Note: `cve.kev == null` means the KEV feed
-  was offline — unknown is unknown, no points awarded.
+- **Exploit-in-wild** (0–20 pts), graded most-to-least certain: `+20` if
+  `cve.kev == true` (CISA KEV catalog, cross-referenced by `cve-enricher`);
+  else `+15` if `cve.epss >= 0.5` (FIRST.org EPSS exploit probability);
+  else `+10` if `cve.epss >= 0.1`; else `+10` if there's a public PoC
+  reference; else `0`. Note: `cve.kev == null` / `cve.epss == null` mean the
+  respective feed was offline — unknown is unknown, no points awarded.
 - **Auth-required** (0–15 pts): `+15` if exploit requires no auth; `+8`
   if auth but no elevated privileges; `+2` if admin-only; `0` if attacker
   must already control the host.

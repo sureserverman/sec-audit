@@ -13,7 +13,12 @@ cat > "$scratch/in.json" <<'JSON'
   {"id":"d","severity":"LOW","exposure":"test"},
   {"id":"e","severity":"HIGH","exposure":"auth","auth_required":"user"},
   {"id":"f","cvss":7.0,"exposure":"internal","poc":true,"auth_required":"admin"},
-  {"id":"g","severity":"CRITICAL"}
+  {"id":"g","severity":"CRITICAL"},
+  {"id":"h","severity":"LOW","epss":0.6},
+  {"id":"i","severity":"LOW","epss":0.2},
+  {"id":"j","severity":"LOW","epss":0.05},
+  {"id":"k","severity":"LOW","epss":0.6,"kev":true},
+  {"id":"m","severity":"LOW","epss":null,"poc":true}
 ]
 JSON
 python3 scripts/secaudit/score.py < "$scratch/in.json" > "$scratch/out.json"
@@ -26,8 +31,14 @@ exp = {  # hand-computed (score, bucket)
   "c": (100, "CRITICAL"),  # deep-deps malicious verdict override
   "d": (6,   "LOW"),       # sev 6 + 0 + 0 + 0
   "e": (51,  "MEDIUM"),    # 28 + 15 + 0 + 8
-  "f": (45,  "MEDIUM"),    # min(40,28) + 5 + 10 + 2
+  "f": (45,  "MEDIUM"),    # min(40,28) + 5 + 10(poc) + 2
   "g": (36,  "LOW"),       # sev 36 only -> below 40
+  # graded exploit-term bands (LOW sev=6 base, no exposure/auth):
+  "h": (21,  "LOW"),       # 6 + epss 0.6 -> 15
+  "i": (16,  "LOW"),       # 6 + epss 0.2 -> 10
+  "j": (6,   "LOW"),       # 6 + epss 0.05 -> 0
+  "k": (26,  "LOW"),       # 6 + kev beats epss -> 20
+  "m": (16,  "LOW"),       # 6 + epss null falls through to poc -> 10
 }
 for k, (sc, bk) in exp.items():
     got = (by[k]["score"], by[k]["bucket"])
@@ -35,7 +46,7 @@ for k, (sc, bk) in exp.items():
 # descending order
 scores = [f["score"] for f in json.load(open(sys.argv[1]))]
 assert scores == sorted(scores, reverse=True), scores
-print("  scoring assertions: OK (7 cases + descending order)")
+print("  scoring assertions: OK (12 cases + descending order)")
 PY
 echo ""
 echo "script-score: OK"
