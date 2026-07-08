@@ -2169,8 +2169,13 @@ Compute a numeric score 0–100 per finding and bucket it. This is
 **deterministic arithmetic — run the script, don't do it by hand**:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/score.py" < findings.json
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/score.py" < findings.json > "$TMPDIR/secaudit-scored.json"
 ```
+
+Capture the scored array to `$TMPDIR/secaudit-scored.json` — it is the durable
+scored-findings artifact consumed by §6 (report-writer) and, when `--sarif` is
+set, by the §6.5 SARIF step. (This is the pipeline's first machine-readable
+findings file; earlier stages stream findings in memory.)
 
 `score.py` reads the finding array (each finding carrying the `severity`/
 `cvss`/`kev` from cve-enricher plus the `exposure` and `auth_required`
@@ -2222,6 +2227,28 @@ inventory. The agent writes
 `<target_path>/sec-audit-report-YYYYMMDD-HHMM.md` (timestamp in UTC) and
 returns the absolute path to stdout so the orchestrator can confirm
 placement.
+
+### 6.5 Optional SARIF output (`--sarif`)
+
+When the command passed `--sarif` (skill input `sarif: true`), also emit a
+machine-readable SARIF 2.1.0 log alongside the markdown report. This is a
+deterministic script step, NOT part of report-writer (whose only file write is
+the markdown report):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" \
+    < "$TMPDIR/secaudit-scored.json" \
+    > "<target_path>/sec-audit-report-YYYYMMDD-HHMM.sarif"
+```
+
+Use the **same** `YYYYMMDD-HHMM` UTC timestamp as the markdown report so the
+two files pair by name. `sarif.py` consumes the scored findings array from §5
+and writes GitHub-code-scanning-compatible SARIF (one run, driver `sec-audit`,
+one result per finding, `security-severity` from CVSS or the priority score).
+When `sarif: true`, add a `**SARIF:** <path>` line to the report's Review
+metadata section; when the flag is absent, skip this step entirely and write no
+`.sarif` file. Upload path and fingerprint behavior are documented in
+`references/sast-tools.md`.
 
 This section documents the report template so it remains readable in the
 skill source — but generation is **delegated** to the agent. Keeping the
