@@ -52,5 +52,22 @@ for other in dast-target sample-stack iis-stack tiny-django vulnerable-webext vu
 done
 echo "  (g) reverse isolation: clean"
 
+# (h) trufflehog's git-repo applicability predicate must agree with inventory.py's
+# .git detection — including git worktrees/submodules where .git is a FILE, not a
+# directory. Regression guard for the v1.21 applicable_when:"git-repo" fix.
+python3 - "$plugin_root" <<'PY'
+import sys, os, tempfile
+sys.path.insert(0, os.path.join(sys.argv[1], "scripts", "secaudit"))
+import runner
+tc = {"applicable_when": "git-repo"}
+d_dir = tempfile.mkdtemp(); os.makedirs(os.path.join(d_dir, ".git"))
+d_file = tempfile.mkdtemp(); open(os.path.join(d_file, ".git"), "w").write("gitdir: /x")
+d_none = tempfile.mkdtemp()
+assert runner._applicable(tc, d_dir), "dir-.git should be git-repo applicable"
+assert runner._applicable(tc, d_file), "worktree (.git file) should be git-repo applicable"
+assert not runner._applicable(tc, d_none), "non-git dir must not be git-repo applicable"
+print("  (h) git-repo predicate: dir + worktree applicable, non-git skipped: OK")
+PY
+
 echo ""
 echo "secrets-e2e: OK"

@@ -277,6 +277,13 @@ def _build_argv(invoke, target, tmp):
 
 
 def _applicable(toolcfg, target):
+    # Semantic applicability predicate (not a filename glob). "git-repo" mirrors
+    # inventory.py's own .git check exactly, so a tool gated on repo-ness (e.g.
+    # trufflehog history scan) stays in lockstep with the inventory — including
+    # git worktrees / submodules where `.git` is a redirect FILE, not a dir.
+    when = toolcfg.get("applicable_when")
+    if when == "git-repo":
+        return os.path.exists(os.path.join(target, ".git"))
     glob = toolcfg.get("applicable_glob")
     if not glob:
         return True
