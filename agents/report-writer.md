@@ -211,11 +211,16 @@ Then append a KEV suffix based on the CVE entry's `kev` field:
 - `kev == null` → append ` — KEV check offline`
 - `kev == false` → append nothing
 
+Then, when the CVE entry's `epss` field is a number (not `null`), append an
+EPSS suffix ` — EPSS <epss as %> (pctl <epss_percentile as %>)`; when `epss`
+is `null`, append nothing (unknown is unknown — do not write "EPSS offline"
+per-CVE, the feed-level banner covers that).
+
 Example rendered lines:
 
 ```
-CVE-2022-28346 (CVSS 9.8, source: OSV, fetched 2026-04-21T14:30Z) — CISA KEV (added 2022-05-23, due 2022-06-13)
-CVE-2023-12345 (CVSS 7.5, source: NVD, fetched 2026-04-21T14:30Z) — KEV check offline
+CVE-2022-28346 (CVSS 9.8, source: OSV, fetched 2026-04-21T14:30Z) — CISA KEV (added 2022-05-23, due 2022-06-13) — EPSS 97.6% (pctl 99.9%)
+CVE-2023-12345 (CVSS 7.5, source: NVD, fetched 2026-04-21T14:30Z) — KEV check offline — EPSS 12.0% (pctl 88.0%)
 CVE-2024-00001 (CVSS 5.3, source: GHSA, fetched 2026-04-21T14:30Z)
 ```
 
@@ -239,6 +244,10 @@ NoAuth sub-scores), render:
 ```
 <score> / 100 (CVSS <a> + Exposure <b> + Exploit <c> + NoAuth <d>, confidence: <confidence>)
 ```
+
+The `Exploit <c>` sub-score is the graded exploit term (KEV=20 / EPSS≥0.5=15 /
+EPSS≥0.1=10 / PoC=10 / else 0 — see SKILL.md §5); render the number verbatim
+from `score_breakdown.exploit`, do not recompute it.
 
 If no score object is supplied, render the severity-mapped default and note
 `(score estimated from severity)`.
@@ -269,16 +278,18 @@ Emit a `## Dependency CVE summary` section with this table:
 ```markdown
 ## Dependency CVE summary
 
-| Package | Version | CVEs | Max CVSS | Fixed in |
-|---------|---------|------|----------|----------|
+| Package | Version | CVEs | Max CVSS | Max EPSS | Fixed in |
+|---------|---------|------|----------|----------|----------|
 ```
 
-Rows are built from the cve-enricher output. One row per package. If the
-cve-enricher output is empty or unavailable, emit the table header with a
-single row:
+Rows are built from the cve-enricher output. One row per package. The
+**Max EPSS** cell is the highest `epss` (rendered as a percentage) across the
+package's CVEs, or `—` when every CVE has `epss: null` (feed offline or no
+EPSS row). If the cve-enricher output is empty or unavailable, emit the table
+header with a single row:
 
 ```
-| (no CVE data — feed offline or no dependencies found) | — | — | — | — |
+| (no CVE data — feed offline or no dependencies found) | — | — | — | — | — |
 ```
 
 **Retire.js bundled libraries:** webext-origin findings with
@@ -287,7 +298,7 @@ ecosystem that the orchestrator adds to the dep-inventory in §3.8. Each
 row renders as:
 
 ```
-| <component> | <version> | <CVE-YYYY-NNNNN> (+ N more if multiple) | <max CVSS> | <advisory "below" field> |
+| <component> | <version> | <CVE-YYYY-NNNNN> (+ N more if multiple) | <max CVSS> | <max EPSS or —> | <advisory "below" field> |
 ```
 
 The `<component>` cell uses the retire-reported component name (e.g.
