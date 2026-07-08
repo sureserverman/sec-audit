@@ -222,10 +222,21 @@ def _epss_enrich(pkgs, budget):
         if status != 200:
             continue
         for row in (_loads(text) or {}).get("data", []) or []:
+            cve = row.get("cve")
+            if not cve:
+                continue
+            # Coerce independently: a malformed `percentile` must not discard a
+            # valid `epss` reading (that would silently under-score a real
+            # exploit signal). A bad `epss` leaves the CVE null — unknown.
             try:
-                epss_index[row.get("cve")] = (float(row.get("epss")), float(row.get("percentile")))
+                e = float(row.get("epss"))
             except (TypeError, ValueError):
-                pass
+                continue
+            try:
+                pc = float(row.get("percentile"))
+            except (TypeError, ValueError):
+                pc = None
+            epss_index[cve] = (e, pc)
     for p in pkgs:
         for c in p["cves"]:
             cve = c.get("cve")
