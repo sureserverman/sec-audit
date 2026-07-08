@@ -101,9 +101,23 @@ def _osv_detail(vid, budget):
     return _loads(text)
 
 
+def _cve_alias(vuln):
+    """The CVE identifier for a vuln — for KEV/EPSS lookups, which are keyed by
+    CVE. OSV's native `id` is often GHSA-… / PYSEC-… with the CVE in `aliases`;
+    without this, CVE-keyed feeds silently never match OSV-sourced advisories."""
+    vid = vuln.get("id", "") or ""
+    if vid.startswith("CVE-"):
+        return vid
+    for a in vuln.get("aliases", []) or []:
+        if isinstance(a, str) and a.startswith("CVE-"):
+            return a
+    return None
+
+
 def _mk_cve(vuln):
     return {
         "id": vuln.get("id"),
+        "cve": _cve_alias(vuln),
         "summary": vuln.get("summary") or vuln.get("details"),
         "cvss": _osv_cvss(vuln),
         "fixed_versions": _fixed_versions(vuln),
@@ -176,9 +190,10 @@ def enrich(inventory, budget):
                 kev_index[v.get("cveID")] = (v.get("dateAdded"), v.get("dueDate"))
         for p in pkgs:
             for c in p["cves"]:
-                if c["id"] in kev_index:
+                cve = c.get("cve")   # KEV is keyed by CVE, not OSV-native id
+                if cve and cve in kev_index:
                     c["kev"] = True
-                    c["kev_date_added"], c["kev_due_date"] = kev_index[c["id"]]
+                    c["kev_date_added"], c["kev_due_date"] = kev_index[cve]
 
     _epss_enrich(pkgs, budget)
     return pkgs
@@ -193,8 +208,8 @@ def _epss_enrich(pkgs, budget):
     cve_ids, seen_ids = [], set()
     for p in pkgs:
         for c in p["cves"]:
-            cid = c.get("id")
-            if cid and cid.startswith("CVE-") and cid not in seen_ids:
+            cid = c.get("cve")   # EPSS is keyed by CVE, not OSV-native id
+            if cid and cid not in seen_ids:
                 seen_ids.add(cid)
                 cve_ids.append(cid)
     epss_index = {}
@@ -213,8 +228,9 @@ def _epss_enrich(pkgs, budget):
                 pass
     for p in pkgs:
         for c in p["cves"]:
-            if c["id"] in epss_index:
-                c["epss"], c["epss_percentile"] = epss_index[c["id"]]
+            cve = c.get("cve")
+            if cve and cve in epss_index:
+                c["epss"], c["epss_percentile"] = epss_index[cve]
 
 
 def main():
