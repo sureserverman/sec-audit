@@ -30,6 +30,8 @@ KEV_URL = os.environ.get(
     "KEV_URL",
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 )
+EPSS = os.environ.get("EPSS_BASE_URL", "https://api.first.org").rstrip("/")
+EPSS_CHUNK = 100  # FIRST.org batch: comma-joined CVE ids; ~100 keeps the GET URL short
 _REPLAY = bool(os.environ.get("SECAUDIT_FEED_REPLAY_DIR"))
 
 
@@ -111,6 +113,8 @@ def _mk_cve(vuln):
         "kev": False,
         "kev_date_added": None,
         "kev_due_date": None,
+        "epss": None,
+        "epss_percentile": None,
     }
 
 
@@ -175,7 +179,42 @@ def enrich(inventory, budget):
                 if c["id"] in kev_index:
                     c["kev"] = True
                     c["kev_date_added"], c["kev_due_date"] = kev_index[c["id"]]
+
+    _epss_enrich(pkgs, budget)
     return pkgs
+
+
+def _epss_enrich(pkgs, budget):
+    """Step 5.6: EPSS enrichment (FIRST.org exploit-prediction). Batch the CVE
+    ids by EPSS_CHUNK per GET; only CVE ids leave the machine — same privacy
+    property as OSV/KEV. epss/percentile come back as strings; coerce to float.
+    Feed offline (or a CVE with no EPSS row) leaves epss None — unknown is
+    unknown, exactly like kev: null. Never fabricated."""
+    cve_ids, seen_ids = [], set()
+    for p in pkgs:
+        for c in p["cves"]:
+            cid = c.get("id")
+            if cid and cid.startswith("CVE-") and cid not in seen_ids:
+                seen_ids.add(cid)
+                cve_ids.append(cid)
+    epss_index = {}
+    for i in range(0, len(cve_ids), EPSS_CHUNK):
+        if not budget.ok():
+            break
+        budget.spend()
+        chunk = cve_ids[i:i + EPSS_CHUNK]
+        status, text = _retrying(lambda c=chunk: net.get(f"{EPSS}/data/v1/epss?cve={','.join(c)}"))
+        if status != 200:
+            continue
+        for row in (_loads(text) or {}).get("data", []) or []:
+            try:
+                epss_index[row.get("cve")] = (float(row.get("epss")), float(row.get("percentile")))
+            except (TypeError, ValueError):
+                pass
+    for p in pkgs:
+        for c in p["cves"]:
+            if c["id"] in epss_index:
+                c["epss"], c["epss_percentile"] = epss_index[c["id"]]
 
 
 def main():
