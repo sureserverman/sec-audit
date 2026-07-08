@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: the hermetic suite only reads the checked-out tree.
+permissions:
+  contents: read
+
+jobs:
+  hermetic-tests:
+    name: Hermetic test suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Show tool versions
+        run: |
+          python3 --version
+          jq --version
+          bash --version | head -1
+
+      - name: Run hermetic test suite
+        run: bash tests/ci-local.sh
