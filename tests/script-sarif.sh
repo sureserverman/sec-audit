@@ -89,5 +89,13 @@ assert "CANARY_RAW_SECRET" not in raw, "raw secret canary leaked into SARIF"
 print(f"  SARIF 2.1.0: {len(results)} results, {len(rules)} rules, levels + regions + security-severity OK")
 PY
 
+# e2e cross-check with jq (independent of the python asserts): the SARIF parses
+# and its result count equals the input finding count.
+jq -e . "$scratch/out.sarif" >/dev/null || { echo "script-sarif: FAIL — output is not valid JSON" >&2; exit 1; }
+sarif_n=$(jq '.runs[0].results | length' "$scratch/out.sarif")
+find_n=$(jq 'length' "$scratch/findings.json")
+[ "$sarif_n" = "$find_n" ] || { echo "script-sarif: FAIL — results $sarif_n != findings $find_n" >&2; exit 1; }
+echo "  jq e2e: valid JSON, results ($sarif_n) == findings ($find_n)"
+
 echo ""
 echo "script-sarif: OK"

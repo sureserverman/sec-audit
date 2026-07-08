@@ -286,3 +286,28 @@ applies.
   non-cryptographic purposes (fuzzing seeds, sampling, jitter) — the real
   risk is `random` for tokens/keys, which is covered by other rules.
   Downgrade when no key/token/secret lexeme is near the call site.
+
+## SARIF output (v1.23.0)
+
+When the `/sec-audit` run is invoked with `--sarif`, the deterministic
+`scripts/secaudit/sarif.py` step (SKILL §6.5) emits a GitHub-code-scanning-
+compatible **SARIF 2.1.0** log from the scored findings array — separate from
+the markdown report. Field mapping:
+
+| sec-audit finding      | SARIF                                                  |
+|------------------------|--------------------------------------------------------|
+| `id`                   | `results[].ruleId` + a deduped `driver.rules[].id`     |
+| `severity`             | `results[].level`: CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW/INFO → `note` |
+| `title`                | `results[].message.text` and `rules[].shortDescription.text` |
+| `file` / `line`        | `locations[].physicalLocation.artifactLocation.uri` / `region.startLine` (region omitted when `line == 0`) |
+| `cwe`                  | `rules[].properties.cwe`                                |
+| `cvss` (or `score/10`) | `rules[].properties.security-severity` (0.0–10.0 string; GitHub's alert-ranking key) |
+
+**Upload path.** Publish the `.sarif` with the
+`github/codeql-action/upload-sarif` action — it **auto-populates**
+`partialFingerprints` (`primaryLocationLineHash`) for alert de-duplication, so
+`sarif.py` omits them deliberately. Raw REST `POST /code-scanning/sarifs`
+uploads do NOT get auto-fingerprinting — compute them yourself on that path.
+GitHub limits: 20 runs/file, 25 000 results/run, 10 MB gzipped. `sarif.py`
+never emits a raw secret — `message.text` is the finding title (or the
+already-redacted evidence), never a plaintext credential.
