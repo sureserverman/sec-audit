@@ -130,8 +130,9 @@ if printf '{"not":"a list"}' | python3 scripts/secaudit/sarif.py >/dev/null 2>&1
 fi
 echo "  non-list stdin -> exit 1 OK"
 
-# sentinel entries (__dep_inventory__, __*_status__) are dropped, not emitted
-echo '[{"id":"__dep_inventory__","x":1},{"__secrets_status__":"ok","tools":[]},{"id":"real","severity":"LOW","title":"t","file":"a","line":1}]' \
+# sentinel entries are dropped in ALL shapes: id-based __dep_inventory__,
+# key-based {__dep_inventory__:...} (contract-check accepts both), and __*_status__
+echo '[{"id":"__dep_inventory__","x":1},{"__dep_inventory__":{"ecosystems":[]}},{"__secrets_status__":"ok","tools":[]},{"id":"real","severity":"LOW","title":"t","file":"a","line":1}]' \
     | python3 scripts/secaudit/sarif.py > "$scratch/sent.sarif"
 python3 - "$scratch/sent.sarif" <<'PY'
 import json, sys

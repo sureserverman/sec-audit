@@ -48,15 +48,17 @@ def _message(f):
 
 
 def _is_sentinel(f):
-    """Pipeline sentinels (the `__dep_inventory__` object, per-lane
-    `__<lane>_status__` records) ride in the findings stream but are not
-    findings — they must never become SARIF results."""
+    """Pipeline sentinels (the `__dep_inventory__` object in either its
+    id-based or key-based shape, per-lane `__<lane>_status__` records) ride in
+    the findings stream but are not findings — they must never become SARIF
+    results. A real finding never carries a `__dunder__` key or id, so treat any
+    such shape as a sentinel (matches tests/contract-check.sh's dual detection)."""
     if not isinstance(f, dict):
         return True
     fid = f.get("id")
     if isinstance(fid, str) and fid.startswith("__"):
         return True
-    return any(isinstance(k, str) and k.startswith("__") and k.endswith("_status__") for k in f)
+    return any(isinstance(k, str) and k.startswith("__") for k in f)
 
 
 def to_sarif(findings):
