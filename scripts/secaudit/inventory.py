@@ -104,6 +104,14 @@ def detect(target):
     # supply-chain rides on the PyPI/npm manifests
     if py or npm:
         lanes["supply-chain"] = ["pypi"] * py + ["npm"] * npm
+    # secrets: applies to any non-empty tree (gitleaks scans the working tree);
+    # append "git-history" when a .git repo is present (trufflehog scans history).
+    # .git is in SKIP_DIRS so walk() never yields its contents — probe directly.
+    if rels:
+        modes = ["tree"]
+        if os.path.exists(os.path.join(target, ".git")):
+            modes.append("git-history")
+        lanes["secrets"] = modes
 
     return {"ecosystems": ecosystems, "lanes": lanes}
 

@@ -23,20 +23,40 @@ print(f"  {fx}: ecosystems={sorted(got_eco)} lanes={sorted(got_lanes)} OK")
 PY
 }
 
-check sample-stack            "PyPI"     "python,supply-chain,virt"
-check vulnerable-supply-chain "PyPI,npm" "python,supply-chain"
-check vulnerable-go           "Go"       "go"
-check vulnerable-iac          ""         "iac"
-check vulnerable-gh-actions   ""         "gh-actions"
-check vulnerable-deep-deps    "npm"      "supply-chain"
+check sample-stack            "PyPI"     "python,supply-chain,virt,secrets"
+check vulnerable-supply-chain "PyPI,npm" "python,supply-chain,secrets"
+check vulnerable-go           "Go"       "go,secrets"
+check vulnerable-iac          ""         "iac,secrets"
+check vulnerable-gh-actions   ""         "gh-actions,secrets"
+check vulnerable-deep-deps    "npm"      "supply-chain,secrets"
 
-# Empty target -> empty inventory (no crash).
-python3 "$inv" "$scratch" > "$scratch/empty.json"
+# Empty target -> empty inventory (no crash). Use a genuinely empty dir: the
+# secrets lane fires on ANY file, so $scratch (which holds inv.json) is not empty.
+mkdir -p "$scratch/empty_dir"
+python3 "$inv" "$scratch/empty_dir" > "$scratch/empty.json"
 python3 - "$scratch/empty.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["ecosystems"] == [] and d["lanes"] == {}, d
 print("  empty target -> empty inventory OK")
+PY
+
+# secrets lane: tree-only on a non-git dir, tree+git-history on a git repo.
+mkdir -p "$scratch/plain"; printf 'x\n' > "$scratch/plain/file.txt"
+python3 "$inv" "$scratch/plain" > "$scratch/plain.json"
+python3 - "$scratch/plain.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("secrets") == ["tree"], d["lanes"].get("secrets")
+print("  non-git tree -> secrets=['tree'] OK")
+PY
+mkdir -p "$scratch/repo/.git"; printf 'x\n' > "$scratch/repo/file.txt"
+python3 "$inv" "$scratch/repo" > "$scratch/repo.json"
+python3 - "$scratch/repo.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("secrets") == ["tree", "git-history"], d["lanes"].get("secrets")
+print("  git repo -> secrets=['tree','git-history'] OK")
 PY
 
 echo ""
