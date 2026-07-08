@@ -1577,6 +1577,46 @@ Webapp findings are code-pattern signal; cve-enricher is
 unaffected (package-version CVEs are already covered by the
 language-specific runners + sec-expert manifest reasoning).
 
+## Secrets lane (v1.21.0)
+
+A `secrets-runner` agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline for **every** project — unlike the manifest- or
+artifact-gated lanes, secret scanning applies to any non-empty tree.
+It shells out to two tools, split by scan surface:
+
+- **`gitleaks`** (gitleaks/gitleaks, MIT) scans the **working
+  tree** (`gitleaks dir`) for committed and uncommitted
+  credentials. Always applicable. Invoked with `--redact` (the raw
+  secret never enters the report) and `--exit-code 0` (so a
+  leaks-found run is distinguishable from a crash by the report
+  file's existence, not the ambiguous default exit code).
+- **`trufflehog`** (trufflesecurity/trufflehog) scans the **git
+  history** (`trufflehog git`), catching secrets that were
+  committed and later deleted from HEAD but remain recoverable from
+  a prior commit — exactly what a working-tree-only regex scan
+  misses. Applicable only to git repositories; a non-git target is
+  a `no-git-history` clean-skip (gitleaks still runs, so the lane is
+  `partial`, not `unavailable`). Invoked with `--no-verification`,
+  so trufflehog never makes a live network call to test whether a
+  found credential authenticates — sec-audit sends nothing off the
+  machine.
+
+Every finding carries `origin: "secrets"`, `tool: "gitleaks" |
+"trufflehog"`, and `cwe: "CWE-798"` (Use of Hard-coded
+Credentials). **Redaction is a hard invariant:** `evidence` is
+always the redacted match (gitleaks `Match` under `--redact`, or
+trufflehog `Redacted`) — never the plaintext secret. A canary
+planted in the recorded fixture's raw `Raw` field is asserted
+absent from the golden by `tests/secrets-e2e.sh`.
+
+Fixes come from sec-expert reading the existing
+`references/secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md`
+packs (rotate the exposed credential, move it to a secrets manager,
+purge it from git history) — the lane is detective; those packs are
+prescriptive. `tests/secrets-drill.sh` enforces the scrubbed-PATH
+degrade contract; `tests/secrets-e2e.sh` validates the
+`vulnerable-secrets` fixture. No secret finding is ever fabricated.
+
 ## License
 
 MIT. See `LICENSE`.
