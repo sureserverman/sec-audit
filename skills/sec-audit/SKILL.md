@@ -85,10 +85,26 @@ header block so the review is reproducible.
 
 Detect the technology stack. Read only — do not install or execute.
 
+**Diff scoping (when `diff` is set — `--diff[=ref]`).** First compute the
+changed-file set and scope the whole review to it:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/diffscope.py" <target_path> [ref] \
+    > "$TMPDIR/secaudit-changed.txt"
+```
+
+`diffscope.py` lists the target-relative paths changed in the working tree +
+untracked (bare `--diff`), plus everything changed since `ref` (`--diff=ref`).
+It exits non-zero if the target is not a git repository — surface that error and
+stop rather than silently scanning the whole tree. Pass this file to the
+inventory and to every runner (below) via `--files`. When `diff` is NOT set,
+skip this step and omit `--files` everywhere (whole-tree review, unchanged).
+
 **Deterministic pre-pass (run this first):**
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/inventory.py" <target_path>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/inventory.py" <target_path> \
+    [--files "$TMPDIR/secaudit-changed.txt"]   # --files only in --diff mode
 ```
 
 `inventory.py` does the unambiguous file-glob / content-grep detection
@@ -751,6 +767,16 @@ behaviour since v0.7; v1.0 makes it the documented contract.
 6. **Consolidated report.** §6 Report writing renders a per-lane
    summary table at the top of the Review-metadata block with one
    row per dispatched lane. See `agents/report-writer.md` Step 2.5.
+7. **Diff scoping (`--diff`).** When `diff` is set, pass
+   `--files "$TMPDIR/secaudit-changed.txt"` to every engine runner
+   invocation (`runner.py <lane> <target> --files …`) so each lane's
+   tool only sees the changed files, and scope the `sec-expert`
+   subagent's prompt to that same file list (review only the changed
+   files, not the whole tree). Lanes with no changed files in scope
+   emit an empty/`unavailable` result and are noted as
+   `scoped-out (no changed files)` in Review metadata. Diff scoping
+   composes with `only_lanes`/`skip_lanes`: the lane filter is applied
+   first, then the file scope narrows what each surviving lane reads.
 
 The canonical lane list (21 total) is enumerated in
 `references/COVERAGE.md` — the single source of truth for which

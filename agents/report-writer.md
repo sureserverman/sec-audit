@@ -96,11 +96,16 @@ Compose:
 
 **Date (UTC):** <YYYY-MM-DD HH:MM>
 **Scope:** <paths included>
+**Diff scope:** diff (<ref or "working tree">) — N changed files   <!-- only when --diff was set; omit this line otherwise -->
 **Excluded:** <paths excluded>
 **Inventory:** <terse stack summary>
 **CVE feeds:** OSV (ok|offline), NVD (ok|offline), GHSA (ok|offline)
 **Findings:** N CRITICAL, N HIGH, N MEDIUM, N LOW
 ```
+
+When the run was diff-scoped (`--diff`), emit the **Diff scope** line naming the
+ref (or "working tree" for bare `--diff`) and the count of changed files
+reviewed; omit the line entirely for a whole-tree review.
 
 If all three feeds are offline, prepend this banner immediately after the
 `# Security Review` heading (before the header block):
