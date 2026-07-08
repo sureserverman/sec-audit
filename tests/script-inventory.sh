@@ -59,5 +59,38 @@ assert d["lanes"].get("secrets") == ["tree", "git-history"], d["lanes"].get("sec
 print("  git repo -> secrets=['tree','git-history'] OK")
 PY
 
+# --files scoping (--diff mode): detection restricted to the listed paths.
+multi="$scratch/multi"; mkdir -p "$multi"
+printf 'x\n' > "$multi/deploy.sh"
+printf 'django==2.2\n' > "$multi/requirements.txt"
+printf 'print(1)\n' > "$multi/app.py"
+# (a) list only the .sh -> shell + secrets, NOT python (its signal is unlisted)
+printf 'deploy.sh\n' > "$multi/list-sh.txt"
+python3 "$inv" "$multi" --files "$multi/list-sh.txt" > "$scratch/sh.json"
+python3 - "$scratch/sh.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+lanes = set(d["lanes"])
+assert "shell" in lanes and "secrets" in lanes, lanes
+assert "python" not in lanes, f"python should not fire for a .sh-only file list: {lanes}"
+print("  --files [deploy.sh] -> shell+secrets, no python OK")
+PY
+# (b) list including requirements.txt -> PyPI ecosystem; excluding it -> absent
+printf 'requirements.txt\n' > "$multi/list-req.txt"
+python3 "$inv" "$multi" --files "$multi/list-req.txt" > "$scratch/req.json"
+python3 "$inv" "$multi" --files "$multi/list-sh.txt" > "$scratch/noreq.json"
+python3 - "$scratch/req.json" "$scratch/noreq.json" <<'PY'
+import json, sys
+withreq = {e["ecosystem"] for e in json.load(open(sys.argv[1]))["ecosystems"]}
+noreq = {e["ecosystem"] for e in json.load(open(sys.argv[2]))["ecosystems"]}
+assert "PyPI" in withreq, withreq
+assert "PyPI" not in noreq, noreq
+print("  --files: PyPI present iff requirements.txt is in the list OK")
+PY
+# (c) regression: no --files == whole-tree (byte-identical)
+python3 "$inv" "$multi" > "$scratch/full1.json"
+python3 "$inv" "$multi" > "$scratch/full2.json"
+diff -q "$scratch/full1.json" "$scratch/full2.json" >/dev/null && echo "  no --files: whole-tree unchanged OK"
+
 echo ""
 echo "script-inventory: OK"
