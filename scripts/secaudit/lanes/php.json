@@ -17,21 +17,13 @@
       "flatten": "messages",
       "const": {"confidence": "medium"},
       "map": {
-        "id": "source",
+        "id": {"concat": ["phpcs:", {"from": "source"}]},
         "severity": {"from": "type", "map": {"ERROR": "HIGH", "WARNING": "MEDIUM"}, "default": "MEDIUM"},
-        "cwe": {"from": "source", "lookup": {
-          "WordPress.Security.EscapeOutput.OutputNotEscaped": "CWE-79",
-          "WordPress.Security.EscapeOutput.UnsafePrintingFunction": "CWE-79",
-          "WordPress.Security.EscapeOutput.ExceptionNotEscaped": "CWE-79",
-          "WordPress.Security.NonceVerification.Missing": "CWE-352",
-          "WordPress.Security.NonceVerification.Recommended": "CWE-352",
-          "WordPress.Security.ValidatedSanitizedInput.InputNotValidated": "CWE-20",
-          "WordPress.Security.ValidatedSanitizedInput.InputNotSanitized": "CWE-20",
-          "WordPress.Security.ValidatedSanitizedInput.MissingUnslash": "CWE-20",
-          "WordPress.DB.PreparedSQL.NotPrepared": "CWE-89",
-          "WordPress.DB.PreparedSQL.InterpolatedNotPrepared": "CWE-89",
-          "WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare": "CWE-89",
-          "WordPress.DB.PreparedSQLPlaceholders.UnsupportedPlaceholder": "CWE-89"
+        "cwe": {"from": "source", "lookup_prefix": true, "lookup": {
+          "WordPress.Security.EscapeOutput": "CWE-79",
+          "WordPress.Security.NonceVerification": "CWE-352",
+          "WordPress.Security.ValidatedSanitizedInput": "CWE-20",
+          "WordPress.DB.PreparedSQL": "CWE-89"
         }, "default": null},
         "title": {"from": "message", "truncate": 120},
         "evidence": {"from": "message", "truncate": 200},

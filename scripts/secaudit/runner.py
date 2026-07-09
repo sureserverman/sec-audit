@@ -98,7 +98,18 @@ def _field(spec, item):
         tbl = spec["lookup"]
         if val in tbl:
             return tbl[val]
-        return tbl.get(str(val), default)
+        sval = str(val)
+        if sval in tbl:
+            return tbl[sval]
+        # lookup_prefix: match a table key that is a prefix of the value — lets a
+        # sniff FAMILY (e.g. "WordPress.DB.PreparedSQL") map every sub-code
+        # ("...PreparedSQLPlaceholders.LikeWildcardsInQuery") without enumerating
+        # them. Keys are checked longest-first so a more specific prefix wins.
+        if spec.get("lookup_prefix"):
+            for k in sorted(tbl, key=len, reverse=True):
+                if sval.startswith(k):
+                    return tbl[k]
+        return default
     if val is None:
         return default
     if spec.get("int"):

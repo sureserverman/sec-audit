@@ -31,10 +31,10 @@ badcwe=$(jq -rs 'map(select(.cwe != null and (.cwe | test("^CWE-[0-9]+$") | not)
 [ "$badcwe" -eq 0 ] || { echo "php-e2e: FAIL (c) malformed cwe: $badcwe" >&2; exit 1; }
 echo "  (c) all cwe well-formed"
 
-# every finding's id is a phpcs WordPress sniff source.
-badid=$(jq -rs 'map(select(.origin=="php" and (.id | startswith("WordPress.") | not))) | length' "$jsonl")
-[ "$badid" -eq 0 ] || { echo "php-e2e: FAIL (d) non-WordPress sniff id: $badid" >&2; exit 1; }
-echo "  (d) all ids are WordPress sniff sources"
+# every finding's id is a phpcs-prefixed WordPress sniff source.
+badid=$(jq -rs 'map(select(.origin=="php" and (.id | test("^phpcs:WordPress\\.") | not))) | length' "$jsonl")
+[ "$badid" -eq 0 ] || { echo "php-e2e: FAIL (d) non-phpcs-WordPress sniff id: $badid" >&2; exit 1; }
+echo "  (d) all ids are phpcs:WordPress sniff sources"
 
 # Origin-tag isolation.
 leak=$(jq -rs 'map(select(.origin=="php" and (.tool=="semgrep" or .tool=="bandit" or .tool=="cppcheck" or .tool=="flawfinder" or .tool=="hadolint" or .tool=="kics" or .tool=="gosec" or .tool=="gitleaks" or .tool=="brakeman" or .tool=="njsscan" or .tool=="bearer"))) | length' "$jsonl")

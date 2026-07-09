@@ -92,9 +92,14 @@ def detect(target, files=None):
     # functions.php using add_action), else "generic" — the phpcs WPCS security
     # sniffs are tuned for WordPress. (Packagist deps are enriched separately.)
     if ".php" in exts or any_name("composer.json"):
+        # WordPress signal: a theme (`Theme Name:` style.css header or an
+        # add_action functions.php), a plugin (a `Plugin Name:` docblock header
+        # in any *.php — the plugin analogue of the theme header), or a
+        # wp-config.php. Else "generic" (Laravel / Symfony / framework-less).
         wp = (any_name("wp-config.php")
               or any(os.path.basename(r) == "style.css" and grep(r, r"(?mi)^\s*Theme Name:") for r in rels)
-              or any(os.path.basename(r) == "functions.php" and grep(r, r"add_action\s*\(") for r in rels))
+              or any(os.path.basename(r) == "functions.php" and grep(r, r"add_action\s*\(") for r in rels)
+              or any(r.endswith(".php") and grep(r, r"(?mi)^\s*\*?\s*Plugin Name:") for r in rels))
         lanes["php"] = ["wordpress"] if wp else ["generic"]
     if any_ext(".tf"):
         lanes["iac"] = True

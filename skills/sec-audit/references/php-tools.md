@@ -69,7 +69,7 @@ Every finding carries `origin: "php"`, `tool: "phpcs"`,
 
 | upstream                                              | sec-audit field             |
 |-------------------------------------------------------|------------------------------|
-| `.source` (the sniff code)                            | `id`                         |
+| `"phpcs:" + .source` (the sniff code)                 | `id`                         |
 | `.type` remap: `ERROR` → HIGH, `WARNING` → MEDIUM     | `severity`                   |
 | CWE looked up from `.source`: `EscapeOutput.*` → CWE-79, `NonceVerification.*` → CWE-352, `ValidatedSanitizedInput.*` → CWE-20, `PreparedSQL(.Placeholders).*` → CWE-89, else `null` | `cwe` |
 | `.message` (truncated to 120 chars)                   | `title`                      |

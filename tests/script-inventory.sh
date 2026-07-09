@@ -51,6 +51,27 @@ assert "c-cpp" in d["lanes"], f"a *.c source must fire c-cpp: {d['lanes']}"
 print("  source *.c -> c-cpp fired OK")
 PY
 
+# php sub-shape: a WordPress plugin (Plugin Name: docblock header, no theme
+# style.css) is detected as ["wordpress"], not ["generic"].
+mkdir -p "$scratch/wp_plugin"
+printf '<?php\n/**\n * Plugin Name: My Plugin\n */\nadd_action("init", "x");\n' > "$scratch/wp_plugin/my-plugin.php"
+python3 "$inv" "$scratch/wp_plugin" > "$scratch/wpp.json"
+python3 - "$scratch/wpp.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("php") == ["wordpress"], f"plugin must be wordpress sub-shape: {d['lanes'].get('php')}"
+print("  WordPress plugin (Plugin Name:) -> php=['wordpress'] OK")
+PY
+# generic PHP (no WP signal) stays ["generic"].
+mkdir -p "$scratch/generic_php"; printf '<?php echo 1;\n' > "$scratch/generic_php/app.php"
+python3 "$inv" "$scratch/generic_php" > "$scratch/gp.json"
+python3 - "$scratch/gp.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("php") == ["generic"], f"plain PHP must be generic: {d['lanes'].get('php')}"
+print("  generic PHP -> php=['generic'] OK")
+PY
+
 # compose FP guard: an unrelated *.yml (no services:/version:) must NOT fire virt;
 # a docker-compose.yml with services: DOES. (Stage 2 v1.25 detection.)
 mkdir -p "$scratch/nocompose"; printf 'foo: bar\n' > "$scratch/nocompose/random.yml"

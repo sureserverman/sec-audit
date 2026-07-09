@@ -32,7 +32,7 @@ clean scan when the tool was unavailable.
 
 ```
 {
-  "id":            "<phpcs sniff source, e.g. WordPress.Security.EscapeOutput.OutputNotEscaped>",
+  "id":            "phpcs:<sniff source, e.g. phpcs:WordPress.Security.EscapeOutput.OutputNotEscaped>",
   "severity":      "HIGH" | "MEDIUM",
   "cwe":           "CWE-<n>" | null,
   "title":         "<verbatim>",
@@ -75,10 +75,10 @@ result to the Finding schema above per `php-tools.md`:
   --sniffs=WordPress.Security.EscapeOutput,WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
   --report=json`): the JSON `files` object is keyed by path; each file's
   `messages[]` entry → one finding. `severity` maps `type` `ERROR→HIGH`,
-  `WARNING→MEDIUM`; `id` is the sniff `source`; `cwe` is looked up from the
-  `source` (`EscapeOutput`→CWE-79, `NonceVerification`→CWE-352,
-  `ValidatedSanitizedInput`→CWE-20, `PreparedSQL(Placeholders)`→CWE-89), else
-  `null`; `title`/`evidence` from `message`; `file` is the `files` key, `line`
+  `WARNING→MEDIUM`; `id` is `phpcs:<sniff source>`; `cwe` is looked up by sniff
+  FAMILY from the `source` (`EscapeOutput`→CWE-79, `NonceVerification`→CWE-352,
+  `ValidatedSanitizedInput`→CWE-20, `PreparedSQL`/`PreparedSQLPlaceholders`→CWE-89,
+  covering every sub-code via prefix match), else `null`; `title`/`evidence` from `message`; `file` is the `files` key, `line`
   from the message.
 
 Output is faithful JSONL — every line `origin: "php"`, `tool: "phpcs"` — then
