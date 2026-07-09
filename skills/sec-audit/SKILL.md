@@ -485,12 +485,18 @@ below — layering them on top of the script's baseline.
   following triggers the `virt` inventory key:
   - **Docker runtime config** — `docker-compose.y(a)ml`,
     `compose.y(a)ml`, `*.compose.y(a)ml`, `*.stack.y(a)ml` files
-    under target, OR a `daemon.json` file (typically under
-    `etc/docker/` in source trees that vendor the daemon config),
-    OR a Dockerfile / Containerfile / `*.dockerfile` /
+    under target (these drive `kics --type DockerCompose`
+    misconfiguration scanning — privileged containers, shared host
+    namespaces, docker-socket mounts, unrestricted capabilities,
+    no-new-privileges; v1.25), OR a `daemon.json` file (typically
+    under `etc/docker/` in source trees that vendor the daemon
+    config), OR a Dockerfile / Containerfile / `*.dockerfile` /
     `*.containerfile` (drives hadolint dispatch — distinct from
     `containers/dockerfile-hardening.md`'s code-pattern reasoning
-    surface).
+    surface). `inventory.py` deterministically fires `virt` on a
+    compose file alone (name-glob + a `services:`/`version:`
+    content grep), so a compose-only project with no Dockerfile is
+    no longer invisible to the lane.
   - **Podman / Quadlet** — `*.container`, `*.volume`,
     `*.network`, `*.pod`, `*.kube`, `*.image`, or `*.build` files
     under `containers/systemd/` or any subdir, OR a
@@ -511,6 +517,8 @@ below — layering them on top of the script's baseline.
   (`["docker", "libvirt"]` is common on Linux build hosts;
   `["apple-containers", "utm"]` on Apple-silicon dev machines).
   Load `references/virt/docker-runtime.md`,
+  `references/virt/compose-hardening.md` (the kics compose-scan
+  detective pack — privileged/host-namespace/cap/docker-socket),
   `references/virt/podman.md`,
   `references/virt/libvirt-qemu.md`,
   `references/virt/apple-containers.md`,
@@ -1360,13 +1368,20 @@ Quadlet, libvirt domain/network/pool/volume XML, Apple Containers
 `virt-runner` agent (`agents/virt-runner.md`, pinned to haiku,
 tools: Read + Bash). The agent shells out to `hadolint`
 (Haskell binary; Dockerfile / Containerfile static linter with
-`DLxxxx` rule IDs and an embedded shellcheck pass) and
+`DLxxxx` rule IDs and an embedded shellcheck pass),
 `virt-xml-validate` (libvirt-clients package; XSD validator that
 checks libvirt domain / network / pool / volume XML against the
-libvirt-shipped Relax-NG schemas). Both tools are cross-platform —
-no host-OS gate. Neither contacts a Docker daemon, a podman
-socket, a libvirtd, or any registry; both run as pure source-tree
-static scanners.
+libvirt-shipped Relax-NG schemas), and — v1.25 — `kics`
+(Checkmarx, Apache-2.0; `kics scan --type DockerCompose` maps
+docker-compose files against its bundled `dockerCompose` query set:
+privileged containers, shared host PID/IPC/network namespaces,
+docker-socket bind-mounts, unrestricted capabilities,
+`no-new-privileges` disabled, unbounded resource limits). `--type
+DockerCompose` scopes kics to compose files so it never re-reports
+Dockerfile findings that hadolint already owns. All three tools are
+cross-platform — no host-OS gate. None contacts a Docker daemon, a
+podman socket, a libvirtd, or any registry; all run as pure
+source-tree static scanners.
 
 virt-runner runs in parallel with every other pass agent. Collect
 the findings into a `virt_findings` list.
@@ -1381,7 +1396,7 @@ Skill-level invariants:
 - **`__virt_status__: "ok"`** — every available + applicable tool
   ran cleanly; `skipped` list may still be populated for
   cleanly-inapplicable tools.
-- **Three skip reasons (v1.4 adds two NEW):**
+- **Four skip reasons (v1.4 adds two, v1.25 adds one):**
   - `tool-missing` — the tool's binary is absent from PATH.
   - `no-containerfile` — NEW in v1.4; hadolint is on PATH but
     target has no Dockerfile / Containerfile / `*.dockerfile` /
@@ -1391,6 +1406,9 @@ Skill-level invariants:
   - `no-libvirt-xml` — NEW in v1.4; virt-xml-validate is on PATH
     but target has no XML files with a libvirt root element
     (`<domain>` / `<network>` / `<pool>` / `<volume>`).
+    Target-shape clean-skip.
+  - `no-compose-file` — NEW in v1.25; kics is on PATH but target
+    has no `docker-compose.y(a)ml` / `compose.y(a)ml` files.
     Target-shape clean-skip.
 
 Virt findings are code-pattern signal against

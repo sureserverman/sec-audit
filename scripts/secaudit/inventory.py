@@ -87,7 +87,15 @@ def detect(target, files=None):
         lanes["iac"] = True
     if any(r.startswith(".github/workflows/") and r.endswith((".yml", ".yaml")) for r in rels):
         lanes["gh-actions"] = True
-    if any_name("Dockerfile", "Containerfile"):
+    # virt fires on a Containerfile OR a docker-compose file. Compose detection
+    # is name-glob + a `services:`/`version:` content grep so an unrelated
+    # `compose.yml` (rare) doesn't trip the lane; kics (--type DockerCompose)
+    # then scans the matched compose files for privileged/host-namespace/
+    # capability misconfigurations.
+    compose_files = [r for r in rels
+                     if re.match(r"(docker-)?compose.*\.ya?ml$", os.path.basename(r), re.I)]
+    has_compose = any(grep(r, r"(?m)^\s*(services|version):") for r in compose_files)
+    if any_name("Dockerfile", "Containerfile") or has_compose:
         lanes["virt"] = True
     if any(r.endswith((".tar", ".sbom.json")) or r.endswith("sbom.json") for r in rels):
         lanes["image"] = True

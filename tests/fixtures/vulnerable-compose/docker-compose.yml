@@ -1,0 +1,16 @@
+# Intentionally insecure Compose file — fixture proving inventory.py detects the
+# virt lane from a compose file ALONE (no Dockerfile present) and driving kics.
+services:
+  web:
+    image: nginx:latest
+    privileged: true
+    network_mode: host
+    pid: host
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  db:
+    image: postgres:latest
+    security_opt:
+      - no-new-privileges:false
