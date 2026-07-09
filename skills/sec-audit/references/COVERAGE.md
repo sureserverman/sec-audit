@@ -320,19 +320,27 @@ Dispatch discipline.
   - UTM — `*.utm/` directory containing `config.plist`.
 - **Tools:** `hadolint` (Dockerfile / Containerfile linter with
   `DLxxxx` rule IDs + bundled shellcheck), `virt-xml-validate`
-  (libvirt-clients XSD validator). Both cross-platform; neither
-  contacts a Docker daemon, podman socket, libvirtd, or any
-  registry.
+  (libvirt-clients XSD validator), and — v1.25 — `kics`
+  (`kics scan --type DockerCompose`: docker-compose
+  misconfiguration scanner covering privileged containers, shared
+  host PID/IPC/network namespaces, docker-socket bind-mounts,
+  unrestricted capabilities, `no-new-privileges` disabled, and
+  unbounded resource limits). `--type DockerCompose` scopes kics
+  to compose files so it never re-reports Dockerfile findings
+  hadolint already owns. All three cross-platform; none contacts a
+  Docker daemon, podman socket, libvirtd, or any registry.
 - **Reference packs:** `references/virt/docker-runtime.md`,
-  `virt/podman.md`, `virt/libvirt-qemu.md`,
+  `virt/compose-hardening.md` (the kics compose-scan detective
+  pack), `virt/podman.md`, `virt/libvirt-qemu.md`,
   `virt/apple-containers.md`, `virt/utm.md`,
   `references/virt-tools.md`.
 - **Host-OS gate:** none.
 - **Skip reasons:** `tool-missing`, `no-containerfile` (NEW in
   v1.4 — target-shape; hadolint applicable), `no-libvirt-xml`
-  (NEW in v1.4 — target-shape; virt-xml-validate applicable).
+  (NEW in v1.4 — target-shape; virt-xml-validate applicable),
+  `no-compose-file` (NEW in v1.25 — target-shape; kics applicable).
 - **Origin tag:** `"virt"`. Tool whitelist: `hadolint`,
-  `virt-xml-validate`.
+  `virt-xml-validate`, `kics`.
 - **Dep-inventory:** NOT affected — virt configurations
   reference image tags and host devices, not package-manifest
   dependencies; image-tag pinning compliance is enforced at the
@@ -342,7 +350,7 @@ Dispatch discipline.
   and `containers/docker.md` for Dockerfile-authoring patterns;
   the virt lane covers the runtime / VMM surface those packs do
   NOT.
-- **Shipped in:** v1.4.0.
+- **Shipped in:** v1.4.0; kics compose scanning added v1.25.0.
 
 ### go
 
@@ -891,7 +899,7 @@ The structured skipped-list primitive introduced in v0.8 stands at
 **27 canonical reason values** as of v1.21, grouped by semantic
 category:
 
-### Target-shape (22)
+### Target-shape (23)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -904,6 +912,7 @@ category:
 | `no-pe`           | windows              | No PE artifact (.exe/.dll/.msi/.msix/.sys) under target.                |
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
+| `no-compose-file` | virt                 | No `docker-compose.y(a)ml` / `compose.y(a)ml` under target (kics-specific). NEW in v1.25. |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 | `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
 | `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |

@@ -673,7 +673,7 @@ volume XML, Apple's `container.yaml` (the open-sourced
 `apple/container` CLI from June 2025), or UTM `*.utm/config.plist`
 bundles. Cross-platform, no host-OS gate.
 
-The runner dispatches two tools:
+The runner dispatches three tools:
 
 - **`hadolint`** (Haskell binary) — Dockerfile / Containerfile
   static linter with `DLxxxx` rule IDs and a bundled `shellcheck`
@@ -688,16 +688,30 @@ The runner dispatches two tools:
   prevent libvirtd from accepting the config — operational
   correctness signal that complements the security reasoning in
   the libvirt-qemu reference pack.
+- **`kics`** (Checkmarx, Apache-2.0; **v1.25**) — `kics scan --type
+  DockerCompose` maps `docker-compose.y(a)ml` files against its
+  bundled dockerCompose query set: privileged containers
+  (CWE-250), shared host PID/IPC/network namespaces (CWE-668),
+  docker-socket bind-mounts (CWE-284), unrestricted capabilities,
+  `no-new-privileges` disabled (CWE-732), and unbounded resource
+  limits (CWE-770). `--type DockerCompose` scopes it to compose
+  files so it never re-reports Dockerfile findings hadolint owns.
+  `inventory.py` now fires the lane on a compose file alone, so a
+  compose-only project (no Dockerfile) is no longer invisible.
 
 Output carries `origin: "virt"` and
-`tool: "hadolint" | "virt-xml-validate"`. Reference packs live in
-`references/virt/`:
+`tool: "hadolint" | "virt-xml-validate" | "kics"`. Reference packs
+live in `references/virt/`:
 
 - `docker-runtime.md` — daemon hardening (`/etc/docker/daemon.json`
   user-namespace remap, `no-new-privileges`, `live-restore`),
   socket protection, Compose service patterns, Swarm secrets.
   Cross-links to `containers/dockerfile-hardening.md` and
   `containers/docker.md` rather than duplicating.
+- `compose-hardening.md` (**v1.25**) — the kics compose-scan
+  detective pack: privileged/host-namespace/docker-socket/
+  capability/`no-new-privileges`/resource-limit patterns with
+  CWE-cited fix recipes (Docker docs + OWASP + kics query catalogue).
 - `podman.md` — rootless mode, Quadlet `.container` units, the
   `containers-policy.json` image-trust schema, socket-proxy
   patterns.
