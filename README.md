@@ -673,7 +673,7 @@ volume XML, Apple's `container.yaml` (the open-sourced
 `apple/container` CLI from June 2025), or UTM `*.utm/config.plist`
 bundles. Cross-platform, no host-OS gate.
 
-The runner dispatches two tools:
+The runner dispatches three tools:
 
 - **`hadolint`** (Haskell binary) — Dockerfile / Containerfile
   static linter with `DLxxxx` rule IDs and a bundled `shellcheck`
@@ -688,16 +688,30 @@ The runner dispatches two tools:
   prevent libvirtd from accepting the config — operational
   correctness signal that complements the security reasoning in
   the libvirt-qemu reference pack.
+- **`kics`** (Checkmarx, Apache-2.0; **v1.25**) — `kics scan --type
+  DockerCompose` maps `docker-compose.y(a)ml` files against its
+  bundled dockerCompose query set: privileged containers
+  (CWE-250), shared host PID/IPC/network namespaces (CWE-668),
+  docker-socket bind-mounts (CWE-284), unrestricted capabilities,
+  `no-new-privileges` disabled (CWE-732), and unbounded resource
+  limits (CWE-770). `--type DockerCompose` scopes it to compose
+  files so it never re-reports Dockerfile findings hadolint owns.
+  `inventory.py` now fires the lane on a compose file alone, so a
+  compose-only project (no Dockerfile) is no longer invisible.
 
 Output carries `origin: "virt"` and
-`tool: "hadolint" | "virt-xml-validate"`. Reference packs live in
-`references/virt/`:
+`tool: "hadolint" | "virt-xml-validate" | "kics"`. Reference packs
+live in `references/virt/`:
 
 - `docker-runtime.md` — daemon hardening (`/etc/docker/daemon.json`
   user-namespace remap, `no-new-privileges`, `live-restore`),
   socket protection, Compose service patterns, Swarm secrets.
   Cross-links to `containers/dockerfile-hardening.md` and
   `containers/docker.md` rather than duplicating.
+- `compose-hardening.md` (**v1.25**) — the kics compose-scan
+  detective pack: privileged/host-namespace/docker-socket/
+  capability/`no-new-privileges`/resource-limit patterns with
+  CWE-cited fix recipes (Docker docs + OWASP + kics query catalogue).
 - `podman.md` — rootless mode, Quadlet `.container` units, the
   `containers-policy.json` image-trust schema, socket-proxy
   patterns.
@@ -727,6 +741,66 @@ vocabulary gains two NEW target-shape reasons:** `no-containerfile`
 with a libvirt root element). Both parallel the existing
 v0.10–v0.12 target-shape primitives (`no-pe`, `no-elf`, `no-pkg`,
 `no-debian-source`).
+
+## C/C++ lane (v1.26.0)
+
+The **`c-cpp-runner`** agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline whenever the §2 inventory finds a C/C++ **source** file
+(`*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`). A header alone
+(`*.h` / `*.hpp` / `*.hxx`) does NOT trigger it — vendored and JNI
+headers are ubiquitous and would false-positive, so the inventory
+requires a translation-unit source file. Cross-platform, no host-OS
+gate; both tools are static — neither compiles nor executes the target.
+
+The runner dispatches two complementary tools:
+
+- **`cppcheck`** (data-flow static analyzer) — proves buffer overruns
+  (CWE-788/120), memory leaks (CWE-401), use-after-free (CWE-416),
+  uninitialised reads, and null derefs by tracking program semantics.
+  `--xml` output carries a per-error `cwe` attribute. High precision.
+- **`flawfinder`** (lexical scanner) — flags every call to the
+  banned-libc-function family (`strcpy`/`gets`/`sprintf`→CWE-120,
+  `system`→CWE-78, `printf`-as-format→CWE-134) regardless of
+  provability. `--sarif` output; the engine extracts the CWE from the
+  message with a `regex` field-transform (new in v1.26). High recall.
+
+Output carries `origin: "c-cpp"` and `tool: "cppcheck" | "flawfinder"`.
+Reference packs: `references/c-cpp/memory-safety.md` (the memory-safety +
+banned-function patterns with SEI CERT C / CWE-cited fix recipes) and
+`references/c-cpp-tools.md` (invocations + field mappings). The lane
+supersedes the former `cpp` coverage-gap fingerprint. Skip reasons:
+`tool-missing`, `no-c-source` (target-shape). No dep-inventory impact —
+C/C++ dependency management is out-of-band (no manifest for cve-enricher).
+
+## PHP / WordPress lane (v1.27.0)
+
+The **`php-runner`** agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline whenever the §2 inventory finds a `*.php` source or a
+`composer.json`. It disambiguates a `["wordpress"]` sub-shape
+(`wp-config.php`, a `style.css` `Theme Name:` header, or a `functions.php`
+calling `add_action(`) from `["generic"]`. Cross-platform (PHP + Composer);
+a pure static scanner — it never executes the PHP.
+
+The runner dispatches one tool:
+
+- **`phpcs`** (PHP_CodeSniffer) with the **WordPress Coding Standards
+  security sniffs** — `WordPress.Security.EscapeOutput` (unescaped output →
+  XSS, CWE-79), `WordPress.Security.NonceVerification` (missing CSRF nonce,
+  CWE-352), `WordPress.Security.ValidatedSanitizedInput` (unvalidated /
+  unsanitized request input, CWE-20), and `WordPress.DB.PreparedSQL(Placeholders)`
+  (unprepared SQL, CWE-89). `--report=json`; the engine iterates the
+  path-keyed `files` object by value (exposing the path as `_parent._key`),
+  flattens `messages`, and maps the sniff `source` to a CWE.
+
+Output carries `origin: "php"` and `tool: "phpcs"`. Reference packs:
+`references/php/wordpress.md` (escaping / nonce / capability / `$wpdb->prepare`
+patterns with WordPress-handbook-cited fix recipes), `references/php/php-web.md`
+(the non-WordPress `unserialize` / LFI / `preg_replace /e` / weak-compare
+surface), and `references/php-tools.md`. WordPress is thereby promoted from a
+coverage-gap fingerprint to a covered lane; the fingerprint is narrowed to the
+non-WordPress (Laravel / Symfony) subset. Skip reasons: `tool-missing`,
+`no-php-source` (target-shape). No dep-inventory impact — `composer.json`
+packages are enriched separately via the `Packagist` ecosystem feed.
 
 ## Go lane (v1.5.0)
 

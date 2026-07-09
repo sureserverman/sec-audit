@@ -83,11 +83,44 @@ def detect(target, files=None):
         lanes["shell"] = True
     if any_name("Cargo.toml"):
         lanes["rust"] = True
+    # c-cpp fires on a C/C++ SOURCE file (not header-only — a vendored/JNI `*.h`
+    # is ubiquitous and would FP). cppcheck + flawfinder then scan the tree.
+    if any_ext(".c", ".cc", ".cpp", ".cxx", ".c++"):
+        lanes["c-cpp"] = True
+    # php fires on a *.php source or composer.json. Sub-shape "wordpress" when a
+    # WP signal is present (wp-config.php, a `Theme Name:` style.css header, or a
+    # functions.php using add_action), else "generic" — the phpcs WPCS security
+    # sniffs are tuned for WordPress. (Packagist deps are enriched separately.)
+    if ".php" in exts or any_name("composer.json"):
+        # WordPress signal: a theme (`Theme Name:` style.css header or an
+        # add_action functions.php), a plugin (a `Plugin Name:` docblock header
+        # in any *.php — the plugin analogue of the theme header), or a
+        # wp-config.php. Else "generic" (Laravel / Symfony / framework-less).
+        wp = (any_name("wp-config.php")
+              or any(os.path.basename(r) == "style.css" and grep(r, r"(?mi)^\s*Theme Name:") for r in rels)
+              or any(os.path.basename(r) == "functions.php" and grep(r, r"add_action\s*\(") for r in rels)
+              or any(r.endswith(".php") and grep(r, r"(?mi)^\s*\*?\s*Plugin Name:") for r in rels))
+        lanes["php"] = ["wordpress"] if wp else ["generic"]
     if any_ext(".tf"):
         lanes["iac"] = True
     if any(r.startswith(".github/workflows/") and r.endswith((".yml", ".yaml")) for r in rels):
         lanes["gh-actions"] = True
-    if any_name("Dockerfile", "Containerfile"):
+    # virt fires on a Containerfile OR a docker-compose file. Compose detection
+    # is name-glob + a `services:`/`version:` content grep so an unrelated
+    # `compose.yml` (rare) doesn't trip the lane; kics (--type DockerCompose)
+    # then scans the matched compose files for privileged/host-namespace/
+    # capability misconfigurations.
+    # Match the SAME compose name-shapes as the kics `applicable_glob` in
+    # lanes/virt.json (docker-compose*/compose*/*.compose .y(a)ml), case-sensitive
+    # like the runner's fnmatch — so inventory never reports virt on a file kics
+    # would then clean-skip as no-compose-file (or vice versa). The `([.-].*)?`
+    # boundary stops `docker-composer.yml` (not a compose file) from matching.
+    def _is_compose_name(b):
+        return bool(re.match(r"(docker-)?compose([.-].*)?\.ya?ml$", b)
+                    or re.search(r"\.compose\.ya?ml$", b))
+    compose_files = [r for r in rels if _is_compose_name(os.path.basename(r))]
+    has_compose = any(grep(r, r"(?m)^\s*(services|version):") for r in compose_files)
+    if any_name("Dockerfile", "Containerfile") or has_compose:
         lanes["virt"] = True
     if any(r.endswith((".tar", ".sbom.json")) or r.endswith("sbom.json") for r in rels):
         lanes["image"] = True

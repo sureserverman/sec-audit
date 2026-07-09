@@ -21,6 +21,15 @@ vx=$(jq -rs 'map(select(.origin=="virt" and .tool=="virt-xml-validate")) | lengt
 [ "$vx" -ge 1 ] || { echo "virt-e2e: FAIL (b) virt-xml-validate findings: $vx" >&2; exit 1; }
 echo "  (b) virt-xml-validate findings: $vx"
 
+# kics compose-misconfiguration findings (v1.25). Assert the privileged-container
+# and docker-socket-mount findings specifically — the canonical compose hazards.
+kx=$(jq -rs 'map(select(.origin=="virt" and .tool=="kics")) | length' "$jsonl")
+[ "$kx" -ge 1 ] || { echo "virt-e2e: FAIL (b2) kics findings: $kx" >&2; exit 1; }
+priv=$(jq -rs 'map(select(.tool=="kics" and (.title|test("Privileged";"i")))) | length' "$jsonl")
+sock=$(jq -rs 'map(select(.tool=="kics" and (.title|test("Socket";"i")))) | length' "$jsonl")
+{ [ "$priv" -ge 1 ] && [ "$sock" -ge 1 ]; } || { echo "virt-e2e: FAIL (b2) kics missing privileged/socket: priv=$priv sock=$sock" >&2; exit 1; }
+echo "  (b2) kics findings: $kx (privileged=$priv, docker-socket=$sock)"
+
 # 30-tool isolation (every other lane's tool name).
 leak=$(jq -rs 'map(select(.origin=="virt" and (.tool=="semgrep" or .tool=="bandit" or .tool=="zap-baseline" or .tool=="addons-linter" or .tool=="web-ext" or .tool=="retire" or .tool=="cargo-audit" or .tool=="cargo-deny" or .tool=="cargo-geiger" or .tool=="cargo-vet" or .tool=="mobsfscan" or .tool=="apkleaks" or .tool=="android-lint" or .tool=="codesign" or .tool=="spctl" or .tool=="notarytool" or .tool=="pkgutil" or .tool=="stapler" or .tool=="systemd-analyze" or .tool=="lintian" or .tool=="checksec" or .tool=="binskim" or .tool=="osslsigncode" or .tool=="sigcheck" or .tool=="kube-score" or .tool=="kubesec" or .tool=="tfsec" or .tool=="checkov" or .tool=="actionlint" or .tool=="zizmor" or .tool=="guarddog" or .tool=="osv-scanner" or .tool=="dep-diff"))) | length' "$jsonl")
 [ "$leak" -eq 0 ] || { echo "virt-e2e: FAIL (c) — $leak cross-lane leaks" >&2; exit 1; }

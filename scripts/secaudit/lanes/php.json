@@ -1,0 +1,35 @@
+{
+  "lane": "php",
+  "status_key": "__php_status__",
+  "origin": "php",
+  "reference": "php-tools.md",
+  "finding_const": {"fix_recipe": null, "reference_url": null},
+  "tools": [
+    {
+      "name": "phpcs",
+      "probe": "phpcs",
+      "applicable_glob": ["*.php"],
+      "inapplicable_reason": "no-php-source",
+      "invoke": ["phpcs", "--standard=WordPress", "--sniffs=WordPress.Security.EscapeOutput,WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders", "--report=json", "{target}"],
+      "output": "stdout",
+      "findings_path": "files",
+      "iterate": "values",
+      "flatten": "messages",
+      "const": {"confidence": "medium"},
+      "map": {
+        "id": {"concat": ["phpcs:", {"from": "source"}]},
+        "severity": {"from": "type", "map": {"ERROR": "HIGH", "WARNING": "MEDIUM"}, "default": "MEDIUM"},
+        "cwe": {"from": "source", "lookup_prefix": true, "lookup": {
+          "WordPress.Security.EscapeOutput": "CWE-79",
+          "WordPress.Security.NonceVerification": "CWE-352",
+          "WordPress.Security.ValidatedSanitizedInput": "CWE-20",
+          "WordPress.DB.PreparedSQL": "CWE-89"
+        }, "default": null},
+        "title": {"from": "message", "truncate": 120},
+        "evidence": {"from": "message", "truncate": 200},
+        "file": {"from": "_parent._key"},
+        "line": {"from": "line", "default": 0}
+      }
+    }
+  ]
+}

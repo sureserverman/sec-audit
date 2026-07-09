@@ -1,0 +1,302 @@
+{
+  "queries": [
+    {
+      "query_name": "Docker Socket Mounted In Container",
+      "query_id": "d6355c88-1e8d-49e9-b2f2-f8a1ca12c75b",
+      "query_url": "https://docs.docker.com/compose/compose-file/#volumes",
+      "severity": "HIGH",
+      "platform": "DockerCompose",
+      "cwe": "284",
+      "risk_score": "8.0",
+      "cloud_provider": "COMMON",
+      "category": "Build Process",
+      "experimental": false,
+      "description": "Docker socket docker.sock should not be mounted on host. If the docker socket is mounted, it can allow its processes to execute docker commands.",
+      "description_id": "8acc9d24",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "78befef8f6702fb7c99cb8da5258393fadbe76f6aff989440a42f897bfc0cf74",
+          "line": 12,
+          "issue_type": "IncorrectValue",
+          "search_key": "services.watchtower.volumes",
+          "search_line": 12,
+          "search_value": "",
+          "expected_value": "To not have docker socket named 'docker.sock' mounted in a volume",
+          "actual_value": "There is a docker socket named 'docker.sock' mounted in a volume"
+        }
+      ]
+    },
+    {
+      "query_name": "Passwords And Secrets - Generic Password",
+      "query_id": "487f4be7-3fd9-4506-a07a-eae252180c08",
+      "query_url": "https://docs.kics.io/latest/secrets/",
+      "severity": "HIGH",
+      "platform": "Common",
+      "cwe": "798",
+      "risk_score": "7.8",
+      "cloud_provider": "COMMON",
+      "category": "Secret Management",
+      "experimental": false,
+      "description": "Query to find passwords and secrets in infrastructure code.",
+      "description_id": "d69d8a89",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "77a45b2ea2265dde06f6fba2d3351a7cf0a471186ff8614b1e6e66b57811a3a9",
+          "line": 17,
+          "issue_type": "RedundantAttribute",
+          "search_key": "",
+          "search_line": 0,
+          "search_value": "",
+          "expected_value": "Hardcoded secret key should not appear in source",
+          "actual_value": "Hardcoded secret key appears in source"
+        }
+      ]
+    },
+    {
+      "query_name": "Privileged Containers Enabled",
+      "query_id": "ae5b6871-7f45-42e0-bb4c-ab300c4d2026",
+      "query_url": "https://docs.docker.com/compose/compose-file/#privileged",
+      "severity": "HIGH",
+      "platform": "DockerCompose",
+      "cwe": "250",
+      "risk_score": "7.7",
+      "cloud_provider": "COMMON",
+      "category": "Resource Management",
+      "experimental": false,
+      "description": "Privileged containers should be used with extreme caution, they have all of the capabilities that the linux kernel offers for docker.",
+      "description_id": "029f6145",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "73e299a032991eaa314682e32a26b4d225448a852e02965a4c985fd8ee2e685b",
+          "line": 10,
+          "issue_type": "IncorrectValue",
+          "search_key": "services.watchtower.privileged",
+          "search_line": 10,
+          "search_value": "",
+          "expected_value": "Docker compose file to have 'privileged' attribute set to false or not set",
+          "actual_value": "Docker compose file has 'privileged' attribute as true"
+        }
+      ]
+    },
+    {
+      "query_name": "Volume Has Sensitive Host Directory",
+      "query_id": "1c1325ff-831d-43a1-973e-839ae57dfcc0",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#volume-configuration-reference",
+      "severity": "HIGH",
+      "platform": "DockerCompose",
+      "cwe": "668",
+      "risk_score": "8.0",
+      "cloud_provider": "COMMON",
+      "category": "Build Process",
+      "experimental": false,
+      "description": "Container has sensitive host directory mounted as a volume",
+      "description_id": "8361cc0a",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "8205d45636d9066846718df8dc9241998b865c3414840d82eee1ec987685355d",
+          "line": 12,
+          "issue_type": "IncorrectValue",
+          "search_key": "services.watchtower.volumes",
+          "search_line": 12,
+          "search_value": "",
+          "expected_value": "There shouldn't be sensitive directory mounted as a volume",
+          "actual_value": "There is a sensitive directory (/var/run/docker.sock) mounted as a volume"
+        }
+      ]
+    },
+    {
+      "query_name": "Container Capabilities Unrestricted",
+      "query_id": "ce76b7d0-9e77-464d-b86f-c5c48e03e22d",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#cap_add-cap_drop",
+      "severity": "MEDIUM",
+      "platform": "DockerCompose",
+      "cwe": "400",
+      "risk_score": "6.8",
+      "cloud_provider": "COMMON",
+      "category": "Resource Management",
+      "experimental": false,
+      "description": "Some capabilities are not needed in certain (or any) containers. Make sure that you only add capabilities that your container needs. Drop unnecessary capabilities as well.",
+      "description_id": "1ddab108",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "62acee6648025cb980abade525de764ee626aebe3a8879e5b8575cc57de2e382",
+          "line": 14,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.api",
+          "search_line": 14,
+          "search_value": "",
+          "expected_value": "Docker compose file to have 'cap_drop' attribute",
+          "actual_value": "Docker compose file doesn't have 'cap_drop' attribute. Make sure your container only has necessary capabilities."
+        },
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "b47a1bcad952df6ac413c2824adfa0f78f2605be39d89ee2f250fcf8280ef740",
+          "line": 8,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.watchtower",
+          "search_line": 8,
+          "search_value": "",
+          "expected_value": "Docker compose file to have 'cap_drop' attribute",
+          "actual_value": "Docker compose file doesn't have 'cap_drop' attribute. Make sure your container only has necessary capabilities."
+        }
+      ]
+    },
+    {
+      "query_name": "Healthcheck Not Set",
+      "query_id": "698ed579-b239-4f8f-a388-baa4bcb13ef8",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#healthcheck",
+      "severity": "MEDIUM",
+      "platform": "DockerCompose",
+      "cwe": "703",
+      "risk_score": "5.1",
+      "cloud_provider": "COMMON",
+      "category": "Availability",
+      "experimental": false,
+      "description": "Check containers periodically to see if they are running properly.",
+      "description_id": "449b7c5c",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "b8895d011990db4b4736258f7cd6cb86b1ac0ebfc2022d40250fc8b24c816b86",
+          "line": 14,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.api",
+          "search_line": 14,
+          "search_value": "",
+          "expected_value": "Healthcheck should be defined.",
+          "actual_value": "Healthcheck is not defined."
+        },
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "2d846a7c71fa95a97feef88b921253d05e044c0892fe8d1439957d0c51dd7eda",
+          "line": 8,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.watchtower",
+          "search_line": 8,
+          "search_value": "",
+          "expected_value": "Healthcheck should be defined.",
+          "actual_value": "Healthcheck is not defined."
+        }
+      ]
+    },
+    {
+      "query_name": "Memory Not Limited",
+      "query_id": "bb9ac4f7-e13b-423d-a010-c74a1bfbe492",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#resources",
+      "severity": "MEDIUM",
+      "platform": "DockerCompose",
+      "cwe": "770",
+      "risk_score": "5.5",
+      "cloud_provider": "COMMON",
+      "category": "Resource Management",
+      "experimental": false,
+      "description": "Memory limits should be defined for each container. This prevents potential resource exhaustion by ensuring that containers consume not more than the designated amount of memory",
+      "description_id": "8fcb9f7d",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "8c64b28df7dc10c79b984518e021e929f739c649c1e132c6b2d4af9bd1947a7b",
+          "line": 14,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.api",
+          "search_line": 14,
+          "search_value": "",
+          "expected_value": "'deploy.resources.limits.memory' should be defined",
+          "actual_value": "'deploy' is not defined"
+        },
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "c0d983c5c1072317567d448e3a81883917af3c24beb7a75650c87fb628398949",
+          "line": 8,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.watchtower",
+          "search_line": 8,
+          "search_value": "",
+          "expected_value": "'deploy.resources.limits.memory' should be defined",
+          "actual_value": "'deploy' is not defined"
+        }
+      ]
+    },
+    {
+      "query_name": "Security Opt Not Set",
+      "query_id": "610e266e-6c12-4bca-9925-1ed0cd29742b",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#security_opt",
+      "severity": "MEDIUM",
+      "platform": "DockerCompose",
+      "cwe": "693",
+      "risk_score": "5.5",
+      "cloud_provider": "COMMON",
+      "category": "Resource Management",
+      "experimental": false,
+      "description": "Attribute 'security_opt' should be defined.",
+      "description_id": "83fb7a65",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "e2fa1fbc24349f056bf9b977d7d3b893c19b003b3a18e0ea5097b970148d395a",
+          "line": 14,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.api",
+          "search_line": 14,
+          "search_value": "",
+          "expected_value": "Docker compose file to have 'security_opt' attribute",
+          "actual_value": "Docker compose file does not have 'security_opt' attribute"
+        },
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "ab11e646e2bd0748771f4016331983daf2f6140100c61b1e9ecdb2aae1cd1272",
+          "line": 8,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.watchtower",
+          "search_line": 8,
+          "search_value": "",
+          "expected_value": "Docker compose file to have 'security_opt' attribute",
+          "actual_value": "Docker compose file does not have 'security_opt' attribute"
+        }
+      ]
+    },
+    {
+      "query_name": "Cpus Not Limited",
+      "query_id": "6b610c50-99fb-4ef0-a5f3-e312fd945bc3",
+      "query_url": "https://docs.docker.com/compose/compose-file/compose-file-v3/#resources",
+      "severity": "LOW",
+      "platform": "DockerCompose",
+      "cwe": "400",
+      "risk_score": "2.9",
+      "cloud_provider": "COMMON",
+      "category": "Resource Management",
+      "experimental": false,
+      "description": "CPU limits should be set because if the system has CPU time free, a container is guaranteed to be allocated as much CPU as it requests",
+      "description_id": "d58d94a1",
+      "files": [
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "09e0bd0b0daa2d3ae24ee4cdc460fc27e0a0517dd1b12ee7636165098b986650",
+          "line": 14,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.api",
+          "search_line": 14,
+          "search_value": "",
+          "expected_value": "'deploy.resources.limits.cpus' should be defined",
+          "actual_value": "'deploy' is not defined"
+        },
+        {
+          "file_name": "docker-compose.yml",
+          "similarity_id": "6ee6951e22d1e4c92e330e76998bcc1f99eb01e13c40a084657c650a994d58ec",
+          "line": 8,
+          "issue_type": "MissingAttribute",
+          "search_key": "services.watchtower",
+          "search_line": 8,
+          "search_value": "",
+          "expected_value": "'deploy.resources.limits.cpus' should be defined",
+          "actual_value": "'deploy' is not defined"
+        }
+      ]
+    }
+  ]
+}

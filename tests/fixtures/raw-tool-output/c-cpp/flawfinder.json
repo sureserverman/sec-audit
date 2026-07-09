@@ -1,0 +1,269 @@
+{
+  "runs": [
+    {
+      "results": [
+        {
+          "ruleId": "FF1013",
+          "level": "note",
+          "message": {
+            "text": "buffer/char:Statically-sized arrays can be improperly restricted, leading to potential overflows or other issues (CWE-119!/CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 8,
+                  "startColumn": 5,
+                  "endColumn": 17,
+                  "snippet": {
+                    "text": "    char buf[8];"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "794dd086f29fe8304359c335f25d99574851f607ff35b5fa940ffbc8b6b35d2c"
+          },
+          "rank": 0.4
+        },
+        {
+          "ruleId": "FF1001",
+          "level": "note",
+          "message": {
+            "text": "buffer/strcpy:Does not check for buffer overflows when copying to destination [MS-banned] (CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10,
+                  "startColumn": 5,
+                  "endColumn": 63,
+                  "snippet": {
+                    "text": "    strcpy(buf, \"this string is way longer than eight bytes\");"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "7c215dc3634b43cfdda70c84d9a6198b381cae78600690327d7e40bc2a72bffe"
+          },
+          "rank": 0.4
+        },
+        {
+          "ruleId": "FF1013",
+          "level": "note",
+          "message": {
+            "text": "buffer/char:Statically-sized arrays can be improperly restricted, leading to potential overflows or other issues (CWE-119!/CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 12,
+                  "startColumn": 5,
+                  "endColumn": 18,
+                  "snippet": {
+                    "text": "    char cmd[64];"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "eadedd33558176b276a74d827e43fe134ca5222bebb309099188e0d7be426d25"
+          },
+          "rank": 0.4
+        },
+        {
+          "ruleId": "FF1015",
+          "level": "error",
+          "message": {
+            "text": "buffer/sprintf:Does not check for buffer overflows (CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 14,
+                  "startColumn": 5,
+                  "endColumn": 33,
+                  "snippet": {
+                    "text": "    sprintf(cmd, \"ls %s\", user);"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "4adbe4c1cf7b0c243e09e2485b79ffddd3c45452d62066506dccd2ef12b33e7a"
+          },
+          "rank": 0.8
+        },
+        {
+          "ruleId": "FF1044",
+          "level": "error",
+          "message": {
+            "text": "shell/system:This causes a new program to execute and is difficult to use safely (CWE-78)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15,
+                  "startColumn": 5,
+                  "endColumn": 17,
+                  "snippet": {
+                    "text": "    system(cmd);"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "5f902dc63032b32ede6064142f127788d07537f0ae5d383507f99be8a5060f46"
+          },
+          "rank": 0.8
+        },
+        {
+          "ruleId": "FF1013",
+          "level": "note",
+          "message": {
+            "text": "buffer/char:Statically-sized arrays can be improperly restricted, leading to potential overflows or other issues (CWE-119!/CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 18,
+                  "startColumn": 5,
+                  "endColumn": 19,
+                  "snippet": {
+                    "text": "    char line[16];"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "698195f6c347d5e59f31d8b6ffa21434c4c634425c0cf863a5b4ffdc10b9b846"
+          },
+          "rank": 0.4
+        },
+        {
+          "ruleId": "FF1014",
+          "level": "error",
+          "message": {
+            "text": "buffer/gets:Does not check for buffer overflows (CWE-120, CWE-20)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 19,
+                  "startColumn": 5,
+                  "endColumn": 16,
+                  "snippet": {
+                    "text": "    gets(line);"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "0ecd6f4fa5d6dbb47e2a082cf0ff3e03a5d15a9e24d3818473c5c43dca90f561"
+          },
+          "rank": 1.0
+        },
+        {
+          "ruleId": "FF1016",
+          "level": "error",
+          "message": {
+            "text": "format/printf:If format strings can be influenced by an attacker, they can be exploited (CWE-134)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 20,
+                  "startColumn": 5,
+                  "endColumn": 82,
+                  "snippet": {
+                    "text": "    printf(buf);            /* format string: user-influenced buffer as format */"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "d20c9c80049c4dd0e393788ecf921aa032790f58998461f38dc9d9de9b18275e"
+          },
+          "rank": 0.8
+        },
+        {
+          "ruleId": "FF1001",
+          "level": "note",
+          "message": {
+            "text": "buffer/strcpy:Does not check for buffer overflows when copying to destination [MS-banned] (CWE-120)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vuln.c",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 27,
+                  "startColumn": 5,
+                  "endColumn": 23,
+                  "snippet": {
+                    "text": "    strcpy(p, \"leak\");"
+                  }
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "contextHash/v1": "ced90b9a5a6cbae7dd88cd9564a9d64d84b97609d1cd90973bec972b84f3ac71"
+          },
+          "rank": 0.4
+        }
+      ]
+    }
+  ]
+}

@@ -69,21 +69,6 @@ Each detection entry follows this shape:
 - **rationale:** Java server-side covers Tomcat, Quarkus, Micronaut, Helidon, Vert.x, JAX-RS — none of which are in `frameworks/spring.md`. Common security surfaces: Java deserialization (CVE-2015-7501 class), JNDI injection (CVE-2021-44228 Log4Shell class), XXE in `javax.xml.parsers`, Velocity / Freemarker SSTI.
 - **notes:** Maven/Gradle dependencies are already covered by the `Maven` ecosystem entry feeding cve-enricher; the new lane would add code-pattern signal beyond dep-version CVE matching.
 
-### C / C++ source
-
-- **suggested_lane:** `cpp`
-- **detection:**
-  - `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.h` / `*.hpp` / `*.hxx` (file-extension, medium)
-  - `CMakeLists.txt` (manifest, high) — strong indicator of a C/C++ project
-  - `Makefile` containing `gcc` / `g++` / `clang` / `clang++` invocations (content-regex, medium)
-  - `*.vcxproj` / Visual Studio C++ project (medium) — overlap with `windows` lane (PE binaries) but distinct (source-only review)
-- **suggested_tools:**
-  - `cppcheck` — https://cppcheck.sourceforge.io/ — open-source static analyzer for C/C++.
-  - `clang-tidy` — https://clang.llvm.org/extra/clang-tidy/ — LLVM-shipped linter with `clang-analyzer-security-*` checks.
-  - `flawfinder` — https://dwheeler.com/flawfinder/ — security-focused scanner targeting `strcpy`, `gets`, `sprintf`, `system` family hazards.
-- **rationale:** C/C++ source review covers buffer overflows (CWE-120/121/122), format-string bugs (CWE-134), use-after-free (CWE-416), integer overflow (CWE-190), and the canonical unsafe-libc-function family. The existing `windows` lane handles PE binaries (binskim runs on compiled artefacts), but pure C/C++ source has no static lane.
-- **notes:** Every project has SOME `*.h` files (e.g. via vendored deps); pair extension detection with `CMakeLists.txt` / `Makefile` to reduce FPs. Exclude `node_modules/`, `.venv/`, `vendor/` per §1 Scope.
-
 ### Solidity (smart contracts)
 
 - **suggested_lane:** `solidity`
@@ -99,21 +84,28 @@ Each detection entry follows this shape:
 - **rationale:** Smart-contract security is its own discipline: re-entrancy (CWE-841), integer overflow (Solidity ≤ 0.7), unchecked external calls, `tx.origin` auth, front-running. None of these map to existing lanes.
 - **notes:** Niche unless the user works in DeFi / Web3 / NFT; flagging is INFO-by-default; user can decide whether to fund the lane.
 
-### PHP (Laravel / Symfony / WordPress / generic)
+### PHP — Laravel / Symfony / generic (WordPress now covered)
 
-- **suggested_lane:** `php`
+- **PARTIALLY COVERED (v1.27):** WordPress is now served by the dedicated `php`
+  lane (phpcs + WordPress Coding Standards security sniffs — EscapeOutput/CWE-79,
+  NonceVerification/CWE-352, ValidatedSanitizedInput/CWE-20, PreparedSQL/CWE-89).
+  This entry now tracks only the **non-WordPress** PHP subset — Laravel, Symfony,
+  and framework-less PHP — whose deep taint analysis remains thin.
+- **suggested_lane:** `php` (extend the existing lane, not a new one)
 - **detection:**
-  - `composer.json` (manifest, high)
-  - `*.php` (file-extension, medium) at non-trivial depth
-  - `wp-config.php` (manifest, high — WordPress signal)
   - `artisan` (manifest, high — Laravel CLI entry point)
   - `bin/console` (manifest, medium — Symfony CLI entry point)
+  - `*.php` (file-extension, medium) at non-trivial depth WITHOUT a WordPress
+    signal (no `wp-config.php` / `Theme Name:` `style.css` / `add_action`)
 - **suggested_tools:**
-  - `psalm` — https://psalm.dev/ — Vimeo's PHP static analyzer with `--taint-analysis`.
+  - `psalm` — https://psalm.dev/ — Vimeo's PHP static analyzer with `--taint-analysis` (needs a composer autoload root — the reason it is not yet in the lane).
   - `phpstan` — https://phpstan.org/ — multi-level static analyzer.
   - `progpilot` — https://github.com/designsecurity/progpilot — PHP security-focused taint analyzer (CWE-89 / CWE-79 / CWE-78 / CWE-22).
-- **rationale:** PHP is one of the most-deployed server-side languages globally. WordPress alone hosts 40%+ of the web. Existing coverage is via SAST lane's semgrep `p/php` ruleset only, which is shallow. A dedicated lane would deepen CWE-89 / CWE-79 / CWE-22 / CWE-78 detection via taint analysis.
-- **notes:** `composer.json` deps are already covered by the `Packagist` ecosystem entry feeding cve-enricher.
+- **rationale:** the WordPress security surface (40%+ of the web) is now covered by
+  the `php` lane; Laravel/Symfony route-handler injection, Blade/Twig SSTI, and
+  mass-assignment still rely only on the SAST lane's shallow semgrep `p/php`
+  ruleset. Deepening these needs taint analysis with an autoload root.
+- **notes:** `composer.json` deps are already covered by the `Packagist` ecosystem entry feeding cve-enricher. The `php` lane runs phpcs's WordPress security sniffs; on non-WordPress PHP those sniffs still fire on the universal issues (unescaped output, unsanitized input, SQL concatenation) but with more FPs — the finding-triager down-ranks them.
 
 ### Ruby (non-Rails)
 
@@ -269,6 +261,62 @@ Each detection entry follows this shape:
   - No canonical security-focused linter; would require pattern-based reviews of `wget` / `curl | sh` install steps, unverified-checksum patterns.
 - **rationale:** Build systems frequently `curl | sh` install dependencies, fetch toolchains without checksum verification, and embed credentials in build args. The existing `shell` lane catches some of this when invoked via shell scripts; the build-system layer adds its own surface.
 - **notes:** Lower priority — most concrete misconfigurations surface via the `shell` lane already.
+
+### Garmin Connect IQ (Monkey C)
+
+- **suggested_lane:** `connectiq`
+- **detection:**
+  - `monkey.jungle` (manifest, high — the Connect IQ build descriptor; unique to the SDK)
+  - `manifest.xml` co-located with `*.mc` source (manifest, high — Connect IQ app / watch-face manifest)
+  - `*.mc` (file-extension, high — Monkey C is the only meaningful consumer of `.mc`)
+  - `*.prg` (file-extension, medium — compiled Connect IQ program artefact)
+- **suggested_tools:**
+  - No canonical third-party SAST tool exists for Monkey C. The Connect IQ SDK's `monkeyc` compiler `--warn` output is the only static signal; a lane would be a custom checker.
+  - Manifest permission audit — `manifest.xml` `<iq:uses-permissions>` over-grant (Positioning / Sensor / Communications / Background) reviewed against declared behaviour.
+- **rationale:** Connect IQ apps and watch-faces request device permissions (GPS position, ANT+ sensor data, phone Communications, background execution) and frequently commit their signing key (`developer_key`, a PKCS#8 `.der` / `.pem`) into the repo. Security surface: permission over-grant (privacy), committed developer signing key (CWE-798), and `Communications.makeWebRequest` to plaintext endpoints (CWE-319). Currently uncovered — and, before this entry, not even surfaced as a coverage gap.
+- **notes:** Pair the `.mc` extension with `monkey.jungle` / `manifest.xml` to avoid FPs. The committed-developer-key hazard is caught by the `secrets` lane's widened key-material globs (see `secrets/secret-sprawl.md`); this fingerprint adds the permission-audit surface.
+
+### OpenWrt package (feed Makefile)
+
+- **suggested_lane:** `openwrt`
+- **detection:**
+  - `Makefile` containing `include $(TOPDIR)/rules.mk` (content-regex, high — the OpenWrt package build signature)
+  - `Makefile` containing `include $(INCLUDE_DIR)/package.mk` (content-regex, high)
+  - `files/etc/uci-defaults/` directory (manifest, high — UCI default-config scripts that run once as root at first boot)
+  - `files/etc/config/` UCI config (manifest, medium)
+- **suggested_tools:**
+  - `shellcheck` on `uci-defaults/` + `postinst` / `prerm` scripts — already available via the `shell` lane; an `openwrt` lane would scope these and add UCI-specific checks.
+  - No canonical OpenWrt-package security linter exists; UCI ACL / RPC-handler review (see the Lua / LuCI entry) would require a custom checker.
+- **rationale:** OpenWrt feed packages install `uci-defaults` scripts that run as root at first boot, ship `/etc/config` UCI files (firewall / dropbear / network) whose defaults set the device's security posture, and often patch system daemons. Package Makefiles fetch sources by URL + hash (`PKG_SOURCE` / `PKG_HASH`) — an unpinned or hash-missing source is a supply-chain hazard (CWE-494). Currently invisible: the only related entry is Lua / LuCI (the admin-UI layer), not the package-build layer.
+- **notes:** Cross-reference the Lua / LuCI entry for the admin-UI surface. Require the `rules.mk` include to distinguish an OpenWrt package Makefile from a generic Makefile and avoid FPs.
+
+### F-Droid repository server (fdroidserver)
+
+- **suggested_lane:** `fdroid-repo`
+- **detection:**
+  - `config.yml` / `config.py` containing `repo_url:` / `keystore:` / `keystorepass:` (content-regex, high — fdroidserver config)
+  - `fdroidserver` referenced in a `Makefile` / `requirements.txt` (content-regex, high)
+  - `repo/index-v1.jar` / `repo/index-v2.json` (manifest, high — a built, signed F-Droid repo index)
+  - `metadata/*.yml` next to a `config.yml` (manifest, medium — per-app build recipes)
+- **suggested_tools:**
+  - `fdroid lint` / `fdroid rewritemeta` — https://f-droid.org/docs/ — fdroidserver's own metadata validator.
+  - Keystore-hygiene review — `config.yml` `keystorepass` / `keypass` stored in plaintext (CWE-256 / CWE-798), keystore (`.p12` / `.jks` / `.keystore`) committed alongside config.
+- **rationale:** An F-Droid repo server is signing infrastructure, not an app: `config.yml` holds the APK-signing keystore path and its passphrase (frequently in plaintext), and the signing keystore itself (`keystore.p12`) is often committed beside it. Compromise of either lets an attacker sign malicious APKs trusted by every device subscribed to the repo. Security surface: plaintext keystore credentials (CWE-256), committed signing keystore (CWE-798), unsigned / plaintext `repo_url` distribution (CWE-319). Currently uncovered.
+- **notes:** The committed-keystore + plaintext-password hazards are caught by the `secrets` lane's widened key-material + fdroidserver patterns (see `secrets/secret-sprawl.md`); this fingerprint adds the repo-signing-hygiene surface. Distinct from the `android` lane, which reviews the app APK, not the repo that serves it.
+
+### Homebrew tap (Formula / Cask Ruby)
+
+- **suggested_lane:** `homebrew`
+- **detection:**
+  - `Casks/*.rb` (manifest, high — a Homebrew Cask definition)
+  - `Formula/*.rb` (manifest, high — a Homebrew Formula)
+  - `*.rb` containing `class ... < Formula` / `cask "..." do` + `sha256` (content-regex, high)
+- **suggested_tools:**
+  - `brew audit --strict --online <name>` — https://docs.brew.sh/Formula-Cookbook — Homebrew's own formula / cask auditor (checksum presence, HTTPS URLs, license).
+  - `brew style` — https://docs.brew.sh/ — RuboCop-backed style + some correctness rules.
+  - Detective pack `supply-chain/homebrew-tap.md` — `sha256 :no_check`, non-HTTPS `url`, unpinned moving-tag `url`, `postflight` / `preflight` script review.
+- **rationale:** A Homebrew tap distributes install recipes that run on the user's machine: a `sha256 :no_check` (CWE-494 download-without-integrity), a non-HTTPS `url` (CWE-319 cleartext fetch, MITM), a `url` pointing at a moving tag / branch rather than a pinned release, and arbitrary `postflight` / `preflight` / `install` Ruby are all real supply-chain hazards. Currently uncovered.
+- **notes:** See `supply-chain/homebrew-tap.md` for the dangerous-pattern detail. A single `*.rb` is ambiguous — require the `class < Formula` / `cask ... do` signature to avoid FPs against generic Ruby.
 
 ## Common false positives (lane-suggestion FPs)
 

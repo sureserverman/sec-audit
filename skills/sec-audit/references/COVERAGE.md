@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across twenty-four tool lanes plus sec-expert
+software projects across twenty-five tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -59,7 +59,10 @@ v1.10 adds no new lanes. Two ergonomic improvements:
    Inventory scans for technologies present in the project but
    NOT covered by any sec-audit lane (using
    `references/uncovered-tech-fingerprints.md`'s curated catalogue
-   of sixteen known-but-uncovered technologies). Detected
+   of eighteen known-but-uncovered technologies — (v1.24) added
+   Garmin Connect IQ / Monkey C, OpenWrt package feed Makefiles,
+   F-Droid repository servers, and Homebrew taps; (v1.26) retired
+   the C/C++ entry, which became the `c-cpp` lane). Detected
    technologies are emitted as an `uncovered_tech` array on the
    `inventory.json` record and rendered by `report-writer`'s new
    Step 5.5 in a "Coverage-gap suggestions" section. The section
@@ -67,8 +70,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to twenty-two review streams in parallel
-(twenty-one tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty-four review streams in parallel
+(twenty-three tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -318,19 +321,27 @@ Dispatch discipline.
   - UTM — `*.utm/` directory containing `config.plist`.
 - **Tools:** `hadolint` (Dockerfile / Containerfile linter with
   `DLxxxx` rule IDs + bundled shellcheck), `virt-xml-validate`
-  (libvirt-clients XSD validator). Both cross-platform; neither
-  contacts a Docker daemon, podman socket, libvirtd, or any
-  registry.
+  (libvirt-clients XSD validator), and — v1.25 — `kics`
+  (`kics scan --type DockerCompose`: docker-compose
+  misconfiguration scanner covering privileged containers, shared
+  host PID/IPC/network namespaces, docker-socket bind-mounts,
+  unrestricted capabilities, `no-new-privileges` disabled, and
+  unbounded resource limits). `--type DockerCompose` scopes kics
+  to compose files so it never re-reports Dockerfile findings
+  hadolint already owns. All three cross-platform; none contacts a
+  Docker daemon, podman socket, libvirtd, or any registry.
 - **Reference packs:** `references/virt/docker-runtime.md`,
-  `virt/podman.md`, `virt/libvirt-qemu.md`,
+  `virt/compose-hardening.md` (the kics compose-scan detective
+  pack), `virt/podman.md`, `virt/libvirt-qemu.md`,
   `virt/apple-containers.md`, `virt/utm.md`,
   `references/virt-tools.md`.
 - **Host-OS gate:** none.
 - **Skip reasons:** `tool-missing`, `no-containerfile` (NEW in
   v1.4 — target-shape; hadolint applicable), `no-libvirt-xml`
-  (NEW in v1.4 — target-shape; virt-xml-validate applicable).
+  (NEW in v1.4 — target-shape; virt-xml-validate applicable),
+  `no-compose-file` (NEW in v1.25 — target-shape; kics applicable).
 - **Origin tag:** `"virt"`. Tool whitelist: `hadolint`,
-  `virt-xml-validate`.
+  `virt-xml-validate`, `kics`.
 - **Dep-inventory:** NOT affected — virt configurations
   reference image tags and host devices, not package-manifest
   dependencies; image-tag pinning compliance is enforced at the
@@ -340,7 +351,36 @@ Dispatch discipline.
   and `containers/docker.md` for Dockerfile-authoring patterns;
   the virt lane covers the runtime / VMM surface those packs do
   NOT.
-- **Shipped in:** v1.4.0.
+- **Shipped in:** v1.4.0; kics compose scanning added v1.25.0.
+
+### c-cpp (C / C++ source memory-safety)
+
+- **Target shape:** at least one C/C++ **source** file under target —
+  `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`. A header alone
+  (`*.h` / `*.hpp` / `*.hxx`) does NOT trigger the lane (vendored /
+  JNI headers are ubiquitous and would false-positive); the §2
+  inventory gate requires a translation-unit source file.
+- **Tools:** `cppcheck` (data-flow static analyzer — buffer overruns
+  CWE-788/120, memory leaks CWE-401, use-after-free CWE-416,
+  uninitialised reads, null deref; `--xml` with per-error `cwe`
+  attributes) and `flawfinder` (lexical scanner for the
+  banned-libc-function family — `strcpy`/`gets`/`sprintf`→CWE-120,
+  `system`→CWE-78, `printf`-format→CWE-134; `--sarif`). Both
+  cross-platform (apt / pip), both static — neither compiles nor
+  executes the target. Complementary: cppcheck proves overflows
+  by data-flow (high precision), flawfinder flags every hazardous
+  call (high recall).
+- **Reference packs:** `references/c-cpp/memory-safety.md`,
+  `references/c-cpp-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-c-source` (NEW in v1.26 —
+  target-shape; tool on PATH but no C/C++ source/header under target).
+- **Origin tag:** `"c-cpp"`. Tool whitelist: `cppcheck`, `flawfinder`.
+- **Dep-inventory:** NOT affected — C/C++ dependency management is
+  out-of-band (system packages / vendored trees), so there is no
+  manifest for cve-enricher; the lane is pure source-pattern signal.
+  Supersedes the retired `cpp` coverage-gap fingerprint.
+- **Shipped in:** v1.26.0.
 
 ### go
 
@@ -443,6 +483,37 @@ Dispatch discipline.
   surfaces (Pickle/YAML deserialization, asyncio task
   swallowing, FastAPI DI bypass, Django ORM `.extra()`).
 - **Shipped in:** v1.7.0.
+
+### php (PHP / WordPress source)
+
+- **Target shape:** a `*.php` source file OR a `composer.json` under
+  target. Sub-shape `["wordpress"]` when a WordPress signal is present
+  (`wp-config.php`, a `style.css` `Theme Name:` header, or a
+  `functions.php` calling `add_action(`), else `["generic"]`.
+- **Tools:** `phpcs` (PHP_CodeSniffer) run with the WordPress Coding
+  Standards **security** sniff subset — `WordPress.Security.EscapeOutput`
+  (unescaped output → XSS, CWE-79), `WordPress.Security.NonceVerification`
+  (missing CSRF nonce, CWE-352), `WordPress.Security.ValidatedSanitizedInput`
+  (unvalidated / unsanitized request input, CWE-20), and
+  `WordPress.DB.PreparedSQL(Placeholders)` (unprepared SQL, CWE-89).
+  `--report=json`. Cross-platform (PHP + Composer); a pure source-tree
+  static scanner (never executes the PHP).
+- **Reference packs:** `references/php/wordpress.md`,
+  `references/php/php-web.md`, `references/php-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing` (phpcs absent, or its `WordPress`
+  standard not registered), `no-php-source` (NEW in v1.27 — target-shape;
+  phpcs on PATH but no `*.php` under target).
+- **Origin tag:** `"php"`. Tool whitelist: `phpcs`.
+- **Dep-inventory:** NOT affected — `composer.json` packages are enriched
+  by cve-enricher via the `Packagist` ecosystem entry, independently of
+  phpcs's code-pattern findings.
+- **Scope note:** the WPCS security sniffs are tuned for WordPress; on the
+  `["generic"]` sub-shape (Laravel / Symfony / framework-less) they still
+  fire on the universal issues (unescaped output, unsanitized input, SQL
+  concatenation) but with more FPs (finding-triager down-ranks). Deep
+  non-WordPress taint analysis remains a coverage-gap fingerprint.
+- **Shipped in:** v1.27.0.
 
 ### ansible
 
@@ -777,7 +848,12 @@ Dispatch discipline.
   field mappings), plus the existing sec-expert hygiene packs
   `references/secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md`
   (the quoted fix recipes: rotate, move to a secrets manager, purge from
-  git history).
+  git history). v1.24 widens `secret-sprawl.md`'s key-material coverage to
+  committed signing keystores / PKCS#8 developer keys
+  (`*.jks`/`*.keystore`/`*.der`/`developer_key.*`/`keystore.p12`, CWE-798) and
+  adds an fdroidserver plaintext-keystore-password pattern
+  (`keystorepass:`/`keypass:` literals, CWE-256) — the hygiene surface behind
+  the new Connect IQ and F-Droid-repo-server coverage-gap fingerprints.
 - **Host-OS gate:** none.
 - **Skip reasons:** `tool-missing`, `no-git-history` (NEW in v1.21 —
   trufflehog on PATH but target is not a git repository; the gitleaks
@@ -881,10 +957,11 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**27 canonical reason values** as of v1.21, grouped by semantic
-category:
+**31 canonical reason values** as of v1.27 (25 target-shape + 3
+host-OS-gated + 1 profile-absent + 2 tool-output), grouped by
+semantic category:
 
-### Target-shape (22)
+### Target-shape (25)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -897,6 +974,9 @@ category:
 | `no-pe`           | windows              | No PE artifact (.exe/.dll/.msi/.msix/.sys) under target.                |
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
+| `no-compose-file` | virt                 | No `docker-compose.y(a)ml` / `compose.y(a)ml` under target (kics-specific). NEW in v1.25. |
+| `no-c-source`     | c-cpp                | No C/C++ source/header under target (cppcheck/flawfinder-specific). NEW in v1.26. |
+| `no-php-source`   | php                  | No `*.php` under target (phpcs-specific). NEW in v1.27.                 |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 | `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
 | `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |

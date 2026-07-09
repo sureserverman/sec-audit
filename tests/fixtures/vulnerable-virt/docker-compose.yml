@@ -1,6 +1,6 @@
-# Intentionally insecure Compose file — fixture for sec-expert reading
-# references/virt/docker-runtime.md. virt-runner's hadolint pass does not
-# touch this file (Compose is YAML; hadolint scans Containerfiles).
+# Intentionally insecure Compose file — the source of virt-runner's kics
+# findings (kics --type DockerCompose scans this; hadolint does not, it scans
+# Containerfiles) and the sec-expert reading of references/virt/compose-hardening.md.
 
 version: "3.8"
 

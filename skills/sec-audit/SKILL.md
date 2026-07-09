@@ -28,7 +28,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14), `c-cpp` (added v1.26), `php` (added v1.27). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -468,6 +468,36 @@ below — layering them on top of the script's baseline.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **C / C++ signals**: at least one C/C++ **source** file under
+  target — `*.c`, `*.cc`, `*.cpp`, `*.cxx`, `*.c++`. A *header* alone
+  (`*.h` / `*.hpp` / `*.hxx`) does NOT trigger the lane — vendored and
+  JNI headers are ubiquitous and would false-positive; `inventory.py`
+  requires a translation-unit source file. When detected, add
+  `"c-cpp"` to the inventory and load `references/c-cpp/memory-safety.md`
+  and the tool-lane reference `references/c-cpp-tools.md`. `CMakeLists.txt`
+  / `Makefile` presence is a corroborating signal (not required) that the
+  sec-expert reads for build-time hazards. No ecosystem entry — C/C++
+  dependency management is out-of-band (system packages / vendored trees),
+  so there is no manifest for cve-enricher; the lane is pure source-pattern
+  signal (cppcheck memory-safety + flawfinder banned-function surface).
+  **This lane supersedes the former `cpp` coverage-gap fingerprint** — the
+  entry was retired from `uncovered-tech-fingerprints.md` in v1.26.
+- **PHP signals**: a `*.php` source file OR a `composer.json` under
+  target. Sub-shape disambiguation: add `"php": ["wordpress"]` when a
+  WordPress signal is present — a `wp-config.php`, a `style.css` with a
+  `Theme Name:` header, or a `functions.php` calling `add_action(` —
+  else `"php": ["generic"]`. When detected, add `"php"` to the inventory
+  and load `references/php/wordpress.md` + `references/php/php-web.md`
+  and the tool-lane reference `references/php-tools.md`. The `php` lane
+  runs phpcs with the WordPress Coding Standards **security** sniffs
+  (EscapeOutput → CWE-79, NonceVerification → CWE-352,
+  ValidatedSanitizedInput → CWE-20, PreparedSQL → CWE-89); it deepens
+  the shallow semgrep `p/php` coverage the SAST lane already provides.
+  `composer.json` dependencies are enriched separately via the existing
+  `Packagist` ecosystem entry (cve-enricher) — the `php` lane is
+  code-pattern signal, not dep-version signal. Non-WordPress PHP
+  (Laravel / Symfony) is only partially covered — deep taint analysis
+  remains a coverage-gap fingerprint (`uncovered-tech-fingerprints.md`).
 - **GitHub Actions signals**: any `.github/workflows/*.yml` or
   `.github/workflows/*.yaml` file under target whose contents
   declare both top-level `on:` and `jobs:` keys (the canonical
@@ -490,7 +520,16 @@ below — layering them on top of the script's baseline.
     OR a Dockerfile / Containerfile / `*.dockerfile` /
     `*.containerfile` (drives hadolint dispatch — distinct from
     `containers/dockerfile-hardening.md`'s code-pattern reasoning
-    surface).
+    surface). The `docker-compose.y(a)ml` / `compose.y(a)ml` /
+    `*.compose.y(a)ml` shapes drive `kics --type DockerCompose`
+    misconfiguration scanning (privileged containers, shared host
+    namespaces, docker-socket mounts, unrestricted capabilities,
+    no-new-privileges; v1.25); `*.stack.y(a)ml` Swarm-stack files
+    are read by sec-expert but are not in kics's `applicable_glob`.
+    `inventory.py` deterministically fires `virt` on a compose file
+    alone (the same name-globs as kics's `applicable_glob` + a
+    `services:`/`version:` content grep), so a compose-only project
+    with no Dockerfile is no longer invisible to the lane.
   - **Podman / Quadlet** — `*.container`, `*.volume`,
     `*.network`, `*.pod`, `*.kube`, `*.image`, or `*.build` files
     under `containers/systemd/` or any subdir, OR a
@@ -511,6 +550,8 @@ below — layering them on top of the script's baseline.
   (`["docker", "libvirt"]` is common on Linux build hosts;
   `["apple-containers", "utm"]` on Apple-silicon dev machines).
   Load `references/virt/docker-runtime.md`,
+  `references/virt/compose-hardening.md` (the kics compose-scan
+  detective pack — privileged/host-namespace/cap/docker-socket),
   `references/virt/podman.md`,
   `references/virt/libvirt-qemu.md`,
   `references/virt/apple-containers.md`,
@@ -1360,13 +1401,20 @@ Quadlet, libvirt domain/network/pool/volume XML, Apple Containers
 `virt-runner` agent (`agents/virt-runner.md`, pinned to haiku,
 tools: Read + Bash). The agent shells out to `hadolint`
 (Haskell binary; Dockerfile / Containerfile static linter with
-`DLxxxx` rule IDs and an embedded shellcheck pass) and
+`DLxxxx` rule IDs and an embedded shellcheck pass),
 `virt-xml-validate` (libvirt-clients package; XSD validator that
 checks libvirt domain / network / pool / volume XML against the
-libvirt-shipped Relax-NG schemas). Both tools are cross-platform —
-no host-OS gate. Neither contacts a Docker daemon, a podman
-socket, a libvirtd, or any registry; both run as pure source-tree
-static scanners.
+libvirt-shipped Relax-NG schemas), and — v1.25 — `kics`
+(Checkmarx, Apache-2.0; `kics scan --type DockerCompose` maps
+docker-compose files against its bundled `dockerCompose` query set:
+privileged containers, shared host PID/IPC/network namespaces,
+docker-socket bind-mounts, unrestricted capabilities,
+`no-new-privileges` disabled, unbounded resource limits). `--type
+DockerCompose` scopes kics to compose files so it never re-reports
+Dockerfile findings that hadolint already owns. All three tools are
+cross-platform — no host-OS gate. None contacts a Docker daemon, a
+podman socket, a libvirtd, or any registry; all run as pure
+source-tree static scanners.
 
 virt-runner runs in parallel with every other pass agent. Collect
 the findings into a `virt_findings` list.
@@ -1381,7 +1429,7 @@ Skill-level invariants:
 - **`__virt_status__: "ok"`** — every available + applicable tool
   ran cleanly; `skipped` list may still be populated for
   cleanly-inapplicable tools.
-- **Three skip reasons (v1.4 adds two NEW):**
+- **Four skip reasons (v1.4 adds two, v1.25 adds one):**
   - `tool-missing` — the tool's binary is absent from PATH.
   - `no-containerfile` — NEW in v1.4; hadolint is on PATH but
     target has no Dockerfile / Containerfile / `*.dockerfile` /
@@ -1391,6 +1439,9 @@ Skill-level invariants:
   - `no-libvirt-xml` — NEW in v1.4; virt-xml-validate is on PATH
     but target has no XML files with a libvirt root element
     (`<domain>` / `<network>` / `<pool>` / `<volume>`).
+    Target-shape clean-skip.
+  - `no-compose-file` — NEW in v1.25; kics is on PATH but target
+    has no `docker-compose.y(a)ml` / `compose.y(a)ml` files.
     Target-shape clean-skip.
 
 Virt findings are code-pattern signal against
@@ -2087,6 +2138,86 @@ Skill-level invariants the orchestrator enforces:
 **Origin-tag isolation:** every secrets finding carries `origin: "secrets"`
 and `tool: "gitleaks" | "trufflehog"`. The contract-check rejects any secrets
 finding tagged with another lane's tool — see `tests/contract-check.sh`.
+
+### 3.29 C/C++ pass — dispatch c-cpp-runner
+
+When the inventory emitted by §2 contains `c-cpp` (at least one C/C++
+source file — `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`; header-only
+trees do NOT trigger), dispatch the `c-cpp-runner` agent
+(`agents/c-cpp-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to `cppcheck` (C/C++ static analyzer — buffer overruns,
+memory leaks, use-after-free, uninitialised reads; `--xml` output with
+per-error `cwe` attributes) and `flawfinder` (lexical scanner for the
+banned-libc-function family — `strcpy`/`gets`/`sprintf`/`system`/`printf`
+format-string; `--sarif` output). Both are cross-platform, apt/pip
+installable, and run as pure source-tree static scanners — neither
+compiles or executes the target. Both map through the deterministic
+runner engine (`scripts/secaudit/runner.py c-cpp`).
+
+c-cpp-runner runs in parallel with every other pass agent. Collect the
+findings into a `c_cpp_findings` list.
+
+Skill-level invariants:
+
+- **No `c-cpp` in inventory** — skip entirely.
+- **`__c_cpp_status__: "unavailable"`** — neither tool on PATH, or no
+  C/C++ source under target.
+- **`__c_cpp_status__: "partial"`** — one tool ran, one failed or
+  cleanly-skipped.
+- **`__c_cpp_status__: "ok"`** — every available + applicable tool ran.
+- **Two skip reasons:**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-c-source` — the tool is on PATH but the target tree contains no
+    C/C++ source file (`*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++` /
+    `*.h` / `*.hpp` / `*.hxx` — the runner's `applicable_glob` includes
+    headers so a genuinely header-only tree still runs the tool; the
+    §2 inventory gate above is stricter). Target-shape clean-skip.
+
+C/C++ findings are source-pattern signal against memory-safety and the
+unsafe-libc-function surface. **The dep-inventory path is NOT affected by
+this lane** — C/C++ dependency management is out-of-band (system packages,
+vendored trees), so there is no manifest for cve-enricher. The lane
+supersedes the retired `cpp` coverage-gap fingerprint. Every finding
+carries `origin: "c-cpp"`, `tool: "cppcheck" | "flawfinder"`.
+
+### 3.30 PHP pass — dispatch php-runner
+
+When the inventory emitted by §2 contains `php` (a `*.php` source or a
+`composer.json`), dispatch the `php-runner` agent
+(`agents/php-runner.md`, pinned to haiku, tools: Read + Bash). The agent
+shells out to `phpcs` (PHP_CodeSniffer) with the **WordPress Coding
+Standards security sniffs** — `WordPress.Security.EscapeOutput`
+(unescaped output → XSS, CWE-79), `WordPress.Security.NonceVerification`
+(missing CSRF nonce, CWE-352), `WordPress.Security.ValidatedSanitizedInput`
+(unvalidated / unsanitized request input, CWE-20), and
+`WordPress.DB.PreparedSQL(Placeholders)` (unprepared SQL, CWE-89) —
+emitting `--report=json`. phpcs is cross-platform (PHP + Composer), runs
+as a pure source-tree static scanner, and maps through the deterministic
+runner engine (`scripts/secaudit/runner.py php`).
+
+php-runner runs in parallel with every other pass agent. Collect the
+findings into a `php_findings` list.
+
+Skill-level invariants:
+
+- **No `php` in inventory** — skip entirely.
+- **`__php_status__: "unavailable"`** — phpcs not on PATH, or no PHP
+  source under target.
+- **`__php_status__: "ok"`** — phpcs ran.
+- **Two skip reasons:**
+  - `tool-missing` — phpcs (or its WordPress standard) is absent.
+  - `no-php-source` — phpcs is on PATH but the target tree contains no
+    `*.php` file. Target-shape clean-skip.
+
+The WPCS security sniffs are tuned for WordPress; on the `["generic"]`
+sub-shape (Laravel / Symfony / framework-less PHP) they still fire on the
+universal issues (unescaped output, unsanitized input, SQL
+concatenation) but with more false positives — the finding-triager
+down-ranks them, and deep non-WordPress taint analysis remains a
+coverage-gap fingerprint. **The dep-inventory path is NOT affected by
+this lane** — `composer.json` packages are enriched by cve-enricher via
+the `Packagist` ecosystem entry, independently of phpcs's code-pattern
+findings. Every finding carries `origin: "php"`, `tool: "phpcs"`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

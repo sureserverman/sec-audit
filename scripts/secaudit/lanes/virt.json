@@ -43,6 +43,27 @@
         "fix_recipe": null,
         "confidence": "high"
       }
+    },
+    {
+      "name": "kics",
+      "probe": "kics",
+      "applicable_glob": ["docker-compose*.yml", "docker-compose*.yaml", "compose*.yml", "compose*.yaml", "*.compose.yml", "*.compose.yaml"],
+      "inapplicable_reason": "no-compose-file",
+      "invoke": ["kics", "scan", "-p", "{target}", "-t", "DockerCompose", "--report-formats", "json", "-o", "{tmp}", "--output-name", "kics", "--silent", "--no-progress"],
+      "output": "file:{tmp}/kics.json",
+      "findings_path": "queries",
+      "flatten": "files",
+      "const": {"confidence": "medium"},
+      "map": {
+        "id": {"concat": ["kics:", {"from": "_parent.query_id", "default": "query"}]},
+        "severity": {"from": "_parent.severity", "map": {"CRITICAL": "CRITICAL", "HIGH": "HIGH", "MEDIUM": "MEDIUM", "LOW": "LOW", "INFO": "LOW", "TRACE": "LOW"}, "default": "MEDIUM"},
+        "cwe": {"concat": ["CWE-", {"from": "_parent.cwe"}], "default": null},
+        "title": {"from": "_parent.query_name"},
+        "evidence": {"from": "actual_value", "truncate": 200},
+        "file": "file_name",
+        "line": {"from": "line", "default": 0},
+        "reference_url": {"from": "_parent.query_url", "default": null}
+      }
     }
   ]
 }
