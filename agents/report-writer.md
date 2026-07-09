@@ -2,7 +2,7 @@
 name: report-writer
 description: Composes the sec-audit markdown report from triaged findings, CVE enrichment output, and the inventory; renders only what the inputs contain.
 model: sonnet
-tools: Read, Write, Bash
+tools: Read, Write, Bash(date:*)
 ---
 
 # report-writer
