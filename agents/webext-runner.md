@@ -96,7 +96,7 @@ The agent reads the target extension path, in order, from:
    (skip if stdin is a TTY or empty);
 2. **positional file argument** `$1` if it points at a readable file
    containing the same JSON object;
-3. **environment variable** `$WEBEXT_TARGET_PATH`, via `printenv`.
+3. **environment variable** `$WEBEXT_TARGET_PATH` (read directly from the environment — no `printenv` call).
 
 If none yields a readable directory, emit the unavailable sentinel
 (Step 4) and exit 0. The path MUST be absolute, MUST exist, and MUST

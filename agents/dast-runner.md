@@ -84,9 +84,9 @@ The agent reads the target URL, in order, from: (1) **stdin** — a
 single JSON line `{"target_url": "https://example.test"}` (skip if
 stdin is a TTY or empty); (2) **positional file argument** `$1` if
 it points at a readable file containing the same JSON object;
-(3) **environment variable** `$DAST_TARGET_URL`, via `printenv`. If
-none yields a non-empty URL, emit the unavailable sentinel (Step 4)
-and exit 0.
+(3) **environment variable** `$DAST_TARGET_URL` (read directly from
+the environment — no `printenv` call). If none yields a non-empty
+URL, emit the unavailable sentinel (Step 4) and exit 0.
 
 The URL must start with `http://` or `https://`. Anything else
 (`file://`, `ftp://`, `javascript:`, bare hostname) is rejected: log

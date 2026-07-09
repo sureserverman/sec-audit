@@ -60,9 +60,11 @@ unavailable.
 2. `$1` positional file arg
 3. `$GO_TARGET_PATH` env var
 
-Validate: directory exists AND contains `go.mod` AND `find
-"$target_path" -type f -name '*.go'` yields ≥ 1 result. Else
-emit unavailable sentinel and exit 0.
+Validate: directory exists AND contains `go.mod` and at least one
+`*.go` source file (the §2 inventory guarantees this precondition
+before dispatch — see SKILL.md §3.19 — and the engine re-checks it,
+so this is not an agent-run `find`). Else emit unavailable sentinel
+and exit 0.
 
 ## Procedure
 
