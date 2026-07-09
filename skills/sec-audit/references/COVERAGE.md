@@ -59,7 +59,9 @@ v1.10 adds no new lanes. Two ergonomic improvements:
    Inventory scans for technologies present in the project but
    NOT covered by any sec-audit lane (using
    `references/uncovered-tech-fingerprints.md`'s curated catalogue
-   of sixteen known-but-uncovered technologies). Detected
+   of nineteen known-but-uncovered technologies — including (v1.24)
+   Garmin Connect IQ / Monkey C, OpenWrt package feed Makefiles,
+   F-Droid repository servers, and Homebrew taps). Detected
    technologies are emitted as an `uncovered_tech` array on the
    `inventory.json` record and rendered by `report-writer`'s new
    Step 5.5 in a "Coverage-gap suggestions" section. The section
@@ -777,7 +779,12 @@ Dispatch discipline.
   field mappings), plus the existing sec-expert hygiene packs
   `references/secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md`
   (the quoted fix recipes: rotate, move to a secrets manager, purge from
-  git history).
+  git history). v1.24 widens `secret-sprawl.md`'s key-material coverage to
+  committed signing keystores / PKCS#8 developer keys
+  (`*.jks`/`*.keystore`/`*.der`/`developer_key.*`/`keystore.p12`, CWE-798) and
+  adds an fdroidserver plaintext-keystore-password pattern
+  (`keystorepass:`/`keypass:` literals, CWE-256) — the hygiene surface behind
+  the new Connect IQ and F-Droid-repo-server coverage-gap fingerprints.
 - **Host-OS gate:** none.
 - **Skip reasons:** `tool-missing`, `no-git-history` (NEW in v1.21 —
   trufflehog on PATH but target is not a git repository; the gitleaks

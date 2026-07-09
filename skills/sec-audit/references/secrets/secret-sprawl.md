@@ -54,6 +54,20 @@ Covers accidental credential exposure across source control history, committed c
 - File globs: `.github/workflows/*.yml`, `.gitlab-ci.yml`, `.circleci/config.yml`, `Jenkinsfile`
 - Source: https://www.cisa.gov/sites/default/files/2023-12/fact-sheet-defending-against-software-supply-chain-attacks-508c.pdf
 
+### Committed signing keystore / private-key material — CWE-798
+
+- Why: A code-/package-signing keystore or private key committed to the repo lets anyone with repo access sign artefacts (APKs, Connect IQ `.prg`, macOS pkgs, JARs) that downstream devices trust. Unlike a leaked API token, a signing key cannot be rotated without re-releasing and re-establishing trust with every consumer. Covers Java/Android keystores (`.jks`, `.keystore`, `.p12`), PKCS#8 / DER developer keys (`developer_key.der` / `.pem` — the Garmin Connect IQ and generic signing-key shape), and F-Droid repo-signing keystores (`keystore.p12`).
+- Grep (filename): `\.(jks|keystore|p12|pfx|der)$` or `developer_key\.(der|pem)$`
+- File globs: `*.jks`, `*.keystore`, `*.p12`, `*.pfx`, `*.der`, `developer_key.*`, `**/keystore.p12`
+- Source: https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html
+
+### Plaintext keystore password in fdroidserver config — CWE-256
+
+- Why: `fdroidserver`'s `config.yml` (or legacy `config.py`) stores the APK-signing keystore path AND its passphrase; when `keystorepass:` / `keypass:` hold literal values (rather than an env-var reference) the signing credential is committed in plaintext. Anyone who reads the repo can unlock the keystore and sign malicious APKs trusted by every device subscribed to the F-Droid repo.
+- Grep: `(keystorepass|keypass|keystorepassfile)\s*[:=]\s*['"]?[^\s'"$]{4,}` (flag when the value is a literal, not `$(...)` / `!env` / a file reference)
+- File globs: `config.yml`, `config.py`, `**/fdroid/config.yml`
+- Source: https://f-droid.org/docs/Build_Server_Setup/ — fdroidserver keystore configuration
+
 ## Secure patterns
 
 Pre-commit hook configuration using gitleaks:
@@ -93,6 +107,11 @@ Source: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_
 *.key
 *.p12
 *.pfx
+*.jks
+*.keystore
+*.der
+developer_key.*
+keystore.p12
 credentials.json
 secrets.yaml
 secrets.yml

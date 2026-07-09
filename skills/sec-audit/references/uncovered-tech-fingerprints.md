@@ -270,6 +270,62 @@ Each detection entry follows this shape:
 - **rationale:** Build systems frequently `curl | sh` install dependencies, fetch toolchains without checksum verification, and embed credentials in build args. The existing `shell` lane catches some of this when invoked via shell scripts; the build-system layer adds its own surface.
 - **notes:** Lower priority — most concrete misconfigurations surface via the `shell` lane already.
 
+### Garmin Connect IQ (Monkey C)
+
+- **suggested_lane:** `connectiq`
+- **detection:**
+  - `monkey.jungle` (manifest, high — the Connect IQ build descriptor; unique to the SDK)
+  - `manifest.xml` co-located with `*.mc` source (manifest, high — Connect IQ app / watch-face manifest)
+  - `*.mc` (file-extension, high — Monkey C is the only meaningful consumer of `.mc`)
+  - `*.prg` (file-extension, medium — compiled Connect IQ program artefact)
+- **suggested_tools:**
+  - No canonical third-party SAST tool exists for Monkey C. The Connect IQ SDK's `monkeyc` compiler `--warn` output is the only static signal; a lane would be a custom checker.
+  - Manifest permission audit — `manifest.xml` `<iq:uses-permissions>` over-grant (Positioning / Sensor / Communications / Background) reviewed against declared behaviour.
+- **rationale:** Connect IQ apps and watch-faces request device permissions (GPS position, ANT+ sensor data, phone Communications, background execution) and frequently commit their signing key (`developer_key`, a PKCS#8 `.der` / `.pem`) into the repo. Security surface: permission over-grant (privacy), committed developer signing key (CWE-798), and `Communications.makeWebRequest` to plaintext endpoints (CWE-319). Currently uncovered — and, before this entry, not even surfaced as a coverage gap.
+- **notes:** Pair the `.mc` extension with `monkey.jungle` / `manifest.xml` to avoid FPs. The committed-developer-key hazard is caught by the `secrets` lane's widened key-material globs (see `secrets/secret-sprawl.md`); this fingerprint adds the permission-audit surface.
+
+### OpenWrt package (feed Makefile)
+
+- **suggested_lane:** `openwrt`
+- **detection:**
+  - `Makefile` containing `include $(TOPDIR)/rules.mk` (content-regex, high — the OpenWrt package build signature)
+  - `Makefile` containing `include $(INCLUDE_DIR)/package.mk` (content-regex, high)
+  - `files/etc/uci-defaults/` directory (manifest, high — UCI default-config scripts that run once as root at first boot)
+  - `files/etc/config/` UCI config (manifest, medium)
+- **suggested_tools:**
+  - `shellcheck` on `uci-defaults/` + `postinst` / `prerm` scripts — already available via the `shell` lane; an `openwrt` lane would scope these and add UCI-specific checks.
+  - No canonical OpenWrt-package security linter exists; UCI ACL / RPC-handler review (see the Lua / LuCI entry) would require a custom checker.
+- **rationale:** OpenWrt feed packages install `uci-defaults` scripts that run as root at first boot, ship `/etc/config` UCI files (firewall / dropbear / network) whose defaults set the device's security posture, and often patch system daemons. Package Makefiles fetch sources by URL + hash (`PKG_SOURCE` / `PKG_HASH`) — an unpinned or hash-missing source is a supply-chain hazard (CWE-494). Currently invisible: the only related entry is Lua / LuCI (the admin-UI layer), not the package-build layer.
+- **notes:** Cross-reference the Lua / LuCI entry for the admin-UI surface. Require the `rules.mk` include to distinguish an OpenWrt package Makefile from a generic Makefile and avoid FPs.
+
+### F-Droid repository server (fdroidserver)
+
+- **suggested_lane:** `fdroid-repo`
+- **detection:**
+  - `config.yml` / `config.py` containing `repo_url:` / `keystore:` / `keystorepass:` (content-regex, high — fdroidserver config)
+  - `fdroidserver` referenced in a `Makefile` / `requirements.txt` (content-regex, high)
+  - `repo/index-v1.jar` / `repo/index-v2.json` (manifest, high — a built, signed F-Droid repo index)
+  - `metadata/*.yml` next to a `config.yml` (manifest, medium — per-app build recipes)
+- **suggested_tools:**
+  - `fdroid lint` / `fdroid rewritemeta` — https://f-droid.org/docs/ — fdroidserver's own metadata validator.
+  - Keystore-hygiene review — `config.yml` `keystorepass` / `keypass` stored in plaintext (CWE-256 / CWE-798), keystore (`.p12` / `.jks` / `.keystore`) committed alongside config.
+- **rationale:** An F-Droid repo server is signing infrastructure, not an app: `config.yml` holds the APK-signing keystore path and its passphrase (frequently in plaintext), and the signing keystore itself (`keystore.p12`) is often committed beside it. Compromise of either lets an attacker sign malicious APKs trusted by every device subscribed to the repo. Security surface: plaintext keystore credentials (CWE-256), committed signing keystore (CWE-798), unsigned / plaintext `repo_url` distribution (CWE-319). Currently uncovered.
+- **notes:** The committed-keystore + plaintext-password hazards are caught by the `secrets` lane's widened key-material + fdroidserver patterns (see `secrets/secret-sprawl.md`); this fingerprint adds the repo-signing-hygiene surface. Distinct from the `android` lane, which reviews the app APK, not the repo that serves it.
+
+### Homebrew tap (Formula / Cask Ruby)
+
+- **suggested_lane:** `homebrew`
+- **detection:**
+  - `Casks/*.rb` (manifest, high — a Homebrew Cask definition)
+  - `Formula/*.rb` (manifest, high — a Homebrew Formula)
+  - `*.rb` containing `class ... < Formula` / `cask "..." do` + `sha256` (content-regex, high)
+- **suggested_tools:**
+  - `brew audit --strict --online <name>` — https://docs.brew.sh/Formula-Cookbook — Homebrew's own formula / cask auditor (checksum presence, HTTPS URLs, license).
+  - `brew style` — https://docs.brew.sh/ — RuboCop-backed style + some correctness rules.
+  - Detective pack `supply-chain/homebrew-tap.md` — `sha256 :no_check`, non-HTTPS `url`, unpinned moving-tag `url`, `postflight` / `preflight` script review.
+- **rationale:** A Homebrew tap distributes install recipes that run on the user's machine: a `sha256 :no_check` (CWE-494 download-without-integrity), a non-HTTPS `url` (CWE-319 cleartext fetch, MITM), a `url` pointing at a moving tag / branch rather than a pinned release, and arbitrary `postflight` / `preflight` / `install` Ruby are all real supply-chain hazards. Currently uncovered.
+- **notes:** See `supply-chain/homebrew-tap.md` for the dangerous-pattern detail. A single `*.rb` is ambiguous — require the `class < Formula` / `cask ... do` signature to avoid FPs against generic Ruby.
+
 ## Common false positives (lane-suggestion FPs)
 
 The detection patterns are tuned for HIGH-precision suggestions, but
