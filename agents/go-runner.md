@@ -2,7 +2,7 @@
 name: go-runner
 description: "Go static-analysis adapter for sec-audit. Runs gosec and staticcheck against a Go module root under target_path; emits JSONL findings tagged origin: \"go\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.19."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # go-runner

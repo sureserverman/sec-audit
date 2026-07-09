@@ -2,7 +2,7 @@
 name: sast-runner
 description: "SAST adapter for sec-audit. Runs semgrep and bandit against target_path; emits JSONL findings tagged origin: \"sast\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.6."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # sast-runner

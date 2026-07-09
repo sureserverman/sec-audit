@@ -2,7 +2,7 @@
 name: c-cpp-runner
 description: "C/C++ static-analysis adapter for sec-audit. Runs cppcheck and flawfinder against C/C++ source under target_path; emits JSONL findings tagged origin: \"c-cpp\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.29."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # c-cpp-runner

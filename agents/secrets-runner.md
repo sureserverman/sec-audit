@@ -2,7 +2,7 @@
 name: secrets-runner
 description: "Secret-scanning adapter for sec-audit. Runs gitleaks (working-tree secret scan) + trufflehog (git-history secret scan, verification disabled) against target_path; emits JSONL findings tagged origin: \"secrets\" with secrets redacted. Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.28."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # secrets-runner

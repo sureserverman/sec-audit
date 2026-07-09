@@ -2,7 +2,7 @@
 name: webext-runner
 description: "Browser-extension static-analysis adapter for sec-audit. Runs addons-linter, web-ext, and retire.js against extension source under target_path; emits JSONL findings tagged origin: \"webext\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.8."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # webext-runner

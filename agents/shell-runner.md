@@ -2,7 +2,7 @@
 name: shell-runner
 description: "Shell-script static-analysis adapter for sec-audit. Runs shellcheck against shell-shaped files under target_path; emits JSONL findings tagged origin: \"shell\". Sentinel-exits when tool is unavailable. Dispatched by sec-audit §3.20."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # shell-runner

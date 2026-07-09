@@ -2,7 +2,7 @@
 name: python-runner
 description: "Python static-analysis adapter for sec-audit. Runs pip-audit and ruff against a Python project root under target_path; emits JSONL findings tagged origin: \"python\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.21."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # python-runner

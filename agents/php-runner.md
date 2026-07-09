@@ -2,7 +2,7 @@
 name: php-runner
 description: "PHP static-analysis adapter for sec-audit. Runs phpcs with the WordPress Coding Standards security sniffs against PHP source under target_path; emits JSONL findings tagged origin: \"php\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.30."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # php-runner

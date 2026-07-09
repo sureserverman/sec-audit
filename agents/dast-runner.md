@@ -2,7 +2,7 @@
 name: dast-runner
 description: "DAST adapter for sec-audit. Runs OWASP ZAP baseline scan against target_url (not target_path) when docker or zap-baseline.py is available; emits JSONL findings tagged origin: \"dast\". Sentinel-exits when tool or URL is unavailable. Dispatched by sec-audit §3.7."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # dast-runner

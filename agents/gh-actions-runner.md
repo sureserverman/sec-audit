@@ -2,7 +2,7 @@
 name: gh-actions-runner
 description: "GitHub Actions workflow static-analysis adapter for sec-audit. Runs actionlint and zizmor against .github/workflows/ under target_path; emits JSONL findings tagged origin: \"gh-actions\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.17."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # gh-actions-runner

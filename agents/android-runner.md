@@ -2,7 +2,7 @@
 name: android-runner
 description: "Android static-analysis adapter for sec-audit. Runs mobsfscan, apkleaks, and android-lint against target_path; emits JSONL findings tagged origin: \"android\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.10."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # android-runner
