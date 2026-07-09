@@ -87,6 +87,15 @@ def detect(target, files=None):
     # is ubiquitous and would FP). cppcheck + flawfinder then scan the tree.
     if any_ext(".c", ".cc", ".cpp", ".cxx", ".c++"):
         lanes["c-cpp"] = True
+    # php fires on a *.php source or composer.json. Sub-shape "wordpress" when a
+    # WP signal is present (wp-config.php, a `Theme Name:` style.css header, or a
+    # functions.php using add_action), else "generic" — the phpcs WPCS security
+    # sniffs are tuned for WordPress. (Packagist deps are enriched separately.)
+    if ".php" in exts or any_name("composer.json"):
+        wp = (any_name("wp-config.php")
+              or any(os.path.basename(r) == "style.css" and grep(r, r"(?mi)^\s*Theme Name:") for r in rels)
+              or any(os.path.basename(r) == "functions.php" and grep(r, r"add_action\s*\(") for r in rels))
+        lanes["php"] = ["wordpress"] if wp else ["generic"]
     if any_ext(".tf"):
         lanes["iac"] = True
     if any(r.startswith(".github/workflows/") and r.endswith((".yml", ".yaml")) for r in rels):

@@ -21,7 +21,7 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across twenty-four tool lanes plus sec-expert
+software projects across twenty-five tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
@@ -70,8 +70,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to twenty-three review streams in parallel
-(twenty-two tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty-four review streams in parallel
+(twenty-three tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -483,6 +483,37 @@ Dispatch discipline.
   surfaces (Pickle/YAML deserialization, asyncio task
   swallowing, FastAPI DI bypass, Django ORM `.extra()`).
 - **Shipped in:** v1.7.0.
+
+### php (PHP / WordPress source)
+
+- **Target shape:** a `*.php` source file OR a `composer.json` under
+  target. Sub-shape `["wordpress"]` when a WordPress signal is present
+  (`wp-config.php`, a `style.css` `Theme Name:` header, or a
+  `functions.php` calling `add_action(`), else `["generic"]`.
+- **Tools:** `phpcs` (PHP_CodeSniffer) run with the WordPress Coding
+  Standards **security** sniff subset — `WordPress.Security.EscapeOutput`
+  (unescaped output → XSS, CWE-79), `WordPress.Security.NonceVerification`
+  (missing CSRF nonce, CWE-352), `WordPress.Security.ValidatedSanitizedInput`
+  (unvalidated / unsanitized request input, CWE-20), and
+  `WordPress.DB.PreparedSQL(Placeholders)` (unprepared SQL, CWE-89).
+  `--report=json`. Cross-platform (PHP + Composer); a pure source-tree
+  static scanner (never executes the PHP).
+- **Reference packs:** `references/php/wordpress.md`,
+  `references/php/php-web.md`, `references/php-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing` (phpcs absent, or its `WordPress`
+  standard not registered), `no-php-source` (NEW in v1.27 — target-shape;
+  phpcs on PATH but no `*.php` under target).
+- **Origin tag:** `"php"`. Tool whitelist: `phpcs`.
+- **Dep-inventory:** NOT affected — `composer.json` packages are enriched
+  by cve-enricher via the `Packagist` ecosystem entry, independently of
+  phpcs's code-pattern findings.
+- **Scope note:** the WPCS security sniffs are tuned for WordPress; on the
+  `["generic"]` sub-shape (Laravel / Symfony / framework-less) they still
+  fire on the universal issues (unescaped output, unsanitized input, SQL
+  concatenation) but with more FPs (finding-triager down-ranks). Deep
+  non-WordPress taint analysis remains a coverage-gap fingerprint.
+- **Shipped in:** v1.27.0.
 
 ### ansible
 
@@ -926,11 +957,11 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**30 canonical reason values** as of v1.26 (24 target-shape + 3
+**31 canonical reason values** as of v1.27 (25 target-shape + 3
 host-OS-gated + 1 profile-absent + 2 tool-output), grouped by
 semantic category:
 
-### Target-shape (24)
+### Target-shape (25)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -945,6 +976,7 @@ semantic category:
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 | `no-compose-file` | virt                 | No `docker-compose.y(a)ml` / `compose.y(a)ml` under target (kics-specific). NEW in v1.25. |
 | `no-c-source`     | c-cpp                | No C/C++ source/header under target (cppcheck/flawfinder-specific). NEW in v1.26. |
+| `no-php-source`   | php                  | No `*.php` under target (phpcs-specific). NEW in v1.27.                 |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 | `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
 | `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |

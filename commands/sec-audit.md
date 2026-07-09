@@ -35,11 +35,11 @@ Parse `$ARGUMENTS` into:
    repository (else the run errors). This is NOT a `--only`/`--skip` lane name
    — it is a separate opt-in flag. Absent ⇒ whole-tree review.
 
-**Canonical lane names (25 total):** `sec-expert`, `sast`, `dast`,
+**Canonical lane names (26 total):** `sec-expert`, `sast`, `dast`,
 `webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
 `k8s`, `iac`, `gh-actions`, `virt`, `c-cpp`, `go`, `shell`, `python`,
-`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`,
-`secrets`.
+`php`, `ansible`, `netcfg`, `image`, `ai-tools`, `webapp`,
+`supply-chain`, `secrets`.
 Reject any invocation that names a lane outside this list. (`--deep-deps`,
 `--sarif`, and `--diff` are flags, not lane names, and are not accepted in
 `--only`/`--skip`.)

@@ -84,21 +84,28 @@ Each detection entry follows this shape:
 - **rationale:** Smart-contract security is its own discipline: re-entrancy (CWE-841), integer overflow (Solidity ≤ 0.7), unchecked external calls, `tx.origin` auth, front-running. None of these map to existing lanes.
 - **notes:** Niche unless the user works in DeFi / Web3 / NFT; flagging is INFO-by-default; user can decide whether to fund the lane.
 
-### PHP (Laravel / Symfony / WordPress / generic)
+### PHP — Laravel / Symfony / generic (WordPress now covered)
 
-- **suggested_lane:** `php`
+- **PARTIALLY COVERED (v1.27):** WordPress is now served by the dedicated `php`
+  lane (phpcs + WordPress Coding Standards security sniffs — EscapeOutput/CWE-79,
+  NonceVerification/CWE-352, ValidatedSanitizedInput/CWE-20, PreparedSQL/CWE-89).
+  This entry now tracks only the **non-WordPress** PHP subset — Laravel, Symfony,
+  and framework-less PHP — whose deep taint analysis remains thin.
+- **suggested_lane:** `php` (extend the existing lane, not a new one)
 - **detection:**
-  - `composer.json` (manifest, high)
-  - `*.php` (file-extension, medium) at non-trivial depth
-  - `wp-config.php` (manifest, high — WordPress signal)
   - `artisan` (manifest, high — Laravel CLI entry point)
   - `bin/console` (manifest, medium — Symfony CLI entry point)
+  - `*.php` (file-extension, medium) at non-trivial depth WITHOUT a WordPress
+    signal (no `wp-config.php` / `Theme Name:` `style.css` / `add_action`)
 - **suggested_tools:**
-  - `psalm` — https://psalm.dev/ — Vimeo's PHP static analyzer with `--taint-analysis`.
+  - `psalm` — https://psalm.dev/ — Vimeo's PHP static analyzer with `--taint-analysis` (needs a composer autoload root — the reason it is not yet in the lane).
   - `phpstan` — https://phpstan.org/ — multi-level static analyzer.
   - `progpilot` — https://github.com/designsecurity/progpilot — PHP security-focused taint analyzer (CWE-89 / CWE-79 / CWE-78 / CWE-22).
-- **rationale:** PHP is one of the most-deployed server-side languages globally. WordPress alone hosts 40%+ of the web. Existing coverage is via SAST lane's semgrep `p/php` ruleset only, which is shallow. A dedicated lane would deepen CWE-89 / CWE-79 / CWE-22 / CWE-78 detection via taint analysis.
-- **notes:** `composer.json` deps are already covered by the `Packagist` ecosystem entry feeding cve-enricher.
+- **rationale:** the WordPress security surface (40%+ of the web) is now covered by
+  the `php` lane; Laravel/Symfony route-handler injection, Blade/Twig SSTI, and
+  mass-assignment still rely only on the SAST lane's shallow semgrep `p/php`
+  ruleset. Deepening these needs taint analysis with an autoload root.
+- **notes:** `composer.json` deps are already covered by the `Packagist` ecosystem entry feeding cve-enricher. The `php` lane runs phpcs's WordPress security sniffs; on non-WordPress PHP those sniffs still fire on the universal issues (unescaped output, unsanitized input, SQL concatenation) but with more FPs — the finding-triager down-ranks them.
 
 ### Ruby (non-Rails)
 

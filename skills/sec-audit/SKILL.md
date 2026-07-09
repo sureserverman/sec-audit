@@ -28,7 +28,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14), `c-cpp` (added v1.26). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14), `c-cpp` (added v1.26), `php` (added v1.27). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -482,6 +482,22 @@ below — layering them on top of the script's baseline.
   signal (cppcheck memory-safety + flawfinder banned-function surface).
   **This lane supersedes the former `cpp` coverage-gap fingerprint** — the
   entry was retired from `uncovered-tech-fingerprints.md` in v1.26.
+- **PHP signals**: a `*.php` source file OR a `composer.json` under
+  target. Sub-shape disambiguation: add `"php": ["wordpress"]` when a
+  WordPress signal is present — a `wp-config.php`, a `style.css` with a
+  `Theme Name:` header, or a `functions.php` calling `add_action(` —
+  else `"php": ["generic"]`. When detected, add `"php"` to the inventory
+  and load `references/php/wordpress.md` + `references/php/php-web.md`
+  and the tool-lane reference `references/php-tools.md`. The `php` lane
+  runs phpcs with the WordPress Coding Standards **security** sniffs
+  (EscapeOutput → CWE-79, NonceVerification → CWE-352,
+  ValidatedSanitizedInput → CWE-20, PreparedSQL → CWE-89); it deepens
+  the shallow semgrep `p/php` coverage the SAST lane already provides.
+  `composer.json` dependencies are enriched separately via the existing
+  `Packagist` ecosystem entry (cve-enricher) — the `php` lane is
+  code-pattern signal, not dep-version signal. Non-WordPress PHP
+  (Laravel / Symfony) is only partially covered — deep taint analysis
+  remains a coverage-gap fingerprint (`uncovered-tech-fingerprints.md`).
 - **GitHub Actions signals**: any `.github/workflows/*.yml` or
   `.github/workflows/*.yaml` file under target whose contents
   declare both top-level `on:` and `jobs:` keys (the canonical
@@ -2163,6 +2179,45 @@ this lane** — C/C++ dependency management is out-of-band (system packages,
 vendored trees), so there is no manifest for cve-enricher. The lane
 supersedes the retired `cpp` coverage-gap fingerprint. Every finding
 carries `origin: "c-cpp"`, `tool: "cppcheck" | "flawfinder"`.
+
+### 3.30 PHP pass — dispatch php-runner
+
+When the inventory emitted by §2 contains `php` (a `*.php` source or a
+`composer.json`), dispatch the `php-runner` agent
+(`agents/php-runner.md`, pinned to haiku, tools: Read + Bash). The agent
+shells out to `phpcs` (PHP_CodeSniffer) with the **WordPress Coding
+Standards security sniffs** — `WordPress.Security.EscapeOutput`
+(unescaped output → XSS, CWE-79), `WordPress.Security.NonceVerification`
+(missing CSRF nonce, CWE-352), `WordPress.Security.ValidatedSanitizedInput`
+(unvalidated / unsanitized request input, CWE-20), and
+`WordPress.DB.PreparedSQL(Placeholders)` (unprepared SQL, CWE-89) —
+emitting `--report=json`. phpcs is cross-platform (PHP + Composer), runs
+as a pure source-tree static scanner, and maps through the deterministic
+runner engine (`scripts/secaudit/runner.py php`).
+
+php-runner runs in parallel with every other pass agent. Collect the
+findings into a `php_findings` list.
+
+Skill-level invariants:
+
+- **No `php` in inventory** — skip entirely.
+- **`__php_status__: "unavailable"`** — phpcs not on PATH, or no PHP
+  source under target.
+- **`__php_status__: "ok"`** — phpcs ran.
+- **Two skip reasons:**
+  - `tool-missing` — phpcs (or its WordPress standard) is absent.
+  - `no-php-source` — phpcs is on PATH but the target tree contains no
+    `*.php` file. Target-shape clean-skip.
+
+The WPCS security sniffs are tuned for WordPress; on the `["generic"]`
+sub-shape (Laravel / Symfony / framework-less PHP) they still fire on the
+universal issues (unescaped output, unsanitized input, SQL
+concatenation) but with more false positives — the finding-triager
+down-ranks them, and deep non-WordPress taint analysis remains a
+coverage-gap fingerprint. **The dep-inventory path is NOT affected by
+this lane** — `composer.json` packages are enriched by cve-enricher via
+the `Packagist` ecosystem entry, independently of phpcs's code-pattern
+findings. Every finding carries `origin: "php"`, `tool: "phpcs"`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

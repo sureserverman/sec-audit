@@ -772,6 +772,36 @@ supersedes the former `cpp` coverage-gap fingerprint. Skip reasons:
 `tool-missing`, `no-c-source` (target-shape). No dep-inventory impact —
 C/C++ dependency management is out-of-band (no manifest for cve-enricher).
 
+## PHP / WordPress lane (v1.27.0)
+
+The **`php-runner`** agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline whenever the §2 inventory finds a `*.php` source or a
+`composer.json`. It disambiguates a `["wordpress"]` sub-shape
+(`wp-config.php`, a `style.css` `Theme Name:` header, or a `functions.php`
+calling `add_action(`) from `["generic"]`. Cross-platform (PHP + Composer);
+a pure static scanner — it never executes the PHP.
+
+The runner dispatches one tool:
+
+- **`phpcs`** (PHP_CodeSniffer) with the **WordPress Coding Standards
+  security sniffs** — `WordPress.Security.EscapeOutput` (unescaped output →
+  XSS, CWE-79), `WordPress.Security.NonceVerification` (missing CSRF nonce,
+  CWE-352), `WordPress.Security.ValidatedSanitizedInput` (unvalidated /
+  unsanitized request input, CWE-20), and `WordPress.DB.PreparedSQL(Placeholders)`
+  (unprepared SQL, CWE-89). `--report=json`; the engine iterates the
+  path-keyed `files` object by value (exposing the path as `_parent._key`),
+  flattens `messages`, and maps the sniff `source` to a CWE.
+
+Output carries `origin: "php"` and `tool: "phpcs"`. Reference packs:
+`references/php/wordpress.md` (escaping / nonce / capability / `$wpdb->prepare`
+patterns with WordPress-handbook-cited fix recipes), `references/php/php-web.md`
+(the non-WordPress `unserialize` / LFI / `preg_replace /e` / weak-compare
+surface), and `references/php-tools.md`. WordPress is thereby promoted from a
+coverage-gap fingerprint to a covered lane; the fingerprint is narrowed to the
+non-WordPress (Laravel / Symfony) subset. Skip reasons: `tool-missing`,
+`no-php-source` (target-shape). No dep-inventory impact — `composer.json`
+packages are enriched separately via the `Packagist` ecosystem feed.
+
 ## Go lane (v1.5.0)
 
 An eighteenth agent, **`go-runner`** (haiku-pinned, `Read` +
