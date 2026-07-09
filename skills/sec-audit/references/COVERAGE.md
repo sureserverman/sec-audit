@@ -59,9 +59,10 @@ v1.10 adds no new lanes. Two ergonomic improvements:
    Inventory scans for technologies present in the project but
    NOT covered by any sec-audit lane (using
    `references/uncovered-tech-fingerprints.md`'s curated catalogue
-   of nineteen known-but-uncovered technologies — including (v1.24)
+   of eighteen known-but-uncovered technologies — (v1.24) added
    Garmin Connect IQ / Monkey C, OpenWrt package feed Makefiles,
-   F-Droid repository servers, and Homebrew taps). Detected
+   F-Droid repository servers, and Homebrew taps; (v1.26) retired
+   the C/C++ entry, which became the `c-cpp` lane). Detected
    technologies are emitted as an `uncovered_tech` array on the
    `inventory.json` record and rendered by `report-writer`'s new
    Step 5.5 in a "Coverage-gap suggestions" section. The section
@@ -69,8 +70,8 @@ v1.10 adds no new lanes. Two ergonomic improvements:
 
 ## Lanes
 
-The plugin dispatches up to twenty-two review streams in parallel
-(twenty-one tool lanes plus the sec-expert code-reasoning stream).
+The plugin dispatches up to twenty-three review streams in parallel
+(twenty-two tool lanes plus the sec-expert code-reasoning stream).
 Each inventory key in `§2 Inventory` maps to one dispatch target.
 Two or more keys trigger multi-stack dispatch; see SKILL.md §3.0
 Dispatch discipline.
@@ -351,6 +352,35 @@ Dispatch discipline.
   the virt lane covers the runtime / VMM surface those packs do
   NOT.
 - **Shipped in:** v1.4.0; kics compose scanning added v1.25.0.
+
+### c-cpp (C / C++ source memory-safety)
+
+- **Target shape:** at least one C/C++ **source** file under target —
+  `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`. A header alone
+  (`*.h` / `*.hpp` / `*.hxx`) does NOT trigger the lane (vendored /
+  JNI headers are ubiquitous and would false-positive); the §2
+  inventory gate requires a translation-unit source file.
+- **Tools:** `cppcheck` (data-flow static analyzer — buffer overruns
+  CWE-788/120, memory leaks CWE-401, use-after-free CWE-416,
+  uninitialised reads, null deref; `--xml` with per-error `cwe`
+  attributes) and `flawfinder` (lexical scanner for the
+  banned-libc-function family — `strcpy`/`gets`/`sprintf`→CWE-120,
+  `system`→CWE-78, `printf`-format→CWE-134; `--sarif`). Both
+  cross-platform (apt / pip), both static — neither compiles nor
+  executes the target. Complementary: cppcheck proves overflows
+  by data-flow (high precision), flawfinder flags every hazardous
+  call (high recall).
+- **Reference packs:** `references/c-cpp/memory-safety.md`,
+  `references/c-cpp-tools.md`.
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-c-source` (NEW in v1.26 —
+  target-shape; tool on PATH but no C/C++ source/header under target).
+- **Origin tag:** `"c-cpp"`. Tool whitelist: `cppcheck`, `flawfinder`.
+- **Dep-inventory:** NOT affected — C/C++ dependency management is
+  out-of-band (system packages / vendored trees), so there is no
+  manifest for cve-enricher; the lane is pure source-pattern signal.
+  Supersedes the retired `cpp` coverage-gap fingerprint.
+- **Shipped in:** v1.26.0.
 
 ### go
 
@@ -896,11 +926,11 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**29 canonical reason values** as of v1.25 (23 target-shape + 3
+**30 canonical reason values** as of v1.26 (24 target-shape + 3
 host-OS-gated + 1 profile-absent + 2 tool-output), grouped by
 semantic category:
 
-### Target-shape (23)
+### Target-shape (24)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -914,6 +944,7 @@ semantic category:
 | `no-containerfile`| virt                 | No Dockerfile / Containerfile under target (hadolint-specific).         |
 | `no-libvirt-xml`  | virt                 | No XML with libvirt root element under target (virt-xml-validate).      |
 | `no-compose-file` | virt                 | No `docker-compose.y(a)ml` / `compose.y(a)ml` under target (kics-specific). NEW in v1.25. |
+| `no-c-source`     | c-cpp                | No C/C++ source/header under target (cppcheck/flawfinder-specific). NEW in v1.26. |
 | `no-shell-source` | shell                | No shell-shaped files under target after vendored-dir exclusions.       |
 | `no-requirements` | python               | No Python manifest or `*.py` files under target.                        |
 | `no-playbook`     | ansible              | No Ansible-shaped files under target.                                   |

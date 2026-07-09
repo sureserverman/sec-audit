@@ -742,6 +742,36 @@ with a libvirt root element). Both parallel the existing
 v0.10–v0.12 target-shape primitives (`no-pe`, `no-elf`, `no-pkg`,
 `no-debian-source`).
 
+## C/C++ lane (v1.26.0)
+
+The **`c-cpp-runner`** agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline whenever the §2 inventory finds a C/C++ **source** file
+(`*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`). A header alone
+(`*.h` / `*.hpp` / `*.hxx`) does NOT trigger it — vendored and JNI
+headers are ubiquitous and would false-positive, so the inventory
+requires a translation-unit source file. Cross-platform, no host-OS
+gate; both tools are static — neither compiles nor executes the target.
+
+The runner dispatches two complementary tools:
+
+- **`cppcheck`** (data-flow static analyzer) — proves buffer overruns
+  (CWE-788/120), memory leaks (CWE-401), use-after-free (CWE-416),
+  uninitialised reads, and null derefs by tracking program semantics.
+  `--xml` output carries a per-error `cwe` attribute. High precision.
+- **`flawfinder`** (lexical scanner) — flags every call to the
+  banned-libc-function family (`strcpy`/`gets`/`sprintf`→CWE-120,
+  `system`→CWE-78, `printf`-as-format→CWE-134) regardless of
+  provability. `--sarif` output; the engine extracts the CWE from the
+  message with a `regex` field-transform (new in v1.26). High recall.
+
+Output carries `origin: "c-cpp"` and `tool: "cppcheck" | "flawfinder"`.
+Reference packs: `references/c-cpp/memory-safety.md` (the memory-safety +
+banned-function patterns with SEI CERT C / CWE-cited fix recipes) and
+`references/c-cpp-tools.md` (invocations + field mappings). The lane
+supersedes the former `cpp` coverage-gap fingerprint. Skip reasons:
+`tool-missing`, `no-c-source` (target-shape). No dep-inventory impact —
+C/C++ dependency management is out-of-band (no manifest for cve-enricher).
+
 ## Go lane (v1.5.0)
 
 An eighteenth agent, **`go-runner`** (haiku-pinned, `Read` +
