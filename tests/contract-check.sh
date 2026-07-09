@@ -2590,6 +2590,25 @@ sys.exit(1 if errs else 0)
 fi
 echo "v1.27-symmetry: foreign lanes reject phpcs"
 
+# --- No bare (unscoped) Bash grant in agent/command frontmatter (CWE-693) ---
+# Every `tools:` / `allowed-tools:` frontmatter line that grants Bash must scope
+# it to a per-tool allowlist (`Bash(python3:*)`), never a bare `Bash` token.
+# A bare grant lets a prompt-injected agent run arbitrary commands against the
+# audited target tree (the very threat model this plugin operates in).
+bare_bash=0
+while IFS= read -r offender; do
+    [ -z "$offender" ] && continue
+    bare_bash=$((bare_bash + 1))
+    echo "  unscoped Bash grant: $offender" >&2
+done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
+         | grep -E 'Bash([^(]|$)' || true)
+echo "no-bare-bash: $bare_bash file(s) with an unscoped Bash grant"
+if [ "$bare_bash" -ne 0 ]; then
+    echo "CONTRACT FAIL: $bare_bash agent/command file(s) grant unscoped Bash (CWE-693);" \
+         "scope each to Bash(tool:*) per docs/plans-notes/bash-scope-inventory.md" >&2
+    fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1
