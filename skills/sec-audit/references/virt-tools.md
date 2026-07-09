@@ -1,9 +1,9 @@
 # virt-tools
 
 <!--
-    Tool-lane reference for sec-audit's virt lane (v1.4.0+).
+    Tool-lane reference for sec-audit's virt lane (v1.4.0+; kics added v1.25).
     Consumed by the `virt-runner` sub-agent. Documents
-    hadolint + virt-xml-validate.
+    hadolint + virt-xml-validate + kics.
 -->
 
 ## Source
@@ -12,6 +12,8 @@
 - https://github.com/hadolint/hadolint/wiki — hadolint rule reference (`DLxxxx` rule IDs and remediation pointers)
 - https://libvirt.org/manpages/virt-xml-validate.html — virt-xml-validate(1) man page (canonical)
 - https://libvirt.org/format.html — libvirt XML schema index (the schemas virt-xml-validate validates against)
+- https://github.com/Checkmarx/kics — kics canonical (Go binary; multi-IaC misconfiguration scanner)
+- https://docs.kics.io/latest/queries/dockercompose-queries/ — kics dockerCompose query catalogue (privileged, host-namespace, socket-mount, capability, resource-limit)
 - https://cwe.mitre.org/
 
 ## Scope
@@ -76,10 +78,44 @@ Source: https://github.com/hadolint/hadolint
 
 Source: https://libvirt.org/manpages/virt-xml-validate.html
 
+### kics (docker-compose)
+
+- Install: pre-built binaries from GitHub Releases (`Checkmarx/kics`,
+  Linux/macOS amd64+arm64) OR `docker pull checkmarx/kics`. The release
+  binary does **not** bundle its query assets; the standard install lays
+  `assets/queries/` beside the binary and kics auto-discovers them (resolving
+  relative to the real executable path). If queries live elsewhere, set
+  `KICS_QUERIES_PATH` or pass `-q <dir>`; the runner's invocation relies on
+  auto-discovery.
+- Invocation:
+  ```bash
+  kics scan -p "$target_path" -t DockerCompose \
+      --report-formats json -o "$TMPDIR" --output-name kics \
+      --silent --no-progress
+  # results at "$TMPDIR/kics.json"
+  ```
+  `-t DockerCompose` restricts the scan to compose files so kics never
+  re-reports Dockerfile findings that hadolint already owns. `-p` may be a
+  directory (all compose files under it) or a single compose file.
+- Output: JSON. `queries[]` is an array of fired queries; each has
+  `query_id`, `query_name`, `severity`
+  (`CRITICAL`/`HIGH`/`MEDIUM`/`LOW`/`INFO`/`TRACE`), `cwe` (bare number
+  string, e.g. `"250"`), `query_url`, `description`, and a nested `files[]`
+  array whose entries carry `file_name`, `line`, `issue_type`,
+  `expected_value`, `actual_value`. The runner flattens `queries[] → files[]`,
+  emitting one finding per file-hit.
+- Tool behaviour: exits non-zero when findings exist (40/50 for HIGH/MEDIUM);
+  NOT a crash — read the JSON report regardless. No compose file under target →
+  empty `queries` (the runner's `applicable_glob` gates this to a
+  `no-compose-file` clean-skip before the tool even runs).
+- Primary source: https://docs.kics.io/latest/queries/dockercompose-queries/
+
+Source: https://github.com/Checkmarx/kics
+
 ## Output-field mapping
 
 Every finding carries `origin: "virt"`,
-`tool: "hadolint" | "virt-xml-validate"`, `reference: "virt-tools.md"`.
+`tool: "hadolint" | "virt-xml-validate" | "kics"`, `reference: "virt-tools.md"`.
 
 ### hadolint → sec-audit finding
 
@@ -111,6 +147,21 @@ Every finding carries `origin: "virt"`,
 | null                                                  | `fix_recipe`                 |
 | `"high"` (validator is deterministic — no FP)         | `confidence`                 |
 
+### kics → sec-audit finding
+
+| upstream                                              | sec-audit field             |
+|-------------------------------------------------------|------------------------------|
+| `"kics:" + query.query_id`                            | `id`                         |
+| `query.severity` remap: `CRITICAL`→CRITICAL, `HIGH`→HIGH, `MEDIUM`→MEDIUM, `LOW`/`INFO`/`TRACE`→LOW | `severity` |
+| `"CWE-" + query.cwe` (verbatim query CWE metadata; `null` when absent) | `cwe`     |
+| `query.query_name`                                    | `title`                      |
+| `files[].file_name`                                   | `file`                       |
+| `files[].line`                                        | `line`                       |
+| `files[].actual_value` (truncated to 200 chars)       | `evidence`                   |
+| `query.query_url`                                     | `reference_url`              |
+| null (kics ships remediation prose, not a code recipe) | `fix_recipe`                |
+| `"medium"`                                            | `confidence`                 |
+
 ## Degrade rules
 
 `__virt_status__` ∈ {`"ok"`, `"partial"`, `"unavailable"`}.
@@ -128,8 +179,11 @@ Skip vocabulary (v1.4.0):
   (`<domain>` / `<network>` / `<pool>` / `<volume>`).
   Target-shape clean-skip; parallel to the above target-shape
   primitives.
+- `no-compose-file` — NEW in v1.25; kics is on PATH but the target
+  tree contains no `docker-compose.y(a)ml` / `compose.y(a)ml`
+  files. Target-shape clean-skip; parallel to the above.
 
-No host-OS gate — both tools are cross-platform with no
+No host-OS gate — all three tools are cross-platform with no
 `requires-<host>-host` precondition.
 
 ## Version pins
@@ -139,3 +193,9 @@ No host-OS gate — both tools are cross-platform with no
   Pinned 2026-04.
 - `virt-xml-validate` ≥ libvirt 9.0 (XSD coverage of `<launchSecurity>`,
   `<tpm>`, virtiofs `<filesystem>` driver). Pinned 2026-04.
+- `kics` ≥ 2.1 (stable `queries[].files[]` JSON schema; `severity`/`cwe`/
+  `query_id`/`query_name` fields fixed; dockerCompose query set covering
+  privileged/host-namespace/socket-mount/capability/resource-limit).
+  Note: the OSS release cadence slowed after 2025-03 — pin the binary +
+  its `assets/queries/` together so the query set does not drift. Pinned
+  2026-07 (v2.1.20).
