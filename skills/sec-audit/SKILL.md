@@ -28,7 +28,7 @@ code analysis; this skill orchestrates and enriches.
   the caller wants to run exclusively. Valid values: `sec-expert`,
   `sast`, `dast`, `webext`, `rust`, `android`, `ios`, `linux`,
   `macos`, `windows`, `k8s` (added v1.1), `iac` (added v1.2),
-  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14). When set, the orchestrator dispatches
+  `gh-actions` (added v1.3), `virt` (added v1.4), `go` (added v1.5), `shell` (added v1.6), `python` (added v1.7), `ansible` (added v1.8), `netcfg` (added v1.9), `image` (added v1.11), `ai-tools` (added v1.12), `webapp` (added v1.14), `c-cpp` (added v1.26). When set, the orchestrator dispatches
   ONLY the named lanes and records the filter in the
   Review-metadata block. Mutually exclusive with `skip_lanes`.
 - `skip_lanes` (optional, v1.0.0+) — list of canonical lane names
@@ -468,6 +468,20 @@ below — layering them on top of the script's baseline.
   presence is expected for binaries (commit the lockfile) and optional
   for libraries; its absence is not a detection trigger, only a signal
   to the runner that cargo-audit will have less to chew on.
+- **C / C++ signals**: at least one C/C++ **source** file under
+  target — `*.c`, `*.cc`, `*.cpp`, `*.cxx`, `*.c++`. A *header* alone
+  (`*.h` / `*.hpp` / `*.hxx`) does NOT trigger the lane — vendored and
+  JNI headers are ubiquitous and would false-positive; `inventory.py`
+  requires a translation-unit source file. When detected, add
+  `"c-cpp"` to the inventory and load `references/c-cpp/memory-safety.md`
+  and the tool-lane reference `references/c-cpp-tools.md`. `CMakeLists.txt`
+  / `Makefile` presence is a corroborating signal (not required) that the
+  sec-expert reads for build-time hazards. No ecosystem entry — C/C++
+  dependency management is out-of-band (system packages / vendored trees),
+  so there is no manifest for cve-enricher; the lane is pure source-pattern
+  signal (cppcheck memory-safety + flawfinder banned-function surface).
+  **This lane supersedes the former `cpp` coverage-gap fingerprint** — the
+  entry was retired from `uncovered-tech-fingerprints.md` in v1.26.
 - **GitHub Actions signals**: any `.github/workflows/*.yml` or
   `.github/workflows/*.yaml` file under target whose contents
   declare both top-level `on:` and `jobs:` keys (the canonical
@@ -2108,6 +2122,47 @@ Skill-level invariants the orchestrator enforces:
 **Origin-tag isolation:** every secrets finding carries `origin: "secrets"`
 and `tool: "gitleaks" | "trufflehog"`. The contract-check rejects any secrets
 finding tagged with another lane's tool — see `tests/contract-check.sh`.
+
+### 3.29 C/C++ pass — dispatch c-cpp-runner
+
+When the inventory emitted by §2 contains `c-cpp` (at least one C/C++
+source file — `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++`; header-only
+trees do NOT trigger), dispatch the `c-cpp-runner` agent
+(`agents/c-cpp-runner.md`, pinned to haiku, tools: Read + Bash). The
+agent shells out to `cppcheck` (C/C++ static analyzer — buffer overruns,
+memory leaks, use-after-free, uninitialised reads; `--xml` output with
+per-error `cwe` attributes) and `flawfinder` (lexical scanner for the
+banned-libc-function family — `strcpy`/`gets`/`sprintf`/`system`/`printf`
+format-string; `--sarif` output). Both are cross-platform, apt/pip
+installable, and run as pure source-tree static scanners — neither
+compiles or executes the target. Both map through the deterministic
+runner engine (`scripts/secaudit/runner.py c-cpp`).
+
+c-cpp-runner runs in parallel with every other pass agent. Collect the
+findings into a `c_cpp_findings` list.
+
+Skill-level invariants:
+
+- **No `c-cpp` in inventory** — skip entirely.
+- **`__c_cpp_status__: "unavailable"`** — neither tool on PATH, or no
+  C/C++ source under target.
+- **`__c_cpp_status__: "partial"`** — one tool ran, one failed or
+  cleanly-skipped.
+- **`__c_cpp_status__: "ok"`** — every available + applicable tool ran.
+- **Two skip reasons:**
+  - `tool-missing` — the tool's binary is absent from PATH.
+  - `no-c-source` — the tool is on PATH but the target tree contains no
+    C/C++ source file (`*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.c++` /
+    `*.h` / `*.hpp` / `*.hxx` — the runner's `applicable_glob` includes
+    headers so a genuinely header-only tree still runs the tool; the
+    §2 inventory gate above is stricter). Target-shape clean-skip.
+
+C/C++ findings are source-pattern signal against memory-safety and the
+unsafe-libc-function surface. **The dep-inventory path is NOT affected by
+this lane** — C/C++ dependency management is out-of-band (system packages,
+vendored trees), so there is no manifest for cve-enricher. The lane
+supersedes the retired `cpp` coverage-gap fingerprint. Every finding
+carries `origin: "c-cpp"`, `tool: "cppcheck" | "flawfinder"`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 

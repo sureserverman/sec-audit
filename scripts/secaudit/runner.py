@@ -108,6 +108,12 @@ def _field(spec, item):
             return default
     if spec.get("truncate"):
         val = str(val)[:spec["truncate"]]
+    if "regex" in spec:                         # extract a match from the value
+        import re
+        m = re.search(spec["regex"], str(val))
+        if not m:
+            return default
+        return m.group(1) if m.groups() else m.group(0)
     if "before" in spec:                       # substring before a delimiter
         val = str(val).split(spec["before"])[0]
     if spec.get("cvss_band"):                   # numeric CVSS base score -> severity tier

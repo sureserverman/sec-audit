@@ -69,21 +69,6 @@ Each detection entry follows this shape:
 - **rationale:** Java server-side covers Tomcat, Quarkus, Micronaut, Helidon, Vert.x, JAX-RS — none of which are in `frameworks/spring.md`. Common security surfaces: Java deserialization (CVE-2015-7501 class), JNDI injection (CVE-2021-44228 Log4Shell class), XXE in `javax.xml.parsers`, Velocity / Freemarker SSTI.
 - **notes:** Maven/Gradle dependencies are already covered by the `Maven` ecosystem entry feeding cve-enricher; the new lane would add code-pattern signal beyond dep-version CVE matching.
 
-### C / C++ source
-
-- **suggested_lane:** `cpp`
-- **detection:**
-  - `*.c` / `*.cc` / `*.cpp` / `*.cxx` / `*.h` / `*.hpp` / `*.hxx` (file-extension, medium)
-  - `CMakeLists.txt` (manifest, high) — strong indicator of a C/C++ project
-  - `Makefile` containing `gcc` / `g++` / `clang` / `clang++` invocations (content-regex, medium)
-  - `*.vcxproj` / Visual Studio C++ project (medium) — overlap with `windows` lane (PE binaries) but distinct (source-only review)
-- **suggested_tools:**
-  - `cppcheck` — https://cppcheck.sourceforge.io/ — open-source static analyzer for C/C++.
-  - `clang-tidy` — https://clang.llvm.org/extra/clang-tidy/ — LLVM-shipped linter with `clang-analyzer-security-*` checks.
-  - `flawfinder` — https://dwheeler.com/flawfinder/ — security-focused scanner targeting `strcpy`, `gets`, `sprintf`, `system` family hazards.
-- **rationale:** C/C++ source review covers buffer overflows (CWE-120/121/122), format-string bugs (CWE-134), use-after-free (CWE-416), integer overflow (CWE-190), and the canonical unsafe-libc-function family. The existing `windows` lane handles PE binaries (binskim runs on compiled artefacts), but pure C/C++ source has no static lane.
-- **notes:** Every project has SOME `*.h` files (e.g. via vendored deps); pair extension detection with `CMakeLists.txt` / `Makefile` to reduce FPs. Exclude `node_modules/`, `.venv/`, `vendor/` per §1 Scope.
-
 ### Solidity (smart contracts)
 
 - **suggested_lane:** `solidity`

@@ -1,0 +1,48 @@
+{
+  "lane": "c-cpp",
+  "status_key": "__c_cpp_status__",
+  "origin": "c-cpp",
+  "reference": "c-cpp-tools.md",
+  "finding_const": {"fix_recipe": null},
+  "tools": [
+    {
+      "name": "cppcheck",
+      "probe": "cppcheck",
+      "applicable_glob": ["*.c", "*.cc", "*.cpp", "*.cxx", "*.c++", "*.h", "*.hpp", "*.hxx"],
+      "inapplicable_reason": "no-c-source",
+      "invoke": ["cppcheck", "--xml", "--enable=warning,portability", "--inline-suppr", "--output-file={tmp}/cppcheck.xml", "{target}"],
+      "output": "file:{tmp}/cppcheck.xml",
+      "input_format": "xml",
+      "xml_item": "error",
+      "const": {"confidence": "high", "reference_url": null},
+      "map": {
+        "id": {"concat": ["cppcheck:", {"from": "id"}]},
+        "severity": {"from": "severity", "map": {"error": "HIGH", "warning": "MEDIUM", "performance": "LOW", "portability": "LOW", "style": "LOW", "information": "LOW"}, "default": "LOW"},
+        "cwe": {"concat": ["CWE-", {"from": "cwe"}], "default": null},
+        "title": "msg",
+        "evidence": {"from": "verbose", "truncate": 200},
+        "file": {"from": "location.file", "default": null},
+        "line": {"from": "location.line", "int": true, "default": 0}
+      }
+    },
+    {
+      "name": "flawfinder",
+      "probe": "flawfinder",
+      "applicable_glob": ["*.c", "*.cc", "*.cpp", "*.cxx", "*.c++", "*.h", "*.hpp", "*.hxx"],
+      "inapplicable_reason": "no-c-source",
+      "invoke": ["flawfinder", "--sarif", "--minlevel=2", "{target}"],
+      "output": "stdout",
+      "findings_path": "runs.0.results",
+      "const": {"confidence": "medium", "reference_url": null},
+      "map": {
+        "id": {"concat": ["flawfinder:", {"from": "ruleId"}]},
+        "severity": {"from": "level", "map": {"error": "HIGH", "warning": "MEDIUM", "note": "LOW"}, "default": "LOW"},
+        "cwe": {"from": "message.text", "regex": "CWE-[0-9]+", "default": null},
+        "title": {"from": "message.text", "truncate": 120},
+        "evidence": {"from": "message.text", "truncate": 200},
+        "file": "locations.0.physicalLocation.artifactLocation.uri",
+        "line": {"from": "locations.0.physicalLocation.region.startLine", "default": 0}
+      }
+    }
+  ]
+}

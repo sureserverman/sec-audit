@@ -83,6 +83,10 @@ def detect(target, files=None):
         lanes["shell"] = True
     if any_name("Cargo.toml"):
         lanes["rust"] = True
+    # c-cpp fires on a C/C++ SOURCE file (not header-only — a vendored/JNI `*.h`
+    # is ubiquitous and would FP). cppcheck + flawfinder then scan the tree.
+    if any_ext(".c", ".cc", ".cpp", ".cxx", ".c++"):
+        lanes["c-cpp"] = True
     if any_ext(".tf"):
         lanes["iac"] = True
     if any(r.startswith(".github/workflows/") and r.endswith((".yml", ".yaml")) for r in rels):
