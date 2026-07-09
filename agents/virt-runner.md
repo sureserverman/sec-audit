@@ -2,7 +2,7 @@
 name: virt-runner
 description: "Virtualization static-analysis adapter for sec-audit. Runs hadolint, virt-xml-validate, and kics (--type DockerCompose) against Dockerfile/Containerfile, libvirt XML, and docker-compose files under target_path; emits JSONL findings tagged origin: \"virt\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.18."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # virt-runner

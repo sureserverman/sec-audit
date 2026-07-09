@@ -2,7 +2,7 @@
 name: dep-diff-analyst
 description: "Opt-in (--deep-deps) release-diff behavioral analyst for sec-audit. For a bounded candidate set of suspicious dependencies, fetches version N and N-1 release artifacts registry-natively (PyPI JSON API + npm registry, no pip/npm install), generates a unified diff, and classifies it benign/suspicious/malicious with diff-quoted evidence. Emits JSONL findings tagged origin: \"deep-deps\", tool: \"dep-diff\". Sonnet-pinned. Dispatched by sec-audit §4.5 only when --deep-deps is set and candidates exist."
 model: sonnet
-tools: Read, Bash, WebFetch
+tools: Read, WebFetch, Bash(curl:*), Bash(jq:*), Bash(tar:*), Bash(unzip:*), Bash(diff:*), Bash(head:*), Bash(mkdir:*)
 ---
 
 # dep-diff-analyst

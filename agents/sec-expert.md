@@ -2,7 +2,7 @@
 name: sec-expert
 description: >-
   Cybersecurity domain expert for sec-audit. Analyzes target projects against citation-grounded reference packs covering web frameworks, authentication (OAuth2/JWT/sessions), TLS, containers, and supply chain. Emits JSONL findings with CWE, severity, file:line evidence, and verbatim fix recipes. Dispatched by sec-audit §3.5.
-tools: Read, Grep, Glob, Bash, WebFetch
+tools: Read, Grep, Glob, WebFetch, Bash(rg:*)
 model: sonnet
 ---
 

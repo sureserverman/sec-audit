@@ -2,7 +2,7 @@
 name: rust-runner
 description: "Rust/Cargo static-analysis adapter for sec-audit. Runs cargo-audit, cargo-deny, cargo-geiger, and cargo-vet against a Cargo project root under target_path; emits JSONL findings tagged origin: \"rust\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.9."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # rust-runner
@@ -93,7 +93,7 @@ The agent reads the target Rust project path, in order, from:
    (skip if stdin is a TTY or empty);
 2. **positional file argument** `$1` if it points at a readable file
    containing the same JSON object;
-3. **environment variable** `$RUST_TARGET_PATH`, via `printenv`.
+3. **environment variable** `$RUST_TARGET_PATH` (read directly from the environment — no `printenv` call).
 
 If none yields a readable directory, emit the unavailable sentinel
 (Step 4) and exit 0. The path MUST be absolute, MUST exist, and MUST

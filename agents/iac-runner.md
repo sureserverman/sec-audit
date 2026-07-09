@@ -2,7 +2,7 @@
 name: iac-runner
 description: "IaC static-analysis adapter for sec-audit. Runs tfsec and checkov against Terraform/Pulumi source under target_path; emits JSONL findings tagged origin: \"iac\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.16."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # iac-runner

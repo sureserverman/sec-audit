@@ -2,7 +2,7 @@
 name: ansible-runner
 description: "Ansible static-analysis adapter for sec-audit. Runs ansible-lint against Ansible-shaped files under target_path; emits JSONL findings tagged origin: \"ansible\". Sentinel-exits when tool is unavailable. Dispatched by sec-audit §3.22."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # ansible-runner

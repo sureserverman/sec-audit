@@ -2590,6 +2590,46 @@ sys.exit(1 if errs else 0)
 fi
 echo "v1.27-symmetry: foreign lanes reject phpcs"
 
+# --- No bare (unscoped) Bash grant in agent/command frontmatter (CWE-693) ---
+# Every `tools:` / `allowed-tools:` frontmatter line that grants Bash must scope
+# it to a per-tool allowlist (`Bash(python3:*)`), never a bare `Bash` token.
+# A bare grant lets a prompt-injected agent run arbitrary commands against the
+# audited target tree (the very threat model this plugin operates in).
+#
+# Token-boundary match: `\bBash` as a whole word (so `Bashful` is not flagged)
+# followed by a token separator (comma/space) or EOL — so a scoped
+# `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
+#
+# KNOWN EXEMPTIONS (BL-002): the 6 host-OS-gated runners still carry a bare
+# `Bash` grant. Their scoping needs live permission-matcher verification (does
+# the matcher gate `[`, process-subs, and variable command names?) that could
+# not be run in the authoring environment; scoping them blind risks silently
+# breaking a lane. Tracked in backlog BL-002 — scope + live-verify together.
+bare_bash_exempt='ios-runner|macos-runner|windows-runner|ai-tools-runner|linux-runner|netcfg-runner'
+bare_bash=0; bare_bash_pending=0
+while IFS= read -r offender; do
+    [ -z "$offender" ] && continue
+    if echo "$offender" | grep -qE "$bare_bash_exempt"; then
+        bare_bash_pending=$((bare_bash_pending + 1))
+        echo "  (BL-002 pending, exempt) unscoped Bash grant: $offender" >&2
+        continue
+    fi
+    bare_bash=$((bare_bash + 1))
+    echo "  unscoped Bash grant: $offender" >&2
+done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
+         | grep -E '\bBash([,[:space:]]|$)' || true)
+echo "no-bare-bash: $bare_bash unexpected + $bare_bash_pending BL-002-exempt file(s) with an unscoped Bash grant"
+if [ "$bare_bash_pending" -ne 6 ]; then
+    echo "CONTRACT FAIL: expected exactly 6 BL-002-exempt host-OS runners with bare Bash," \
+         "found $bare_bash_pending — update the exemption list / BL-002 as lanes are scoped" >&2
+    fail=1
+fi
+if [ "$bare_bash" -ne 0 ]; then
+    echo "CONTRACT FAIL: $bare_bash non-exempt agent/command file(s) grant unscoped Bash (CWE-693);" \
+         "scope each to Bash(tool:*) per docs/plans-notes/bash-scope-inventory.md" >&2
+    fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1

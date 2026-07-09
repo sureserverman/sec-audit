@@ -2,7 +2,7 @@
 name: webext-runner
 description: "Browser-extension static-analysis adapter for sec-audit. Runs addons-linter, web-ext, and retire.js against extension source under target_path; emits JSONL findings tagged origin: \"webext\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.8."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # webext-runner
@@ -96,7 +96,7 @@ The agent reads the target extension path, in order, from:
    (skip if stdin is a TTY or empty);
 2. **positional file argument** `$1` if it points at a readable file
    containing the same JSON object;
-3. **environment variable** `$WEBEXT_TARGET_PATH`, via `printenv`.
+3. **environment variable** `$WEBEXT_TARGET_PATH` (read directly from the environment — no `printenv` call).
 
 If none yields a readable directory, emit the unavailable sentinel
 (Step 4) and exit 0. The path MUST be absolute, MUST exist, and MUST

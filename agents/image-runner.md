@@ -2,7 +2,7 @@
 name: image-runner
 description: "Container-image vulnerability-scan adapter for sec-audit. Runs trivy and grype against image tarballs/OCI layouts under target_path; emits JSONL findings tagged origin: \"image\". Sentinel-exits when tools or image artifacts are unavailable. Dispatched by sec-audit §3.24."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # image-runner

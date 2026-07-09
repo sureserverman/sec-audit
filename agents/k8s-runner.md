@@ -2,7 +2,7 @@
 name: k8s-runner
 description: "Kubernetes manifest static-analysis adapter for sec-audit. Runs kube-score and kubesec against YAML manifests under target_path; emits JSONL findings tagged origin: \"k8s\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.15."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # k8s-runner

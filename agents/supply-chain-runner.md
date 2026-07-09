@@ -2,7 +2,7 @@
 name: supply-chain-runner
 description: "Supply-chain adapter for sec-audit. Runs guarddog (heuristic malicious-package detection) + osv-scanner (MAL- advisories only) against a PyPI/npm target_path; emits JSONL findings tagged origin: \"supply-chain\". Sentinel-exits when tools or manifests are unavailable. Dispatched by sec-audit §3.27."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # supply-chain-runner
