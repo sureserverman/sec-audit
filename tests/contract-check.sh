@@ -2600,8 +2600,11 @@ while IFS= read -r offender; do
     [ -z "$offender" ] && continue
     bare_bash=$((bare_bash + 1))
     echo "  unscoped Bash grant: $offender" >&2
+# Token-boundary match: `\bBash` as a whole word (so `Bashful` is not flagged)
+# followed by a token separator (comma/space) or EOL — so a scoped
+# `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
 done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
-         | grep -E 'Bash([^(]|$)' || true)
+         | grep -E '\bBash([,[:space:]]|$)' || true)
 echo "no-bare-bash: $bare_bash file(s) with an unscoped Bash grant"
 if [ "$bare_bash" -ne 0 ]; then
     echo "CONTRACT FAIL: $bare_bash agent/command file(s) grant unscoped Bash (CWE-693);" \
