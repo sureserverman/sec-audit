@@ -2,7 +2,7 @@
 name: macos-runner
 description: "Desktop macOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, pkgutil, and stapler on macOS hosts with bundle/pkg artifacts under target_path; emits JSONL findings tagged origin: \"macos\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.13."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(command -v:*), Bash(find:*), Bash(mobsfscan:*), Bash(codesign:*), Bash(spctl:*), Bash(pkgutil:*), Bash(xcrun:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)
 ---
 
 # macos-runner
