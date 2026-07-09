@@ -29,6 +29,38 @@ check vulnerable-go           "Go"       "go,secrets"
 check vulnerable-iac          ""         "iac,secrets"
 check vulnerable-gh-actions   ""         "gh-actions,secrets"
 check vulnerable-deep-deps    "npm"      "supply-chain,secrets"
+check vulnerable-c            ""         "c-cpp,secrets"
+check vulnerable-compose      ""         "virt,secrets"
+
+# c-cpp FP guard: a header-only tree (no translation-unit source) must NOT fire
+# the c-cpp lane — vendored / JNI *.h is ubiquitous. Source *.c DOES fire it.
+mkdir -p "$scratch/hdr_only"; printf '#define X 1\nint f(void);\n' > "$scratch/hdr_only/api.h"
+python3 "$inv" "$scratch/hdr_only" > "$scratch/hdr.json"
+python3 - "$scratch/hdr.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert "c-cpp" not in d["lanes"], f"header-only tree must NOT fire c-cpp: {d['lanes']}"
+print("  header-only *.h -> c-cpp NOT fired OK")
+PY
+mkdir -p "$scratch/c_src"; printf 'int main(void){return 0;}\n' > "$scratch/c_src/m.c"
+python3 "$inv" "$scratch/c_src" > "$scratch/csrc.json"
+python3 - "$scratch/csrc.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert "c-cpp" in d["lanes"], f"a *.c source must fire c-cpp: {d['lanes']}"
+print("  source *.c -> c-cpp fired OK")
+PY
+
+# compose FP guard: an unrelated *.yml (no services:/version:) must NOT fire virt;
+# a docker-compose.yml with services: DOES. (Stage 2 v1.25 detection.)
+mkdir -p "$scratch/nocompose"; printf 'foo: bar\n' > "$scratch/nocompose/random.yml"
+python3 "$inv" "$scratch/nocompose" > "$scratch/nc.json"
+python3 - "$scratch/nc.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert "virt" not in d["lanes"], f"a plain *.yml must NOT fire virt: {d['lanes']}"
+print("  plain *.yml -> virt NOT fired OK")
+PY
 
 # Empty target -> empty inventory (no crash). Use a genuinely empty dir: the
 # secrets lane fires on ANY file, so $scratch (which holds inv.json) is not empty.
