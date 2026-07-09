@@ -1,6 +1,6 @@
 ---
 description: Run a full cybersecurity review of a project (code + deps + CVE feeds) and write a prioritized markdown report.
-allowed-tools: Read, Grep, Glob, Bash, WebFetch, Agent
+allowed-tools: Read, Grep, Glob, WebFetch, Agent, Bash(python3:*)
 ---
 
 Run the `sec-audit` skill against the target path the user provided.
