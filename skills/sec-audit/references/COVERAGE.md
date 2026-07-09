@@ -896,8 +896,9 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**27 canonical reason values** as of v1.21, grouped by semantic
-category:
+**29 canonical reason values** as of v1.25 (23 target-shape + 3
+host-OS-gated + 1 profile-absent + 2 tool-output), grouped by
+semantic category:
 
 ### Target-shape (23)
 

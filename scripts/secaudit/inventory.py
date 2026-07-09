@@ -92,8 +92,15 @@ def detect(target, files=None):
     # `compose.yml` (rare) doesn't trip the lane; kics (--type DockerCompose)
     # then scans the matched compose files for privileged/host-namespace/
     # capability misconfigurations.
-    compose_files = [r for r in rels
-                     if re.match(r"(docker-)?compose.*\.ya?ml$", os.path.basename(r), re.I)]
+    # Match the SAME compose name-shapes as the kics `applicable_glob` in
+    # lanes/virt.json (docker-compose*/compose*/*.compose .y(a)ml), case-sensitive
+    # like the runner's fnmatch — so inventory never reports virt on a file kics
+    # would then clean-skip as no-compose-file (or vice versa). The `([.-].*)?`
+    # boundary stops `docker-composer.yml` (not a compose file) from matching.
+    def _is_compose_name(b):
+        return bool(re.match(r"(docker-)?compose([.-].*)?\.ya?ml$", b)
+                    or re.search(r"\.compose\.ya?ml$", b))
+    compose_files = [r for r in rels if _is_compose_name(os.path.basename(r))]
     has_compose = any(grep(r, r"(?m)^\s*(services|version):") for r in compose_files)
     if any_name("Dockerfile", "Containerfile") or has_compose:
         lanes["virt"] = True

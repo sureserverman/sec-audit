@@ -485,18 +485,21 @@ below — layering them on top of the script's baseline.
   following triggers the `virt` inventory key:
   - **Docker runtime config** — `docker-compose.y(a)ml`,
     `compose.y(a)ml`, `*.compose.y(a)ml`, `*.stack.y(a)ml` files
-    under target (these drive `kics --type DockerCompose`
-    misconfiguration scanning — privileged containers, shared host
-    namespaces, docker-socket mounts, unrestricted capabilities,
-    no-new-privileges; v1.25), OR a `daemon.json` file (typically
-    under `etc/docker/` in source trees that vendor the daemon
-    config), OR a Dockerfile / Containerfile / `*.dockerfile` /
+    under target, OR a `daemon.json` file (typically under
+    `etc/docker/` in source trees that vendor the daemon config),
+    OR a Dockerfile / Containerfile / `*.dockerfile` /
     `*.containerfile` (drives hadolint dispatch — distinct from
     `containers/dockerfile-hardening.md`'s code-pattern reasoning
-    surface). `inventory.py` deterministically fires `virt` on a
-    compose file alone (name-glob + a `services:`/`version:`
-    content grep), so a compose-only project with no Dockerfile is
-    no longer invisible to the lane.
+    surface). The `docker-compose.y(a)ml` / `compose.y(a)ml` /
+    `*.compose.y(a)ml` shapes drive `kics --type DockerCompose`
+    misconfiguration scanning (privileged containers, shared host
+    namespaces, docker-socket mounts, unrestricted capabilities,
+    no-new-privileges; v1.25); `*.stack.y(a)ml` Swarm-stack files
+    are read by sec-expert but are not in kics's `applicable_glob`.
+    `inventory.py` deterministically fires `virt` on a compose file
+    alone (the same name-globs as kics's `applicable_glob` + a
+    `services:`/`version:` content grep), so a compose-only project
+    with no Dockerfile is no longer invisible to the lane.
   - **Podman / Quadlet** — `*.container`, `*.volume`,
     `*.network`, `*.pod`, `*.kube`, `*.image`, or `*.build` files
     under `containers/systemd/` or any subdir, OR a
