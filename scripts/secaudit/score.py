@@ -9,7 +9,8 @@ Rubric (verbatim from SKILL.md §5):
   CVSS      0-40 : min(40, cvss*4) if numeric cvss; else severity tier
                    CRITICAL=36 / HIGH=28 / MEDIUM=16 / LOW=6 / INFO=0
   Exposure  0-25 : unauth=25 / auth=15 / internal=5 / test=0  (field `exposure`)
-  Exploit   0-20 : kev True=20 / poc True=10 / else 0
+  Exploit   0-20 : kev True=20 / epss>=0.5=15 / epss>=0.1=10 / poc True=10 / else 0
+                   (fields `kev`, `epss`, `poc`; epss null contributes nothing)
   Auth      0-15 : none=15 / user=8 / admin=2 / host=0  (field `auth_required`)
   Buckets   : 90-100 CRITICAL, 70-89 HIGH, 40-69 MEDIUM, 0-39 LOW
 
@@ -48,8 +49,16 @@ def score_one(f):
 
     exposure_pts = EXPOSURE.get(f.get("exposure"), 0)
 
+    # Graded exploit term: KEV (known exploited) dominates; else EPSS
+    # (exploit-probability) grades the middle; else a bare PoC; else nothing.
+    # epss null (feed offline / no row) contributes nothing — unknown is unknown.
+    epss = f.get("epss")
     if f.get("kev") is True:
         exploit_pts = 20
+    elif isinstance(epss, (int, float)) and epss >= 0.5:
+        exploit_pts = 15
+    elif isinstance(epss, (int, float)) and epss >= 0.1:
+        exploit_pts = 10
     elif f.get("poc") is True:
         exploit_pts = 10
     else:

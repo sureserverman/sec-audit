@@ -85,10 +85,31 @@ header block so the review is reproducible.
 
 Detect the technology stack. Read only — do not install or execute.
 
+**Diff scoping (when `diff` is set — `--diff[=ref]`).** First compute the
+changed-file set and scope the whole review to it:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/diffscope.py" <target_path> [ref] \
+    > "$TMPDIR/secaudit-changed.txt"
+```
+
+`diffscope.py` lists the target-relative paths changed in the working tree +
+untracked (bare `--diff`), plus everything changed since `ref` (`--diff=ref`).
+It exits non-zero if the target is not a git repository — surface that error and
+stop rather than silently scanning the whole tree. Pass this file to the
+inventory and to every runner (below) via `--files`. When `diff` is NOT set,
+skip this step and omit `--files` everywhere (whole-tree review, unchanged).
+
+Note: the `secrets` lane's gitleaks working-tree scan and trufflehog git-history
+scan are NOT narrowed by `--files` (they scan the tree / full history by design,
+not a file list). Under `--diff` they still run whole-scope — a leaked secret
+anywhere in the repo is worth surfacing even on a scoped PR review.
+
 **Deterministic pre-pass (run this first):**
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/inventory.py" <target_path>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/inventory.py" <target_path> \
+    [--files "$TMPDIR/secaudit-changed.txt"]   # --files only in --diff mode
 ```
 
 `inventory.py` does the unambiguous file-glob / content-grep detection
@@ -751,6 +772,16 @@ behaviour since v0.7; v1.0 makes it the documented contract.
 6. **Consolidated report.** §6 Report writing renders a per-lane
    summary table at the top of the Review-metadata block with one
    row per dispatched lane. See `agents/report-writer.md` Step 2.5.
+7. **Diff scoping (`--diff`).** When `diff` is set, pass
+   `--files "$TMPDIR/secaudit-changed.txt"` to every engine runner
+   invocation (`runner.py <lane> <target> --files …`) so each lane's
+   tool only sees the changed files, and scope the `sec-expert`
+   subagent's prompt to that same file list (review only the changed
+   files, not the whole tree). Lanes with no changed files in scope
+   emit an empty/`unavailable` result and are noted as
+   `scoped-out (no changed files)` in Review metadata. Diff scoping
+   composes with `only_lanes`/`skip_lanes`: the lane filter is applied
+   first, then the file scope narrows what each surviving lane reads.
 
 The canonical lane list (21 total) is enumerated in
 `references/COVERAGE.md` — the single source of truth for which
@@ -1986,6 +2017,77 @@ unchanged.
 contract-check rejects any supply-chain finding tagged with another lane's
 tool — see `tests/contract-check.sh`.
 
+### 3.28 Secrets pass — dispatch secrets-runner
+
+When the inventory emitted by §2 contains `secrets` (any non-empty tree —
+this lane applies to every project), dispatch the `secrets-runner` agent
+(`agents/secrets-runner.md`, pinned to haiku, tools: Read + Bash). The agent
+shells out to up to two secret-scanning tools — `gitleaks` (gitleaks/gitleaks,
+MIT; scans the working tree for committed and uncommitted credentials with
+`--redact` so raw secrets never enter the report) and `trufflehog`
+(trufflesecurity/trufflehog, AGPL/commercial; scans the full git history with
+`--no-verification`, catching secrets deleted from HEAD but alive in a prior
+commit) — parses each tool's native output, and emits sec-expert-compatible
+JSONL on stdout — every line carrying `origin: "secrets"` and
+`tool: "gitleaks" | "trufflehog"`. Every finding is CWE-798 (Use of Hard-coded
+Credentials).
+
+**Two scan surfaces, by design.** gitleaks scans the **working tree**
+(`gitleaks dir`) and is always applicable. trufflehog scans **git history**
+(`trufflehog git`) and is applicable only when the target is a git repository;
+on a non-git target trufflehog cleanly skips with `no-git-history`. Together
+they cover "a secret is in the current files" (gitleaks) and "a secret was
+committed and later deleted but is still recoverable from history" (trufflehog)
+— the latter being exactly what a source-tree regex scan misses.
+
+**Redaction is a hard invariant.** No raw secret is ever emitted. `evidence`
+is mapped from gitleaks' `--redact`ed `Match` or trufflehog's `Redacted`
+field — never trufflehog's `Raw` or gitleaks' `Secret`. `tests/secrets-e2e.sh`
+plants a canary in the raw `Raw` field of the recorded fixture and asserts it
+never appears in the mapped golden.
+
+**Verification stays off.** trufflehog's `--no-verification` flag is mandatory:
+verification would make live network calls to each credential's service to test
+whether it authenticates. sec-audit sends nothing off the machine — a secret's
+presence is the finding, not its liveness.
+
+**Delineation from the secrets/ reference packs (sec-expert).** This lane is
+*detective* (the tools locate leaked credentials in files and history);
+sec-expert's `secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md` packs
+are *prescriptive* (how to store secrets — env vars vs a secrets manager,
+Vault patterns) and supply the quoted fix recipes the report renders. A
+secrets-lane finding lands with `fix_recipe: null`; the triager's domain-pack
+lookup fills in the "rotate, move to a manager, purge from history" recipe.
+
+secrets-runner runs in parallel with every other pass agent; its input is the
+project tree (read-only), so other agents may read the same files without
+conflict. Collect the JSONL into a `secrets_findings` list.
+
+Skill-level invariants the orchestrator enforces:
+
+- **`secrets` always in inventory (non-empty tree)** — unlike other lanes,
+  there is no target-shape gate for the working-tree scan; every project gets
+  gitleaks. Only an empty target skips the lane entirely.
+- **`__secrets_status__: "unavailable"`** — neither tool on PATH, or both
+  crashed. Add the `⚠ Secret-scanning tools unavailable — install gitleaks
+  and/or trufflehog to enable credential-leak detection` banner to Review
+  metadata. Do NOT fabricate findings; do NOT treat absence as a clean scan.
+- **`__secrets_status__: "partial"`** — one tool ran, the other was
+  missing/inapplicable (commonly trufflehog `no-git-history` on a non-git
+  target). Merge findings; note the skip in Review metadata (`Secret tools
+  run: gitleaks; trufflehog skipped — no-git-history`).
+- **`__secrets_status__: "ok"`** — both available tools ran. Merge findings
+  into the triaged stream.
+- **Two skip reasons (secrets lane):**
+  - `tool-missing` — binary absent from PATH.
+  - `no-git-history` — trufflehog on PATH but the target is not a git
+    repository (no `.git`), so there is no history to scan. Target-shape
+    clean-skip; the working-tree scan (gitleaks) still runs.
+
+**Origin-tag isolation:** every secrets finding carries `origin: "secrets"`
+and `tool: "gitleaks" | "trufflehog"`. The contract-check rejects any secrets
+finding tagged with another lane's tool — see `tests/contract-check.sh`.
+
 ## 4. CVE enrichment — dispatch cve-enricher
 
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
@@ -2098,8 +2200,13 @@ Compute a numeric score 0–100 per finding and bucket it. This is
 **deterministic arithmetic — run the script, don't do it by hand**:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/score.py" < findings.json
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/score.py" < findings.json > "$TMPDIR/secaudit-scored.json"
 ```
+
+Capture the scored array to `$TMPDIR/secaudit-scored.json` — it is the durable
+scored-findings artifact consumed by §6 (report-writer) and, when `--sarif` is
+set, by the §6.5 SARIF step. (This is the pipeline's first machine-readable
+findings file; earlier stages stream findings in memory.)
 
 `score.py` reads the finding array (each finding carrying the `severity`/
 `cvss`/`kev` from cve-enricher plus the `exposure` and `auth_required`
@@ -2116,10 +2223,12 @@ spec — keep them in sync.
 - **Exposure** (0–25 pts): `+25` if the affected file is reachable from an
   unauthenticated HTTP path, `+15` if authenticated, `+5` if internal-only
   (admin, cron, worker), `0` if test/fixture code.
-- **Exploit-in-wild** (0–20 pts): `+20` if `cve.kev == true` (CISA KEV
-  catalog, cross-referenced by `cve-enricher`); `+10` if there's a public
-  PoC reference; `0` otherwise. Note: `cve.kev == null` means the KEV feed
-  was offline — unknown is unknown, no points awarded.
+- **Exploit-in-wild** (0–20 pts), graded most-to-least certain: `+20` if
+  `cve.kev == true` (CISA KEV catalog, cross-referenced by `cve-enricher`);
+  else `+15` if `cve.epss >= 0.5` (FIRST.org EPSS exploit probability);
+  else `+10` if `cve.epss >= 0.1`; else `+10` if there's a public PoC
+  reference; else `0`. Note: `cve.kev == null` / `cve.epss == null` mean the
+  respective feed was offline — unknown is unknown, no points awarded.
 - **Auth-required** (0–15 pts): `+15` if exploit requires no auth; `+8`
   if auth but no elevated privileges; `+2` if admin-only; `0` if attacker
   must already control the host.
@@ -2149,6 +2258,28 @@ inventory. The agent writes
 `<target_path>/sec-audit-report-YYYYMMDD-HHMM.md` (timestamp in UTC) and
 returns the absolute path to stdout so the orchestrator can confirm
 placement.
+
+### 6.5 Optional SARIF output (`--sarif`)
+
+When the command passed `--sarif` (skill input `sarif: true`), also emit a
+machine-readable SARIF 2.1.0 log alongside the markdown report. This is a
+deterministic script step, NOT part of report-writer (whose only file write is
+the markdown report):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" \
+    < "$TMPDIR/secaudit-scored.json" \
+    > "<target_path>/sec-audit-report-YYYYMMDD-HHMM.sarif"
+```
+
+Use the **same** `YYYYMMDD-HHMM` UTC timestamp as the markdown report so the
+two files pair by name. `sarif.py` consumes the scored findings array from §5
+and writes GitHub-code-scanning-compatible SARIF (one run, driver `sec-audit`,
+one result per finding, `security-severity` from CVSS or the priority score).
+When `sarif: true`, add a `**SARIF:** <path>` line to the report's Review
+metadata section; when the flag is absent, skip this step entirely and write no
+`.sarif` file. Upload path and fingerprint behavior are documented in
+`references/sast-tools.md`.
 
 This section documents the report template so it remains readable in the
 skill source — but generation is **delegated** to the agent. Keeping the

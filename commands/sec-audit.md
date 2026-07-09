@@ -23,13 +23,26 @@ Parse `$ARGUMENTS` into:
    `--only`/`--skip` lane name — it is a separate opt-in flag (the pass is
    network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
    not run.
+5. **`--sarif`** (optional, opt-in) — additionally emit a SARIF 2.1.0 log
+   (`<target>/sec-audit-report-YYYYMMDD-HHMM.sarif`, same timestamp as the
+   markdown report) for GitHub code-scanning / IDE consumption (§6.5). This is
+   NOT a `--only`/`--skip` lane name — it is a separate opt-in flag. Absent ⇒
+   no `.sarif` file is written.
+6. **`--diff[=ref]`** (optional, opt-in) — scope the review to changed files
+   only (PR-time / pre-commit use). Bare `--diff` scopes to the working-tree
+   changes + untracked files; `--diff=ref` also includes everything changed
+   since `ref` (e.g. `--diff=main`, `--diff=HEAD~5`). The target must be a git
+   repository (else the run errors). This is NOT a `--only`/`--skip` lane name
+   — it is a separate opt-in flag. Absent ⇒ whole-tree review.
 
-**Canonical lane names (23 total):** `sec-expert`, `sast`, `dast`,
+**Canonical lane names (24 total):** `sec-expert`, `sast`, `dast`,
 `webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
 `k8s`, `iac`, `gh-actions`, `virt`, `go`, `shell`, `python`,
-`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`.
-Reject any invocation that names a lane outside this list. (`--deep-deps`
-is a flag, not a lane name, and is not accepted in `--only`/`--skip`.)
+`ansible`, `netcfg`, `image`, `ai-tools`, `webapp`, `supply-chain`,
+`secrets`.
+Reject any invocation that names a lane outside this list. (`--deep-deps`,
+`--sarif`, and `--diff` are flags, not lane names, and are not accepted in
+`--only`/`--skip`.)
 
 **Mutual exclusion:** `--only` and `--skip` MUST NOT both be set. The
 two flags are mutually exclusive. If the caller passed both, refuse
@@ -87,6 +100,9 @@ Invoke the `sec-audit` skill (see `skills/sec-audit/SKILL.md`) with:
   (falsy) otherwise
 - `deep_deps_max` — the cap N from `--deep-deps=N`, or the default `10` when
   bare `--deep-deps` was passed; omit when `deep_deps` is falsy
+- `sarif` — `true` when `--sarif` was passed; omit (falsy) otherwise
+- `diff` — `true` when `--diff` / `--diff=ref` was passed; omit (falsy) otherwise
+- `diff_ref` — the `ref` from `--diff=ref`, or omit for bare `--diff`
 - `target_url`, `github_token`, `nvd_api_key` — read from env vars
   as before (see SKILL.md Inputs)
 

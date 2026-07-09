@@ -27,11 +27,15 @@ def walk(target):
             yield os.path.relpath(os.path.join(root, fn), target), fn
 
 
-def detect(target):
+def detect(target, files=None):
+    # files=None -> walk the whole tree (default). files=<iterable of relpaths>
+    # -> restrict detection to exactly those paths (--diff scoping): only lanes
+    # whose signals appear among the changed files fire.
     names = set()        # basenames present
     rels = []            # relative paths
     exts = set()
-    for rel, fn in walk(target):
+    source = walk(target) if files is None else ((rel, os.path.basename(rel)) for rel in files)
+    for rel, fn in source:
         names.add(fn)
         rels.append(rel)
         _, e = os.path.splitext(fn)
@@ -104,15 +108,35 @@ def detect(target):
     # supply-chain rides on the PyPI/npm manifests
     if py or npm:
         lanes["supply-chain"] = ["pypi"] * py + ["npm"] * npm
+    # secrets: applies to any non-empty tree (gitleaks scans the working tree);
+    # append "git-history" when a .git repo is present (trufflehog scans history).
+    # .git is in SKIP_DIRS so walk() never yields its contents — probe directly.
+    if rels:
+        modes = ["tree"]
+        if os.path.exists(os.path.join(target, ".git")):
+            modes.append("git-history")
+        lanes["secrets"] = modes
 
     return {"ecosystems": ecosystems, "lanes": lanes}
 
 
 def main():
-    if len(sys.argv) < 2:
-        sys.stderr.write("usage: inventory.py <target_path>\n")
+    args = sys.argv[1:]
+    files = None
+    if "--files" in args:
+        i = args.index("--files")
+        try:
+            listfile = args[i + 1]
+        except IndexError:
+            sys.stderr.write("inventory.py: --files needs a path\n")
+            sys.exit(2)
+        with open(listfile, encoding="utf-8") as f:
+            files = [ln.strip() for ln in f if ln.strip()]
+        args = args[:i] + args[i + 2:]
+    if not args:
+        sys.stderr.write("usage: inventory.py <target_path> [--files <listfile>]\n")
         sys.exit(2)
-    json.dump(detect(sys.argv[1]), sys.stdout, indent=2, sort_keys=True)
+    json.dump(detect(args[0], files), sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
 
 

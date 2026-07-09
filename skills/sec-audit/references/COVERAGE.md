@@ -21,13 +21,30 @@
 ## Scope
 
 The sec-audit plugin performs citation-grounded security review of
-software projects across twenty-three tool lanes plus sec-expert
+software projects across twenty-four tool lanes plus sec-expert
 code reasoning. It reads source trees and pre-built artifacts, emits
 origin-tagged JSONL findings per lane, enriches with live CVE data,
 and produces a prioritized markdown report. All fix recipes are
 quoted verbatim from primary-source reference packs (vendor docs +
 IETF RFCs + OWASP + CIS + NIST + Mozilla + OpenID + SLSA/Sigstore/
 CISA).
+
+## Orchestration flags (not lanes)
+
+Three opt-in `/sec-audit` flags change *how* the review runs without being lane
+names — they are rejected from `--only`/`--skip`:
+
+- **`--deep-deps[=N]`** (v1.16) — enable the release-diff pass (§4.5).
+- **`--sarif`** (v1.23) — additionally emit a GitHub-code-scanning SARIF 2.1.0
+  log (`sec-audit-report-*.sarif`) via `scripts/secaudit/sarif.py`, from the
+  scored findings array persisted in §5. Deterministic; not part of
+  report-writer (which stays markdown-only).
+- **`--diff[=ref]`** (v1.23) — scope the whole review to changed files.
+  `scripts/secaudit/diffscope.py` computes the changed set (working tree +
+  untracked; plus `<ref>...HEAD` for `--diff=ref`); the list is threaded via
+  `--files` into `inventory.py` and every engine runner, and scopes the
+  sec-expert prompt. Requires a git-repo target. The runner prunes
+  `.git`/vendored dirs so VCS internals are never fed to a tool.
 
 ## v1.10 UX improvements (no new lanes)
 
@@ -742,6 +759,43 @@ Dispatch discipline.
   entries by `(ecosystem, name, version)`.
 - **Shipped in:** v1.16.0.
 
+### secrets (leaked-credential detection)
+
+- **Target shape:** any non-empty tree — this lane applies to every project
+  (there is no manifest/artifact gate for the working-tree scan). The
+  inventory value is `["tree"]`, plus `"git-history"` appended when a `.git`
+  repository is present.
+- **Tools:** `gitleaks` (gitleaks/gitleaks, MIT; regex + entropy secret
+  scanner; scans the **working tree** via `gitleaks dir` with `--redact` so
+  raw secrets never enter the report and `--exit-code 0` to disambiguate
+  findings from crashes) and `trufflehog` (trufflesecurity/trufflehog;
+  detector-based scanner; scans **git history** via `trufflehog git` with
+  `--no-verification` so no credential is tested against a live service).
+  Two-tool lane, split by surface: gitleaks = working tree (always), trufflehog
+  = history (git repos only). Cross-platform; neither contacts the network.
+- **Reference packs:** `references/secrets-tools.md` (tool invocations +
+  field mappings), plus the existing sec-expert hygiene packs
+  `references/secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md`
+  (the quoted fix recipes: rotate, move to a secrets manager, purge from
+  git history).
+- **Host-OS gate:** none.
+- **Skip reasons:** `tool-missing`, `no-git-history` (NEW in v1.21 —
+  trufflehog on PATH but target is not a git repository; the gitleaks
+  working-tree scan still runs, so the lane is `partial` not `unavailable`).
+- **Origin tag:** `"secrets"`. Tool whitelist: `gitleaks`, `trufflehog`.
+  Status values: `ok` / `partial` / `unavailable`.
+- **Redaction invariant:** every finding's `evidence` is the redacted match
+  (gitleaks `Match` under `--redact`, or trufflehog `Redacted`) — never the
+  plaintext secret (gitleaks `Secret`, trufflehog `Raw`). `tests/secrets-e2e.sh`
+  plants a canary in the recorded fixture's `Raw` field and asserts it never
+  reaches the golden.
+- **Dep-inventory:** NOT affected — secret findings are credential-leak
+  signal, not package-version signal. Every finding is CWE-798.
+- **Delineation:** *detective* (the tools locate leaked credentials in files
+  and history) vs the *prescriptive* `secrets/` sec-expert packs (how to store
+  secrets), which supply the quoted fix recipe.
+- **Shipped in:** v1.21.0.
+
 ## Deterministic scripts vs LLM agents (v1.17)
 
 As of v1.17 the **deterministic** parts of the pipeline run as stdlib-Python
@@ -827,10 +881,10 @@ surfaces the gap rather than silently missing CVEs.
 ## Skip-reason vocabulary
 
 The structured skipped-list primitive introduced in v0.8 stands at
-**26 canonical reason values** as of v1.16, grouped by semantic
+**27 canonical reason values** as of v1.21, grouped by semantic
 category:
 
-### Target-shape (21)
+### Target-shape (22)
 
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
@@ -855,6 +909,7 @@ category:
 | `no-rails-source` | webapp               | brakeman on PATH but target is not a Rails app (no Gemfile mentioning rails AND no `config/application.rb`).           |
 | `no-supply-chain-source` | supply-chain  | guarddog / osv-scanner on PATH but target has no PyPI / npm dependency manifest.                                       |
 | `no-prior-version` | deep-deps           | A flagged dependency's installed release is the first published version — no N-1 to diff against.                      |
+| `no-git-history`  | secrets              | trufflehog on PATH but the target is not a git repository (no `.git`) — no history to scan. gitleaks' working-tree scan still runs. NEW in v1.21. |
 
 ### Host-OS-gated (3)
 

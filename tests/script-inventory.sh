@@ -23,21 +23,74 @@ print(f"  {fx}: ecosystems={sorted(got_eco)} lanes={sorted(got_lanes)} OK")
 PY
 }
 
-check sample-stack            "PyPI"     "python,supply-chain,virt"
-check vulnerable-supply-chain "PyPI,npm" "python,supply-chain"
-check vulnerable-go           "Go"       "go"
-check vulnerable-iac          ""         "iac"
-check vulnerable-gh-actions   ""         "gh-actions"
-check vulnerable-deep-deps    "npm"      "supply-chain"
+check sample-stack            "PyPI"     "python,supply-chain,virt,secrets"
+check vulnerable-supply-chain "PyPI,npm" "python,supply-chain,secrets"
+check vulnerable-go           "Go"       "go,secrets"
+check vulnerable-iac          ""         "iac,secrets"
+check vulnerable-gh-actions   ""         "gh-actions,secrets"
+check vulnerable-deep-deps    "npm"      "supply-chain,secrets"
 
-# Empty target -> empty inventory (no crash).
-python3 "$inv" "$scratch" > "$scratch/empty.json"
+# Empty target -> empty inventory (no crash). Use a genuinely empty dir: the
+# secrets lane fires on ANY file, so $scratch (which holds inv.json) is not empty.
+mkdir -p "$scratch/empty_dir"
+python3 "$inv" "$scratch/empty_dir" > "$scratch/empty.json"
 python3 - "$scratch/empty.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["ecosystems"] == [] and d["lanes"] == {}, d
 print("  empty target -> empty inventory OK")
 PY
+
+# secrets lane: tree-only on a non-git dir, tree+git-history on a git repo.
+mkdir -p "$scratch/plain"; printf 'x\n' > "$scratch/plain/file.txt"
+python3 "$inv" "$scratch/plain" > "$scratch/plain.json"
+python3 - "$scratch/plain.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("secrets") == ["tree"], d["lanes"].get("secrets")
+print("  non-git tree -> secrets=['tree'] OK")
+PY
+mkdir -p "$scratch/repo/.git"; printf 'x\n' > "$scratch/repo/file.txt"
+python3 "$inv" "$scratch/repo" > "$scratch/repo.json"
+python3 - "$scratch/repo.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["lanes"].get("secrets") == ["tree", "git-history"], d["lanes"].get("secrets")
+print("  git repo -> secrets=['tree','git-history'] OK")
+PY
+
+# --files scoping (--diff mode): detection restricted to the listed paths.
+multi="$scratch/multi"; mkdir -p "$multi"
+printf 'x\n' > "$multi/deploy.sh"
+printf 'django==2.2\n' > "$multi/requirements.txt"
+printf 'print(1)\n' > "$multi/app.py"
+# (a) list only the .sh -> shell + secrets, NOT python (its signal is unlisted)
+printf 'deploy.sh\n' > "$multi/list-sh.txt"
+python3 "$inv" "$multi" --files "$multi/list-sh.txt" > "$scratch/sh.json"
+python3 - "$scratch/sh.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+lanes = set(d["lanes"])
+assert "shell" in lanes and "secrets" in lanes, lanes
+assert "python" not in lanes, f"python should not fire for a .sh-only file list: {lanes}"
+print("  --files [deploy.sh] -> shell+secrets, no python OK")
+PY
+# (b) list including requirements.txt -> PyPI ecosystem; excluding it -> absent
+printf 'requirements.txt\n' > "$multi/list-req.txt"
+python3 "$inv" "$multi" --files "$multi/list-req.txt" > "$scratch/req.json"
+python3 "$inv" "$multi" --files "$multi/list-sh.txt" > "$scratch/noreq.json"
+python3 - "$scratch/req.json" "$scratch/noreq.json" <<'PY'
+import json, sys
+withreq = {e["ecosystem"] for e in json.load(open(sys.argv[1]))["ecosystems"]}
+noreq = {e["ecosystem"] for e in json.load(open(sys.argv[2]))["ecosystems"]}
+assert "PyPI" in withreq, withreq
+assert "PyPI" not in noreq, noreq
+print("  --files: PyPI present iff requirements.txt is in the list OK")
+PY
+# (c) regression: no --files == whole-tree (byte-identical)
+python3 "$inv" "$multi" > "$scratch/full1.json"
+python3 "$inv" "$multi" > "$scratch/full2.json"
+diff -q "$scratch/full1.json" "$scratch/full2.json" >/dev/null && echo "  no --files: whole-tree unchanged OK"
 
 echo ""
 echo "script-inventory: OK"

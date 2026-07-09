@@ -1577,6 +1577,122 @@ Webapp findings are code-pattern signal; cve-enricher is
 unaffected (package-version CVEs are already covered by the
 language-specific runners + sec-expert manifest reasoning).
 
+## Secrets lane (v1.21.0)
+
+A `secrets-runner` agent (haiku-pinned, `Read` + `Bash`) joins the
+pipeline for **every** project — unlike the manifest- or
+artifact-gated lanes, secret scanning applies to any non-empty tree.
+It shells out to two tools, split by scan surface:
+
+- **`gitleaks`** (gitleaks/gitleaks, MIT) scans the **working
+  tree** (`gitleaks dir`) for committed and uncommitted
+  credentials. Always applicable. Invoked with `--redact` (the raw
+  secret never enters the report) and `--exit-code 0` (so a
+  leaks-found run is distinguishable from a crash by the report
+  file's existence, not the ambiguous default exit code).
+- **`trufflehog`** (trufflesecurity/trufflehog) scans the **git
+  history** (`trufflehog git`), catching secrets that were
+  committed and later deleted from HEAD but remain recoverable from
+  a prior commit — exactly what a working-tree-only regex scan
+  misses. Applicable only to git repositories; a non-git target is
+  a `no-git-history` clean-skip (gitleaks still runs, so the lane is
+  `partial`, not `unavailable`). Invoked with `--no-verification`,
+  so trufflehog never makes a live network call to test whether a
+  found credential authenticates — sec-audit sends nothing off the
+  machine.
+
+Every finding carries `origin: "secrets"`, `tool: "gitleaks" |
+"trufflehog"`, and `cwe: "CWE-798"` (Use of Hard-coded
+Credentials). **Redaction is a hard invariant:** `evidence` is
+always the redacted match (gitleaks `Match` under `--redact`, or
+trufflehog `Redacted`) — never the plaintext secret. A canary
+planted in the recorded fixture's raw `Raw` field is asserted
+absent from the golden by `tests/secrets-e2e.sh`.
+
+Fixes come from sec-expert reading the existing
+`references/secrets/{env-var-leaks,secret-sprawl,vault-patterns}.md`
+packs (rotate the exposed credential, move it to a secrets manager,
+purge it from git history) — the lane is detective; those packs are
+prescriptive. `tests/secrets-drill.sh` enforces the scrubbed-PATH
+degrade contract; `tests/secrets-e2e.sh` validates the
+`vulnerable-secrets` fixture. No secret finding is ever fabricated.
+
+## EPSS enrichment (v1.22.0)
+
+`cve-enricher` now attaches **EPSS** (FIRST.org Exploit Prediction
+Scoring System) probabilities to every CVE, batch-fetched after the
+CISA KEV pass. Only CVE identifiers leave the machine — the same
+privacy property as OSV and KEV. Because OSV reports advisories under
+GHSA/PYSEC-native IDs with the CVE in `aliases`, the enricher resolves
+the CVE alias per advisory (a `cve` field) and keys **both** KEV and
+EPSS lookups on it — without which neither feed matches OSV-sourced
+CVEs.
+
+The §5 exploit sub-score becomes **graded** rather than binary:
+`KEV=20 / EPSS≥0.5=15 / EPSS≥0.1=10 / PoC=10 / else 0` (the maximum is
+unchanged at 20, so existing score buckets don't shift). A `null` EPSS
+(feed offline or no score for that CVE) contributes nothing — unknown
+is unknown, never fabricated. The report renders EPSS on each CVE line
+and a **Max EPSS** column in the dependency summary.
+
+## SARIF output (v1.23.0)
+
+Pass `--sarif` to additionally emit a **SARIF 2.1.0** log beside the
+markdown report (`sec-audit-report-YYYYMMDD-HHMM.sarif`, same
+timestamp), giving the pipeline its first machine-readable deliverable:
+
+```text
+/sec-audit /path/to/repo --sarif
+```
+
+The SARIF is produced by a deterministic `scripts/secaudit/sarif.py`
+step (not the report-writer, which stays markdown-only) from the scored
+findings array. Each finding becomes one `results[]` entry under a
+single `sec-audit` tool driver; severity maps to the SARIF `level`
+vocabulary (CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW/INFO →
+`note`), and `rule.properties.security-severity` (0–10) carries the
+CVSS base score, or the sec-audit priority score scaled to 0–10 when no
+CVSS is present, so GitHub ranks alerts correctly.
+
+**Uploading to GitHub code scanning:** commit or upload the `.sarif`
+with the `github/codeql-action/upload-sarif` action — it auto-populates
+`partialFingerprints` for alert de-duplication, so `sarif.py` omits
+them deliberately. Raw REST `/code-scanning/sarifs` uploads do **not**
+get auto-fingerprinting; compute them yourself on that path. GitHub
+caps a run at 25 000 results / 10 MB gzipped.
+
+## Diff-scoped mode (v1.23.0)
+
+Pass `--diff` to scope the review to changed files only — cheap enough
+for PR-time and pre-commit use instead of a full-tree audit:
+
+```text
+/sec-audit /path/to/repo --diff            # working-tree changes + untracked
+/sec-audit /path/to/repo --diff=main       # everything changed since main
+/sec-audit /path/to/repo --diff=HEAD~5     # since a specific ref
+```
+
+`scripts/secaudit/diffscope.py` computes the changed set (working tree +
+untracked for bare `--diff`; plus a three-dot merge-base diff since the
+ref for `--diff=ref`), excluding deletions. That file list is threaded
+via `--files` into `inventory.py` (only lanes whose signals appear among
+the changed files fire) and into every engine runner (each lane's tool
+sees only the changed files), and the `sec-expert` prompt is scoped to
+the same list. The target must be a git repository; a non-git target
+errors rather than silently scanning everything.
+
+### PR-time audit (`--diff` + `--sarif`)
+
+The two flags compose into a fast, machine-readable pull-request gate:
+
+```text
+/sec-audit . --diff=origin/main --sarif
+```
+
+scans only what the PR changed and writes a SARIF log you can upload to
+the GitHub Security tab with `github/codeql-action/upload-sarif` — a
+scoped, low-cost review on every push rather than a periodic full audit.
+
 ## License
 
 MIT. See `LICENSE`.
