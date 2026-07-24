@@ -140,6 +140,38 @@ if [ "$mode" = "live" ]; then
     fi
 fi
 
+# --- v1.32: offline WITH a warm advisory cache -------------------------------
+# The dangerous case: cached advisory data is available, so the run can still
+# say plenty — but it has NOT checked the feeds this run. Every package must
+# report UNKNOWN (stale), never SAFE. Absence of a fresh check must not read as
+# a clean bill of health.
+echo "=== offline + warm cache -> stale UNKNOWN, never SAFE ==="
+warm=$(mktemp -d)
+cat > "$warm/advisory-cache.json" <<'JSON'
+{"schema":1,"advisories":{"CVE-2024-0001":{"fetched_at":"2026-07-20T00:00:00Z",
+  "detail":{"id":"CVE-2024-0001","summary":"cached advisory",
+            "severity":[{"type":"CVSS_V3","score":9.1}],
+            "affected":[{"package":{"ecosystem":"PyPI","name":"django"},
+                         "ranges":[{"type":"ECOSYSTEM",
+                                    "events":[{"introduced":"0"},{"fixed":"2.2.28"}]}]}]}}}}
+JSON
+inv_warm='{"ecosystems":[{"ecosystem":"PyPI","packages":[{"name":"django","version":"2.2.0"},{"name":"safepkg","version":"1.0.0"}]}]}'
+out_warm=$(printf '%s' "$inv_warm" | SECAUDIT_FEED_REPLAY_DIR="$warm/no-fixtures" \
+    python3 scripts/secaudit/cve_enricher.py --cache "$warm/advisory-cache.json" 2>/dev/null)
+echo "$out_warm" | python3 -c "
+import json, sys
+pkgs = json.load(sys.stdin)
+for p in pkgs:
+    assert p['status'] == 'offline', p
+    vs = p.get('version_safety') or {}
+    assert vs.get('status') == 'UNKNOWN', (
+        'offline run reported %r for %s — a run that could not consult the feeds '
+        'must never claim safety' % (vs.get('status'), p['name']))
+    assert 'offline' in (vs.get('reason') or ''), vs
+print('  offline + warm cache: every package UNKNOWN (stale), none SAFE OK')
+"
+rm -rf "$warm"
+
 rm -rf "$scratch"
 
 echo ""

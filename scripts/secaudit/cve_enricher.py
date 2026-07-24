@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -91,14 +91,109 @@ def _fixed_versions(vuln):
     return out
 
 
-def _osv_detail(vid, budget):
+ADVISORY_TTL_DAYS = int(os.environ.get("SECAUDIT_ADVISORY_TTL_DAYS", "7"))
+
+
+class AdvisoryCache:
+    """Per-advisory-id cache of OSV detail documents (v1.32).
+
+    What is cached and what is NOT is the whole point of this class:
+
+      cached      per-id detail GETs — the expensive part, one request per
+                  advisory per run, and an advisory's content is stable enough
+                  to reuse for ADVISORY_TTL_DAYS (they do get amended, hence a
+                  TTL rather than forever).
+      NEVER cached  the OSV `querybatch` call. It is one request for up to 1000
+                  packages AND it is precisely the "did this unchanged version
+                  become vulnerable overnight?" probe. Caching it would defeat
+                  the entire purpose of re-auditing unchanged code.
+
+    A corrupt cache file is discarded with a warning and the run proceeds at
+    full cost — a damaged cache must never be able to hide an advisory."""
+
+    def __init__(self, path=None, now=None):
+        self.path = path
+        self.now = now or datetime.now(timezone.utc)
+        self.entries = {}
+        self.hits = 0
+        self.misses = 0
+        self.stale = 0
+        self.corrupt = False
+        if path and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    doc = json.load(f)
+                if isinstance(doc, dict) and isinstance(doc.get("advisories"), dict):
+                    self.entries = doc["advisories"]
+                else:
+                    self.corrupt = True
+            except (OSError, ValueError):
+                self.corrupt = True
+            if self.corrupt:
+                self.entries = {}
+                sys.stderr.write(
+                    f"cve_enricher: advisory cache at {path} is unreadable — "
+                    "ignoring it and re-fetching everything (a damaged cache must "
+                    "never be able to hide an advisory)\n")
+
+    def _fresh(self, entry):
+        try:
+            fetched = datetime.fromisoformat(
+                str(entry.get("fetched_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return (self.now - fetched) <= timedelta(days=ADVISORY_TTL_DAYS)
+
+    def get(self, vid):
+        entry = self.entries.get(vid)
+        if not entry:
+            self.misses += 1
+            return None
+        if not self._fresh(entry):
+            self.stale += 1
+            return None
+        self.hits += 1
+        return entry.get("detail")
+
+    def put(self, vid, detail):
+        if detail is None:
+            return
+        self.entries[vid] = {
+            "fetched_at": self.now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "detail": detail,
+        }
+
+    def save(self):
+        if not self.path:
+            return
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"schema": 1, "advisories": self.entries}, f, sort_keys=True)
+            f.write("\n")
+        os.replace(tmp, self.path)
+
+    def stats(self):
+        return {"hits": self.hits, "misses": self.misses, "stale": self.stale,
+                "cached_advisories": len(self.entries), "corrupt": self.corrupt,
+                "ttl_days": ADVISORY_TTL_DAYS}
+
+
+def _osv_detail(vid, budget, cache=None):
+    if cache is not None:
+        hit = cache.get(vid)
+        if hit is not None:
+            return hit
     if not budget.ok():
         return None
     budget.spend()
     status, text = _retrying(lambda: net.get(f"{OSV}/v1/vulns/{quote(vid, safe='')}"))
     if status != 200:
         return None
-    return _loads(text)
+    detail = _loads(text)
+    if cache is not None:
+        cache.put(vid, detail)
+    return detail
 
 
 def _cve_alias(vuln):
@@ -169,7 +264,7 @@ def _mk_malicious(vuln, source="OSV"):
     }
 
 
-def enrich(inventory, budget):
+def enrich(inventory, budget, cache=None):
     pkgs = []  # flattened, each carries its ecosystem
     for eco in inventory.get("ecosystems", []):
         for p in eco.get("packages", []):
@@ -203,7 +298,7 @@ def enrich(inventory, budget):
                 if not budget.ok():
                     p["status"] = "capped"
                     break
-                detail = _osv_detail(vid, budget)
+                detail = _osv_detail(vid, budget, cache)
                 if detail is None:
                     continue
                 if vid.startswith("MAL-"):
@@ -312,13 +407,28 @@ def _epss_enrich(pkgs, budget):
 
 
 def main():
+    # --cache <path> enables the advisory-detail cache (v1.32). Absent -> every
+    # detail is fetched, exactly as before.
+    cache_path = None
+    argv = sys.argv[1:]
+    if "--cache" in argv:
+        i = argv.index("--cache")
+        cache_path = argv[i + 1] if i + 1 < len(argv) else None
     raw = sys.stdin.read()
     inv = _loads(raw) or {}
     budget = Budget()
-    out = enrich(inv, budget)
+    cache = AdvisoryCache(cache_path) if cache_path else None
+    out = enrich(inv, budget, cache)
+    if cache is not None:
+        cache.save()
     sys.stdout.write(json.dumps(out, indent=2))
     sys.stdout.write("\n")
-    sys.stderr.write(f"cve_enricher: {len(out)} packages, {budget.n} requests\n")
+    msg = f"cve_enricher: {len(out)} packages, {budget.n} requests"
+    if cache is not None:
+        st = cache.stats()
+        msg += (f", cache hits={st['hits']} misses={st['misses']} "
+                f"stale={st['stale']} stored={st['cached_advisories']}")
+    sys.stderr.write(msg + "\n")
 
 
 if __name__ == "__main__":

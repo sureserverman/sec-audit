@@ -2722,6 +2722,25 @@ if [ "$bare_bash" -ne 0 ]; then
     fail=1
 fi
 
+# --- feed-driven incrementality (v1.32.0 Stage 5):
+# The querybatch call must NEVER be cached — it is the "did this unchanged
+# version become vulnerable overnight?" probe, and caching it would silently
+# turn every re-audit into a replay of the last one.
+check skills/sec-audit/SKILL.md 'advisory-cache.json' "SKILL.md §4 missing the advisory cache wiring"
+check skills/sec-audit/SKILL.md 'Never cached' "SKILL.md §4 missing the never-cache rule"
+check skills/sec-audit/SKILL.md 'Never add it to the cache' "SKILL.md §4 missing the explicit querybatch prohibition"
+check skills/sec-audit/SKILL.md 'never as fixed' "SKILL.md §4 missing the withdrawn-is-not-fixed rule"
+check agents/report-writer.md 'New since last audit — dependency feeds' "report-writer missing the feed-delta section"
+check agents/report-writer.md 'Escalated' "report-writer missing the escalation table"
+check agents/report-writer.md 'Withdrawn' "report-writer missing the withdrawn table"
+check agents/report-writer.md 'is mandatory' "report-writer missing the (unchanged) marker rule"
+check scripts/secaudit/cve_enricher.py 'NEVER cached' "cve_enricher missing the never-cache contract in code"
+if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; then
+    echo "CONTRACT FAIL: querybatch is being cached — the newly-published-advisory probe must always run" >&2
+    fail=1
+fi
+echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1

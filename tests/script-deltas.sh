@@ -208,5 +208,78 @@ except saved:
     print("  conservation guard fires on a simulated drop OK")
 PY
 
+echo "=== FEED-DRIVEN deltas: new advisory on an UNCHANGED dependency ==="
+cat > "$scratch/prevdeps.json" <<'JSON'
+{"schema":1,"findings":{},
+ "deps":{
+   "PyPI|django":  {"version":"2.2.0","advisories":["CVE-2024-0001"],
+                    "kev":[],"epss":{"CVE-2024-0001":0.05},"last_seen_run":"20260701-1200"},
+   "PyPI|urllib3": {"version":"1.26.4","advisories":["CVE-2023-4321"],
+                    "kev":[],"epss":{"CVE-2023-4321":0.2},"last_seen_run":"20260701-1200"},
+   "npm|left-pad": {"version":"1.0.0","advisories":["CVE-2019-0000"],
+                    "kev":[],"epss":{},"last_seen_run":"20260701-1200"}}}
+JSON
+cat > "$scratch/cveout.json" <<'JSON'
+[{"ecosystem":"PyPI","name":"django","version":"2.2.0","status":"ok",
+  "cves":[{"id":"CVE-2024-0001","cve":"CVE-2024-0001","cvss":7.5,"epss":0.06,"kev":false},
+          {"id":"CVE-2026-5555","cve":"CVE-2026-5555","cvss":9.8,"epss":0.7,"kev":false}],
+  "malicious":[]},
+ {"ecosystem":"PyPI","name":"urllib3","version":"1.26.4","status":"ok",
+  "cves":[{"id":"CVE-2023-4321","cve":"CVE-2023-4321","cvss":6.1,"epss":0.62,"kev":true,
+           "kev_date_added":"2026-07-20"}],
+  "malicious":[]},
+ {"ecosystem":"npm","name":"left-pad","version":"1.0.0","status":"ok",
+  "cves":[],"malicious":[]}]
+JSON
+python3 - "$scratch/prevdeps.json" "$scratch/cveout.json" <<'PYX'
+import json, sys
+sys.path.insert(0, "scripts")
+from secaudit.deltas import advisory_deltas, deps_state_from_cve_output
+state = json.load(open(sys.argv[1]))
+cve = json.load(open(sys.argv[2]))
+d = advisory_deltas(state["deps"], cve, "20260724-1200")
+
+new = d["new"]
+assert len(new) == 1, new
+n = new[0]
+assert n["advisory"] == "CVE-2026-5555" and n["package"] == "PyPI|django", n
+assert n["dep_unchanged"] is True, "a new advisory on an unchanged version must say so: %r" % n
+print("  NEW (feed-driven): %s on %s @ %s, dep_unchanged=%s OK"
+      % (n["advisory"], n["package"], n["version"], n["dep_unchanged"]))
+
+esc = {(e["advisory"], e["kind"]): e for e in d["escalated"]}
+assert ("CVE-2023-4321", "kev") in esc, d["escalated"]
+assert ("CVE-2023-4321", "epss") in esc, d["escalated"]
+assert esc[("CVE-2023-4321", "epss")]["threshold"] == 0.5, esc
+print("  ESCALATED: KEV listing + EPSS 0.2->0.62 crossing the 0.5 band OK")
+
+wd = d["withdrawn"]
+assert len(wd) == 1 and wd[0]["advisory"] == "CVE-2019-0000", wd
+assert "not fixed" in wd[0]["note"], wd
+print("  WITHDRAWN: %s reported as withdrawn, explicitly NOT as fixed OK" % wd[0]["advisory"])
+
+# an already-known advisory whose signal did not move is not re-reported
+assert not any(x["advisory"] == "CVE-2024-0001" for x in d["new"]), d["new"]
+print("  a known, unmoved advisory is not re-announced OK")
+
+# the persisted map lets the NEXT run do this again
+nxt = deps_state_from_cve_output(cve, "20260724-1200")
+assert nxt["PyPI|urllib3"]["kev"] == ["CVE-2023-4321"], nxt["PyPI|urllib3"]
+assert nxt["PyPI|django"]["advisories"] == ["CVE-2024-0001", "CVE-2026-5555"], nxt["PyPI|django"]
+assert nxt["PyPI|django"]["epss"]["CVE-2026-5555"] == 0.7, nxt
+print("  persisted deps map carries advisories + kev + epss for the next run OK")
+PYX
+
+echo "=== a first audit (no prior deps) announces nothing as feed-driven ==="
+python3 - "$scratch/cveout.json" <<'PYX'
+import json, sys
+sys.path.insert(0, "scripts")
+from secaudit.deltas import advisory_deltas
+cve = json.load(open(sys.argv[1]))
+d = advisory_deltas({}, cve, "20260724-1200")
+assert d["new"] == [] and d["escalated"] == [] and d["withdrawn"] == [], d
+print("  no baseline -> no feed deltas (they would be meaningless) OK")
+PYX
+
 echo ""
 echo "script-deltas: OK"

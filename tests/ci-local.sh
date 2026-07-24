@@ -27,7 +27,7 @@ run() {  # label, command...
 echo "=== deterministic script suites ==="
 for t in contract-check script-runner script-score script-inventory script-cve-enricher \
          script-sarif script-diffscope script-statehome script-statestore \
-         script-fingerprint script-changeset script-deltas script-depinv script-versions; do
+         script-fingerprint script-changeset script-deltas script-depinv script-versions script-advisory-cache; do
   run "$t" bash "tests/$t.sh"
 done
 

@@ -194,6 +194,43 @@ Baseline: `20260709-1738` (2026-07-09 17:38 UTC) — 12 of 812 files changed,
 Then list the NEW and REGRESSED findings by title with links to their blocks —
 these are what the reader must act on.
 
+### Step 2.75 — Emit "New since last audit — dependency feeds" (v1.32.0+)
+
+Incremental runs only, immediately after Step 2.7. This section carries what a
+file hash can never show: the code did not move, but what is *known* about it
+did. Render from `advisory_deltas`, omitting any sub-table that is empty:
+
+```markdown
+## New since last audit — dependency feeds
+
+### Newly published advisories affecting unchanged dependencies
+
+| Package | Installed | Advisory | CVSS | Since |
+|---------|-----------|----------|-----:|-------|
+| django | 2.2.0 (unchanged) | CVE-2026-5555 | 9.8 | 20260709-1738 |
+
+### Escalated — the exploit signal moved on an advisory you already had
+
+| Package | Advisory | Change |
+|---------|----------|--------|
+| urllib3 | CVE-2023-4321 | added to CISA KEV on 2026-07-20 |
+| urllib3 | CVE-2023-4321 | EPSS 0.20 → 0.62 (crossed the 0.5 band) |
+
+### Withdrawn — no longer returned by the feeds
+
+| Package | Advisory | Note |
+|---------|----------|------|
+| left-pad | CVE-2019-0000 | withdrawn from the feeds — **not** fixed in your code |
+```
+
+Two rules:
+
+- **`(unchanged)` after the installed version is mandatory** when
+  `dep_unchanged` is true. The reader's first instinct on seeing a new advisory
+  is "what did I change?" — the answer is nothing, and saying so is the point.
+- **A withdrawn advisory is never rendered as fixed.** Nothing about the code
+  changed; the feed changed its mind. Keep it in its own table with the note.
+
 ### Step 2.8 — Emit "Fixed since last audit" (v1.30.0+)
 
 Findings with `status: FIXED` do NOT appear in the severity buckets (they are

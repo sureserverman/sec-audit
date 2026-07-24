@@ -213,6 +213,101 @@ def _state_rec(finding, lane, status, prev, run_id, ts, touch=True):
     return rec
 
 
+def advisory_deltas(prev_deps, cve_output, run_id):
+    """Classify what the FEEDS changed since the last audit (§5.2, v1.32).
+
+    This is the half of incrementality a file hash can never see: the code did
+    not move, but the world's knowledge about it did. Three classes:
+
+      NEW (feed-driven)  an advisory now returned for a package whose version
+                         did NOT change — i.e. an unchanged dependency became
+                         known-vulnerable. This is the highest-value output of a
+                         re-audit.
+      ESCALATED          an already-known advisory whose severity signal moved:
+                         added to CISA KEV, or EPSS crossing a scoring threshold.
+                         A MEDIUM you triaged last month and CISA added to KEV
+                         yesterday is not the same finding.
+      WITHDRAWN          an advisory the feeds no longer return. Reported as
+                         withdrawn, NOT as fixed — nothing about the code
+                         changed, so calling it fixed would be a lie.
+
+    `prev_deps` is the state's `deps` map: {"eco|name": {version, advisories:[],
+    kev:[], epss:{}}}.
+    """
+    prev_deps = prev_deps or {}
+    out = {"new": [], "escalated": [], "withdrawn": [], "unchanged": 0}
+    # Thresholds mirror score.py's exploit sub-score bands: crossing one of
+    # these changes the finding's priority, so it is worth telling the user.
+    bands = (0.5, 0.1)
+
+    for pkg in cve_output or []:
+        key = f"{pkg.get('ecosystem')}|{pkg.get('name')}"
+        prev = prev_deps.get(key) or {}
+        prev_ids = set(prev.get("advisories") or [])
+        prev_kev = set(prev.get("kev") or [])
+        prev_epss = prev.get("epss") or {}
+        version_changed = bool(prev) and prev.get("version") != pkg.get("version")
+        now_ids = set()
+
+        for c in (pkg.get("cves") or []) + (pkg.get("malicious") or []):
+            vid = c.get("id")
+            if not vid:
+                continue
+            now_ids.add(vid)
+            if prev and vid not in prev_ids:
+                out["new"].append({
+                    "package": key, "version": pkg.get("version"), "advisory": vid,
+                    "cve": c.get("cve"), "cvss": c.get("cvss"),
+                    "dep_unchanged": not version_changed,
+                    "since": prev.get("last_seen_run"),
+                    "first_seen": run_id,
+                })
+                continue
+            if not prev:
+                continue
+            # already known — did its exploit signal move?
+            if c.get("kev") and vid not in prev_kev:
+                out["escalated"].append({
+                    "package": key, "advisory": vid, "kind": "kev",
+                    "from": "not in KEV", "to": "CISA KEV",
+                    "kev_date_added": c.get("kev_date_added")})
+            old_e, new_e = prev_epss.get(vid), c.get("epss")
+            if isinstance(new_e, (int, float)) and isinstance(old_e, (int, float)):
+                for b in bands:
+                    if new_e >= b > old_e:
+                        out["escalated"].append({
+                            "package": key, "advisory": vid, "kind": "epss",
+                            "from": old_e, "to": new_e, "threshold": b})
+                        break
+        if prev:
+            for vid in sorted(prev_ids - now_ids):
+                out["withdrawn"].append({
+                    "package": key, "advisory": vid,
+                    "note": "no longer returned by the feeds — withdrawn, not fixed"})
+            if not (prev_ids ^ now_ids):
+                out["unchanged"] += 1
+    return out
+
+
+def deps_state_from_cve_output(cve_output, run_id):
+    """The `deps` map to persist so the NEXT run can compute advisory deltas."""
+    out = {}
+    for pkg in cve_output or []:
+        key = f"{pkg.get('ecosystem')}|{pkg.get('name')}"
+        cves = (pkg.get("cves") or []) + (pkg.get("malicious") or [])
+        out[key] = {
+            "version": pkg.get("version"),
+            "resolution": pkg.get("resolution"),
+            "advisories": sorted({c["id"] for c in cves if c.get("id")}),
+            "kev": sorted({c["id"] for c in cves if c.get("kev") and c.get("id")}),
+            "epss": {c["id"]: c["epss"] for c in cves
+                     if c.get("id") and isinstance(c.get("epss"), (int, float))},
+            "status": pkg.get("status"),
+            "last_seen_run": run_id,
+        }
+    return out
+
+
 def _read_findings(path):
     if not path:
         return []
@@ -241,7 +336,8 @@ def main(argv):
         i += 1
     if "changeset" not in args or "run-id" not in args:
         sys.stderr.write("usage: deltas.py --state <f> --changeset <f> --run-id <id> "
-                         "[--findings <f>] [--lane-status <f>] [--now ISO]\n")
+                         "[--findings <f>] [--lane-status <f>] [--cve-output <f>] "
+                         "[--now ISO]\n")
         return 2
 
     state = json.load(open(args["state"], encoding="utf-8")) if args.get("state") and \
@@ -260,9 +356,13 @@ def main(argv):
     except ConservationError as e:
         sys.stderr.write(f"deltas: CONSERVATION FAILURE — {e}\n")
         return 5
-    sys.stdout.write(json.dumps({"findings": findings, "deltas": deltas,
-                                 "state_findings": new_state},
-                                indent=2, sort_keys=True) + "\n")
+    doc = {"findings": findings, "deltas": deltas, "state_findings": new_state}
+    if args.get("cve-output") and os.path.exists(args["cve-output"]):
+        cve_out = json.load(open(args["cve-output"], encoding="utf-8"))
+        doc["advisory_deltas"] = advisory_deltas(state.get("deps"), cve_out,
+                                                 args["run-id"])
+        doc["state_deps"] = deps_state_from_cve_output(cve_out, args["run-id"])
+    sys.stdout.write(json.dumps(doc, indent=2, sort_keys=True) + "\n")
     return 0
 
 

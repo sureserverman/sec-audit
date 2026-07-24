@@ -2365,6 +2365,32 @@ OSV doesn't cover. Endpoint URLs live in `references/cve-feeds.md` —
 the agent body. That file is the single choke-point when feed schemas
 change.
 
+**Advisory cache (v1.32.0+).** Pass the state home's cache so per-advisory
+detail fetches are reused across runs:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/cve_enricher.py" \
+    --cache "<state_home>/advisory-cache.json" < inventory.json
+```
+
+What is and is not cached is a correctness rule, not an optimization:
+
+- **Cached:** per-advisory detail GETs, for `SECAUDIT_ADVISORY_TTL_DAYS` (7).
+  These scale with the dependency count and dominate the request budget.
+- **Never cached:** the OSV `querybatch` discovery call. It is one request for
+  up to 1000 packages *and* it is precisely the "did this unchanged version
+  become vulnerable overnight?" probe. Caching it would defeat the entire point
+  of re-auditing unchanged code. **Never add it to the cache.**
+- A corrupt cache is discarded with a warning and the run proceeds at full cost.
+  A damaged cache must never be able to hide an advisory.
+
+**Feed-driven deltas (v1.32.0+).** Pass the enricher output to §4.9 via
+`--cve-output`; `deltas.py` then classifies what the *feeds* changed —
+newly-published advisories on unchanged dependencies, KEV/EPSS escalations on
+advisories you already had, and withdrawals. Persist the returned `state_deps`
+in §6 so the next run can do the same. A withdrawal is reported as withdrawn,
+**never as fixed** — nothing about the code changed.
+
 Skill-level invariants the orchestrator still enforces (the agent
 reports these states; the skill decides what to do with them):
 
