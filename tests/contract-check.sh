@@ -1500,6 +1500,14 @@ if grep -nE '(<target_path>|<target>)/sec-audit-report' agents/report-writer.md 
 fi
 echo "report-relocation: report + SARIF + latest.md write under the state home only"
 
+# --- run provenance in the report (v1.29.0 Stage 1 Task 1.5):
+check agents/report-writer.md '^- State home:' "report-writer metadata missing State home"
+check agents/report-writer.md '^- Run id:' "report-writer metadata missing Run id"
+check agents/report-writer.md '^- Previous run:' "report-writer metadata missing Previous run"
+check agents/report-writer.md 'none — first audit' \
+    "report-writer must render an explicit first-audit marker, not an omitted line"
+echo "run-provenance: report metadata carries state home + run id + previous run"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors

@@ -121,10 +121,26 @@ def save(home, state):
     return p
 
 
+# The canonical run record. `run_id` and `mode` are required — a history line
+# that cannot say which run it was, or whether that run was full or incremental,
+# is not usable trend data. The rest are normalized to null when absent:
+# explicitly unknown, never a fabricated zero (a missing `counts` must not read
+# as "this run found nothing").
+RUN_REQUIRED = ("run_id", "mode")
+RUN_OPTIONAL = ("started_at", "finished_at", "plugin_version", "counts",
+                "deltas", "lanes_ran", "lanes_carried", "cost")
+
+
 def append_run(home, run, state=None):
     """Append one run record to history.jsonl and to the state's capped runs[]."""
-    if not isinstance(run, dict) or not run.get("run_id"):
-        raise StateError("run record needs a `run_id`")
+    if not isinstance(run, dict):
+        raise StateError("run record must be a JSON object")
+    missing = [k for k in RUN_REQUIRED if not run.get(k)]
+    if missing:
+        raise StateError(f"run record is missing required field(s): {', '.join(missing)}")
+    run = dict(run)
+    for k in RUN_OPTIONAL:
+        run.setdefault(k, None)
     os.makedirs(home, exist_ok=True)
     with open(history_path(home), "a", encoding="utf-8") as f:
         f.write(json.dumps(run, sort_keys=True) + "\n")

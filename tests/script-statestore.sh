@@ -83,21 +83,61 @@ out=$(python3 "$ss" load "$home")
 [ "$(echo "$out" | j "['runs'].__len__()")" = 2 ] || { echo "FAIL: runs[] length"; exit 1; }
 echo "  append-run: OK"
 
-echo "=== a run without run_id is refused ==="
+echo "=== a run without run_id / mode is refused ==="
 set +e
 echo '{"mode":"full"}' | python3 "$ss" append-run "$home" 2>/dev/null; rc=$?
 set -e
 [ "$rc" = 4 ] || { echo "FAIL: run without run_id accepted"; exit 1; }
-echo "  run_id required: OK"
+set +e
+echo '{"run_id":"x"}' | python3 "$ss" append-run "$home" 2>"$scratch/mode.txt"; rc=$?
+set -e
+[ "$rc" = 4 ] || { echo "FAIL: run without mode accepted"; exit 1; }
+grep -q 'mode' "$scratch/mode.txt" || { echo "FAIL: error does not name the missing field"; exit 1; }
+echo "  run_id + mode required: OK"
+
+echo "=== a full canonical run record round-trips into history.jsonl ==="
+cat > "$scratch/run.json" <<'JSON'
+{"run_id":"20260724-1900","mode":"incremental","started_at":"2026-07-24T19:00:00Z",
+ "finished_at":"2026-07-24T19:06:12Z","plugin_version":"1.29.0",
+ "counts":{"CRITICAL":1,"HIGH":3,"MEDIUM":7,"LOW":2},
+ "deltas":{"new":2,"fixed":1,"carried":9,"regressed":0},
+ "lanes_ran":["sast","python"],"lanes_carried":["rust","shell"],
+ "cost":{"tokens_out":41233,"usd":1.87}}
+JSON
+python3 "$ss" append-run "$home" < "$scratch/run.json"
+line=$(grep '20260724-1900' "$home/history.jsonl")
+for k in run_id mode plugin_version counts deltas lanes_ran lanes_carried cost started_at finished_at; do
+    echo "$line" | grep -q "\"$k\"" || { echo "FAIL: history line lost field $k"; exit 1; }
+done
+echo "$line" | python3 -c "
+import json,sys
+r = json.loads(sys.stdin.read())
+assert r['counts']['CRITICAL'] == 1, r
+assert r['deltas']['carried'] == 9, r
+assert r['lanes_carried'] == ['rust','shell'], r
+print('  full record: all fields preserved OK')
+"
+
+echo "=== a thin record normalizes missing fields to null, never to zero ==="
+echo '{"run_id":"20260724-1901","mode":"full"}' | python3 "$ss" append-run "$home"
+grep '20260724-1901' "$home/history.jsonl" | python3 -c "
+import json,sys
+r = json.loads(sys.stdin.read())
+assert r['counts'] is None, 'missing counts must be null (unknown), not {} or 0: %r' % (r['counts'],)
+assert r['plugin_version'] is None, r
+print('  unknown stays unknown OK')
+"
 
 echo "=== runs[] capped at 50 while history.jsonl keeps everything ==="
+before_lines=$(wc -l < "$home/history.jsonl")
 for i in $(seq 1 60); do
     printf '{"run_id":"cap-%03d","mode":"full"}\n' "$i" | python3 "$ss" append-run "$home"
 done
 out=$(python3 "$ss" load "$home")
 [ "$(echo "$out" | j "['runs'].__len__()")" = 50 ] || { echo "FAIL: runs[] not capped at 50"; exit 1; }
 [ "$(echo "$out" | j "['runs'][-1]['run_id']")" = cap-060 ] || { echo "FAIL: cap dropped the newest"; exit 1; }
-[ "$(wc -l < "$home/history.jsonl")" = 62 ] || { echo "FAIL: history.jsonl lost lines"; exit 1; }
+[ "$(wc -l < "$home/history.jsonl")" = "$((before_lines + 60))" ] \
+    || { echo "FAIL: history.jsonl lost lines (cap must not touch history)"; exit 1; }
 echo "  cap + full history: OK"
 
 echo ""

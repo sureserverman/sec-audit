@@ -384,6 +384,9 @@ comma-separated list (truncate to the first three entries plus an
 ## Review metadata
 
 - Plugin version: sec-audit <version>
+- State home: <absolute path resolved by SKILL.md §1.5>
+- Run id: <YYYYMMDD-HHMM>
+- Previous run: <YYYYMMDD-HHMM (YYYY-MM-DD HH:MM UTC)> or "none — first audit"
 - Reference packs loaded: <comma-separated list from inventory or orchestrator>
 - sec-expert runs: <n>
 - Lanes dispatched: <comma-separated list of lane keys that actually ran>
@@ -410,6 +413,11 @@ Lanes filtered out via `only_lanes` / `skip_lanes` inputs are NOT
 listed here — they appear instead in the `Lane filter applied` line
 so the reader can distinguish "lane was out of scope" from "lane
 was explicitly excluded by the caller."
+
+`State home`, `Run id`, and `Previous run` (v1.29.0+) come from the orchestrator:
+the §1.5 resolution and the state store's `runs[]`. On a project's first audit
+write `none — first audit` for `Previous run` — never omit the line, because its
+absence and "no prior audit" must not look the same to a reader.
 
 All values must come from the inputs. If a value is not supplied, write
 `unknown` rather than inventing a number.
