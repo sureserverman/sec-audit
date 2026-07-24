@@ -153,5 +153,36 @@ print("    %s" % {k: len(v) for k, v in sorted(by.items())})
 print("    deltas: %s" % {k: dl[k] for k in ('new','regressed','reverified','carried','fixed')})
 PY
 
+echo "=== contract: version-safety sections (v1.31) ==="
+need "$rw" '## Dependency version safety' "missing the Dependency version safety section"
+need "$rw" '### Verified safe'             "missing the Verified-safe table"
+need "$rw" '### Unknown — no claim made'   "missing the Unknown table"
+need "$rw" '## Program & runtime versions' "missing the Program & runtime versions section"
+need "$rw" 'Min safe (same major)'         "missing the in-major upgrade column"
+need "$rw" 'exactly one'                   "missing the one-table-per-package rule"
+need "$rw" 'never invent a version string' "missing the no-invented-version rule"
+need "$rw" 'requires major upgrade'        "missing the null in-major rendering"
+need "$rw" 'never about the code'          "missing the point-in-time safety qualifier"
+need "$rw" 'never appear in Verified safe' "missing the unevaluated-not-safe rule"
+need "$rw" 'cannot be cleared' "missing the unpinned-tag rule"
+need "$rw" 'do not imply' "missing the null-ecosystem rule"
+echo "  version-safety sections: OK"
+
+echo "=== data: enricher verdicts feed those tables ==="
+python3 - <<'PYX'
+import sys, json
+sys.path.insert(0, "scripts")
+from secaudit.versions import package_status
+advs = [{"id": "CVE-X", "affected": [{"ranges": [
+    {"type": "ECOSYSTEM", "events": [{"introduced": "2.2"}, {"fixed": "2.2.28"}]}]}]}]
+v = package_status("2.2.0", advs, "PyPI")
+s = package_status("9.9", advs, "PyPI")
+u = package_status(">=1", advs, "PyPI", resolution="declared")
+assert v["status"] == "VULNERABLE" and v["min_safe"] == "2.2.28" and v["ranges"], v
+assert s["status"] == "SAFE" and "consulted feeds" in s["reason"], s
+assert u["status"] == "UNKNOWN" and u["reason"], u
+print("  one package per table, each with the fields its table renders: OK")
+PYX
+
 echo ""
 echo "report-incremental-e2e: OK"

@@ -357,6 +357,77 @@ from the matched enricher entries (the `references` array of each CVE entry).
 
 ### Step 5 — Emit dependency CVE summary
 
+#### Dependency version safety (v1.31.0+)
+
+Before the CVE summary, emit `## Dependency version safety` — the section that
+answers, per package, *which versions are vulnerable and which are safe*. Every
+package in the inventory appears in **exactly one** of the three tables, driven
+by the `version_safety` verdict cve-enricher attaches. Never move a package
+between tables on your own judgement.
+
+```markdown
+## Dependency version safety
+
+_As of <fetched_at> UTC, feeds consulted: OSV, NVD, GHSA, KEV, EPSS._
+
+### Vulnerable
+
+| Package | Eco | Installed | Vulnerable ranges | Fixed in | Min safe | Min safe (same major) | Max CVSS | Max EPSS | KEV |
+|---------|-----|-----------|-------------------|----------|----------|-----------------------|---------:|---------:|-----|
+| django | PyPI | 2.2.0 | >=2.2, <2.2.28 · >=3.0, <=3.1.9 | 2.2.28 | 2.2.28 | 2.2.28 | 9.8 | 0.976 | yes |
+
+### Verified safe
+
+| Package | Eco | Installed | Advisories checked | Feeds |
+|---------|-----|-----------|-------------------:|-------|
+| urllib3 | PyPI | 2.2.3 | 4 | OSV, GHSA, NVD |
+
+### Unknown — no claim made
+
+| Package | Eco | Installed | Why |
+|---------|-----|-----------|-----|
+| rangepkg | PyPI | `>=1.0` | no exact installed version (declared) — a range cannot be evaluated against advisory ranges |
+```
+
+Rules, in order of importance:
+
+1. **`Min safe` is rendered verbatim from `version_safety.min_safe`.** It is the
+   smallest advisory-named fixed version that clears *every* advisory affecting
+   the package — which is often NOT the nearest fixed version. Never substitute
+   a "closer" one, and never invent a version string: if `min_safe` is null,
+   write `none published` and say so plainly.
+   Note the value comes from the advisories, so it can occasionally name a
+   version the registry has not published yet (observed: GHSA advisories citing
+   lodash 4.18.0 while npm's latest is 4.17.21). That is the feed's claim, not
+   ours — always render the contributing advisory IDs beside it so the reader
+   can check, and never "correct" it to a version you believe exists.
+2. **`Min safe (same major)` is null when no in-major fix exists.** Write
+   `— (requires major upgrade)`. Do not fall back to the cross-major version in
+   that column; the whole point of the column is to show whether a non-breaking
+   fix is available.
+3. **The Verified-safe heading is a claim about the consulted feeds at a point
+   in time, never about the code.** Keep the `_As of … feeds consulted …_` line
+   directly under the section heading. Do not write "this version is secure".
+4. **Anything the pipeline could not evaluate goes in Unknown, with the reason
+   verbatim** from `version_safety.reason` — an offline feed, a declared range,
+   an unsupported ecosystem, or an approximate comparison. An unevaluated
+   package must never appear in Verified safe.
+5. Sort Vulnerable by descending Max CVSS, then package name; sort the other two
+   alphabetically.
+
+#### Program & runtime versions (v1.31.0+)
+
+When the inventory carries `programs` entries (base images, OS package pins, CI
+action pins, toolchain pins), emit `## Program & runtime versions` with the same
+three-way split. Two extra rules:
+
+- An entry with `pinned: false` has **no version** — render `Installed` as
+  `unpinned (<note>)` and place it in Unknown, never in Verified safe. A moving
+  tag cannot be cleared.
+- An entry whose `ecosystem` is null is not covered by the consulted feeds.
+  Place it in Unknown with `not covered by the consulted feeds` — do not imply
+  the absence of advisories means safety.
+
 Emit a `## Dependency CVE summary` section with this table:
 
 ```markdown

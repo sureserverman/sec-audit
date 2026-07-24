@@ -114,6 +114,28 @@ def _cve_alias(vuln):
     return None
 
 
+def _affected_projection(vuln):
+    """Keep the whole `affected[]` shape versions.py needs to decide whether a
+    version is in range: per entry the package, the enumerated `versions[]` and
+    every range's `type` + raw `events[]`.
+
+    `fixed_versions` (below) is a lossy summary — it cannot tell 'fixed in
+    2.2.28 on the 2.2 line' from 'fixed in 2.2.28 for everything', which is
+    exactly the distinction a minimum-safe-upgrade computation turns on."""
+    out = []
+    for aff in vuln.get("affected", []) or []:
+        pkg = aff.get("package", {}) or {}
+        entry = {
+            "ecosystem": pkg.get("ecosystem"),
+            "name": pkg.get("name"),
+            "versions": aff.get("versions") or [],
+            "ranges": [{"type": r.get("type"), "events": r.get("events") or []}
+                       for r in (aff.get("ranges") or [])],
+        }
+        out.append(entry)
+    return out
+
+
 def _mk_cve(vuln):
     return {
         "id": vuln.get("id"),
@@ -121,6 +143,7 @@ def _mk_cve(vuln):
         "summary": vuln.get("summary") or vuln.get("details"),
         "cvss": _osv_cvss(vuln),
         "fixed_versions": _fixed_versions(vuln),
+        "affected": _affected_projection(vuln),
         "references": [r.get("url") for r in vuln.get("references", []) or [] if r.get("url")],
         "source": "OSV",
         "fetched_at": _now(),
@@ -152,6 +175,10 @@ def enrich(inventory, budget):
         for p in eco.get("packages", []):
             pkgs.append({"ecosystem": eco.get("ecosystem"), "name": p.get("name"),
                          "version": p.get("version"), "cves": [], "malicious": [],
+                         # How exact the installed version is (depinv.py):
+                         # lockfile/pinned are exact; declared/unparsed can only
+                         # ever yield UNKNOWN in the safety verdict.
+                         "resolution": p.get("resolution", "lockfile"),
                          "status": "ok"})
 
     # Step 2: OSV querybatch (one POST for the whole set).
@@ -163,6 +190,10 @@ def enrich(inventory, budget):
         if status != 200:
             for p in pkgs:
                 p["status"] = "offline"
+            # Still attach a verdict — an offline run must say UNKNOWN out loud
+            # rather than leave the field missing, which a renderer could read
+            # as "nothing to report".
+            _version_safety(pkgs)
             return pkgs
         results = (_loads(text) or {}).get("results", [])
         for p, res in zip(pkgs, results):
@@ -196,7 +227,43 @@ def enrich(inventory, budget):
                     c["kev_date_added"], c["kev_due_date"] = kev_index[cve]
 
     _epss_enrich(pkgs, budget)
+    _version_safety(pkgs)
     return pkgs
+
+
+def _version_safety(pkgs):
+    """Attach the VULNERABLE / SAFE / UNKNOWN verdict + minimum safe upgrade.
+
+    This is what lets the report say which versions are vulnerable and which are
+    safe. versions.py refuses to claim SAFE from an offline feed, a declared
+    range, an unsupported ecosystem, or an approximate comparison — those all
+    come back UNKNOWN, and the report renders them as such."""
+    from secaudit import versions as _versions
+    for p in pkgs:
+        advisories = [{"id": c.get("id"), "cve": c.get("cve"),
+                       "affected": c.get("affected") or []}
+                      for c in p.get("cves") or []]
+        verdict = _versions.package_status(
+            p.get("version"), advisories, p.get("ecosystem"),
+            resolution=p.get("resolution", "lockfile"),
+            feeds_ok=p.get("status") == "ok",
+            name=p.get("name"))
+        # A package the feeds flagged but whose ranges we could not evaluate is
+        # still vulnerable — the advisory named it. Do not let an evaluation gap
+        # downgrade a positive hit to UNKNOWN.
+        if verdict["status"] != "VULNERABLE" and advisories:
+            mine = [aff for a in advisories
+                    for aff in _versions.entries_for(a["affected"], p.get("ecosystem"),
+                                                     p.get("name"))]
+            verdict = {"status": "VULNERABLE",
+                       "advisories": [a["id"] for a in advisories],
+                       "ranges": _versions.describe_ranges(mine, p.get("ecosystem")),
+                       "fixed_versions": _versions.fixed_versions(mine),
+                       "note": verdict.get("reason")}
+            ms, sm, _ = _versions.min_safe_version(p.get("version"), advisories,
+                                                   p.get("ecosystem"), p.get("name"))
+            verdict["min_safe"], verdict["min_safe_same_major"] = ms, sm
+        p["version_safety"] = verdict
 
 
 def _epss_enrich(pkgs, budget):
