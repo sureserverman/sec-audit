@@ -46,7 +46,17 @@ Optional env vars (not required):
 /sec-audit /abs/path/to/my-web-app
 ```
 
-The review writes its report to `<target>/sec-audit-report-YYYYMMDD-HHMM.md` (UTC timestamp). Open it when the run finishes — it's the only user-facing deliverable.
+The review writes its report to the project's **portfolio** home —
+`<portfolio_root>/<area>/<name>/security/reports/sec-audit-YYYYMMDD-HHMM.md`
+(UTC timestamp) — and prints the absolute path when it finishes. **As of v1.29
+nothing is written into the audited project's tree.** The path is resolved from
+`~/.claude/projects-registry.yaml`; pass `--state-dir=<path>` to send it
+somewhere else (unmounted vault, CI runner, ad-hoc target).
+
+Re-running is **incremental by default** (v1.30+): the second audit of a project
+re-analyses only what changed and carries everything else forward, labelled so
+you can see what was and was not re-checked. Pass `--full` to force a complete
+re-audit and rewrite the baseline.
 
 A CRITICAL finding block from a real run against the sample fixture looks like:
 
@@ -60,6 +70,84 @@ A CRITICAL finding block from a real run against the sample fixture looks like:
 - **Recommended fix** (quoted from `references/frameworks/django.md`):
   > cursor.execute("SELECT … WHERE user_id = %s", [user_id])
 ```
+
+## Incremental audits & version safety (v1.29–v1.32)
+
+Three things changed in how repeat audits work.
+
+**1. Results persist in the portfolio, not in your repo.**
+
+```text
+<portfolio_root>/<area>/<name>/security/
+  audit-state.json      the incremental baseline
+  advisory-cache.json   cached advisory details (7-day TTL)
+  history.jsonl         one line per run
+  latest.md             pointer to the newest report
+  reports/sec-audit-<ts>.md
+```
+
+If the portfolio root is unreachable the run **stops** and tells you to pass
+`--state-dir` — it will not quietly write into the project you asked it to audit.
+
+**2. A re-run audits only what changed — in code *or* in the feeds.**
+
+A lane is skipped only when nothing it looks at changed, its own detection rules
+are byte-identical, its last run finished cleanly, and it is inside the 30-day
+staleness TTL. Anything else re-runs, including a lane whose scanner rules were
+updated — so a new rule is never invisible to unchanged code.
+
+Every finding is labelled:
+
+| Status | Meaning |
+|--------|---------|
+| `NEW` / `REGRESSED` | new, or previously fixed and back |
+| `REVERIFIED` | re-scanned this run, still there |
+| `CARRIED` | **not re-verified this run** — with the reason why |
+| `FIXED` | re-scanned cleanly and gone, or its file was deleted |
+
+A finding is only ever marked FIXED if the lane that produced it actually re-ran
+and completed successfully. Not looking is not evidence of absence, and the run
+aborts rather than let a baseline finding go unaccounted for.
+
+Dependencies are re-queried against the feeds on **every** run even when nothing
+changed, so a newly-published advisory on an untouched dependency still surfaces
+— reported as `NEW (feed-driven)` with an `(unchanged)` marker. Advisories added
+to CISA KEV or crossing an EPSS band since the last run are reported as
+`ESCALATED`; advisories the feeds retract are `WITHDRAWN`, never "fixed".
+Caching cuts the request cost sharply (measured: 82 → 3 requests on a re-run of
+an unchanged package set) without ever caching the discovery call itself.
+
+**3. The report says which versions are vulnerable and which are safe.**
+
+```markdown
+### Vulnerable
+| Package | Installed | Vulnerable ranges | Fixed in | Min safe | Min safe (same major) |
+|---------|-----------|-------------------|----------|----------|-----------------------|
+| django  | 2.2.0     | >=2.2,<2.2.28 · >=3.2,<3.2.13 | 2.2.28, 3.2.13 | 4.2.26 | — (requires major upgrade) |
+
+### Verified safe
+_As of 2026-07-24T18:30Z, feeds consulted: OSV, GHSA, NVD, KEV, EPSS._
+| Package | Installed | Advisories checked |
+|---------|-----------|-------------------:|
+| urllib3 | 2.2.3     | 4                  |
+
+### Unknown — no claim made
+| Package | Installed | Why |
+|---------|-----------|-----|
+| somepkg | `>=1.0`   | no exact installed version (declared) — a range cannot be evaluated |
+```
+
+`Min safe` is the smallest version the advisories themselves name as fixed that
+clears *every* advisory for that package — often not the nearest one. Nothing is
+invented: if no fix has been published the column says so. "Safe" always means
+*no advisory in the consulted feeds affects this exact version, as of this
+timestamp* — never that the code is secure. When safety cannot be established
+(feed offline, version is a range, ecosystem has no exact comparator), the answer
+is UNKNOWN rather than a reassuring guess.
+
+Base images, `apt`/`apk` pins, CI action pins and toolchain pins get the same
+treatment. A floating tag (`FROM node:20`, `@v4`) is reported as unpinned with no
+version — a moving target cannot be cleared.
 
 ## What it checks
 

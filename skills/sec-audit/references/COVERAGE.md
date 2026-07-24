@@ -29,10 +29,103 @@ quoted verbatim from primary-source reference packs (vendor docs +
 IETF RFCs + OWASP + CIS + NIST + Mozilla + OpenID + SLSA/Sigstore/
 CISA).
 
+## State home + incremental audits (v1.29–v1.32)
+
+### Where output goes (v1.29)
+
+Every artifact lands in the audited project's **portfolio** home, never in the
+audited tree:
+
+```
+<portfolio_root>/<area>/<name>/security/
+  audit-state.json      schema-versioned baseline: manifest, lane_state, findings,
+                        deps, programs, feeds
+  advisory-cache.json   per-advisory-id detail cache (7-day TTL)
+  history.jsonl         append-only, one line per run
+  latest.md             pointer to the newest report
+  reports/sec-audit-<ts>.md[.sarif]
+```
+
+`scripts/secaudit/statehome.py` resolves it: `--state-dir` override → registry
+longest-prefix match (`~/.claude/projects-registry.yaml`) → `<dev_root>/<area>/
+<name>` inference (one-time confirmation) → deterministic `_adhoc/<slug>`. An
+unwritable root **stops the run** (exit 3) rather than falling back to writing
+inside the audited project. A corrupt or future-schema state file is likewise a
+hard error, never a silent rebaseline — the message names `--full`.
+
+### What makes a lane re-run (v1.30)
+
+`changeset.py` decides, per lane, re-run or carry. Triggers are evaluated in
+this fixed order; the matched reason string reaches the report so a reader can
+always see why something was or was not re-checked:
+
+| # | Trigger | Notes |
+|---|---------|-------|
+| 1 | `--full`, no baseline, or a lane absent from `LANE_PATTERNS` | fail-safe: unknown ⇒ re-run |
+| 2 | always-on lane | `secrets` (trufflehog scans git history), `dast` (live target) |
+| 3 | lane definition digest changed | lane JSON + runner agent + `runner.py`; for `sec-expert`, the whole reference-pack tree — so a new rule is never invisible to unchanged code |
+| 4 | an applicable file added / modified / deleted | matched against the lane's own file-shape patterns |
+| 5 | previous run's status ≠ `ok`, or no recorded status | a degraded run is never trusted as a clean gap |
+| 6 | tool versions changed | per-lane `tool_versions` map |
+| 7 | staleness TTL exceeded | default 30 days, `--staleness-days` |
+
+A lane is skipped **only** when none of the above fire. Findings from a skipped
+lane are carried forward, never re-derived and never dropped.
+
+### Finding status vocabulary (v1.30)
+
+`deltas.py` assigns exactly one status per finding:
+
+| Status | Meaning |
+|--------|---------|
+| `NEW` | not in the baseline |
+| `REVERIFIED` | lane re-ran, still found |
+| `CARRIED` | lane did not re-run (or ran degraded) — **not re-verified this run** |
+| `FIXED` | lane re-ran cleanly and it is gone, or its file was deleted |
+| `REGRESSED` | previously fixed, found again |
+
+Three invariants: FIXED requires a clean lane re-run; a degraded lane carries
+with `stale: true` and fixes nothing; a deleted file resolves without a re-run.
+Conservation is enforced — every baseline finding comes out as exactly one of
+carried / reverified / fixed, else the run aborts (exit 5).
+
+### Package status vocabulary (v1.31)
+
+`versions.py` assigns exactly one verdict per dependency and program:
+
+| Status | Meaning |
+|--------|---------|
+| `VULNERABLE` | an advisory in the consulted feeds affects this exact version; the report shows the vulnerable ranges, the fixed versions, and the minimum safe upgrade (absolute + within-major) |
+| `SAFE` | no advisory in the consulted feeds affects this exact version, **as of the fetch timestamp** — never a claim that the code is secure |
+| `UNKNOWN` | feeds offline, a declared range rather than an exact version, an ecosystem with no exact comparator, or an approximate comparison. **UNKNOWN is returned instead of SAFE whenever safety cannot be established.** |
+
+Exact comparators: PEP 440 (PyPI), SemVer 2.0.0 (npm/crates.io/Packagist/NuGet/
+CocoaPods/SwiftPM/GitHub Actions), Go semver + pseudo-versions, RubyGems, Maven,
+dpkg EVR (Debian/Ubuntu), apk (Alpine). Anything else falls back to `generic`,
+which is inexact and can therefore only ever yield UNKNOWN.
+
+### Feed-driven deltas (v1.32)
+
+Advisory *detail* documents are cached by id (7-day TTL). The OSV `querybatch`
+discovery call is **never** cached — it is the "did this unchanged version
+become vulnerable overnight?" probe. Three feed classes are reported:
+
+- **NEW (feed-driven)** — an advisory newly returned for a package whose version
+  did not change; rendered with a mandatory `(unchanged)` marker.
+- **ESCALATED** — an already-known advisory added to CISA KEV, or crossing an
+  EPSS band (0.1 / 0.5, mirroring `score.py`).
+- **WITHDRAWN** — no longer returned by the feeds. Reported as withdrawn, **not**
+  as fixed: nothing about the code changed.
+
 ## Orchestration flags (not lanes)
 
-Three opt-in `/sec-audit` flags change *how* the review runs without being lane
+Five opt-in `/sec-audit` flags change *how* the review runs without being lane
 names — they are rejected from `--only`/`--skip`:
+
+- **`--full`** (v1.29) — force a complete re-audit and rewrite the baseline.
+  Absent, a run is incremental whenever prior state exists.
+- **`--state-dir=<path>`** (v1.29) — write state/reports somewhere other than the
+  portfolio home (unmounted vault, CI runner, ad-hoc target).
 
 - **`--deep-deps[=N]`** (v1.16) — enable the release-diff pass (§4.5).
 - **`--sarif`** (v1.23) — additionally emit a GitHub-code-scanning SARIF 2.1.0

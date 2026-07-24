@@ -2741,6 +2741,23 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
 
+# --- docs closeout (v1.32 Stage 6 Task 6.1):
+check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \
+    "COVERAGE.md missing the state-home / incremental section"
+check skills/sec-audit/references/COVERAGE.md 'What makes a lane re-run' \
+    "COVERAGE.md missing the rerun-trigger matrix"
+check skills/sec-audit/references/COVERAGE.md 'Package status vocabulary' \
+    "COVERAGE.md missing the VULNERABLE/SAFE/UNKNOWN vocabulary"
+check skills/sec-audit/references/COVERAGE.md 'UNKNOWN is returned instead of SAFE' \
+    "COVERAGE.md missing the unknown-over-safe rule"
+check skills/sec-audit/references/COVERAGE.md 'Finding status vocabulary' \
+    "COVERAGE.md missing the finding status vocabulary"
+check README.md 'Incremental audits & version safety' "README missing the incremental section"
+check README.md '\-\-state-dir' "README missing --state-dir"
+check README.md '\-\-full' "README missing --full"
+check README.md 'nothing is written into the audited' "README missing the no-in-repo-writes statement"
+echo "docs-closeout: COVERAGE.md + README document the state home, rerun matrix and status vocabularies"
+
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2
     exit 1
