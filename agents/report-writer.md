@@ -128,6 +128,12 @@ and severity tallies, before the severity-bucket sections. One row
 per dispatched lane; lanes filtered out by `--only` / `--skip` do
 NOT appear here but are noted in Step 6 Review metadata instead.
 
+On an incremental run (v1.30.0+) add a `Re-run` column carrying the changeset's
+verdict and reason verbatim — `yes (9 applicable files changed)` or
+`no (no applicable file changed since 20260709-1738)`. A lane that was carried
+is NOT the same as a lane that was out of scope or excluded by `--only`/`--skip`;
+the three must remain visually distinct.
+
 ```markdown
 ## Per-lane summary
 
@@ -162,6 +168,52 @@ Do NOT add a row for a lane that did not dispatch (whether due to
 absent inventory key, filter, or runner crash). Absent-entirely
 lanes are listed under Step 6 "Lanes dispatched" metadata.
 
+### Step 2.7 — Emit "Changes since last audit" (v1.30.0+, incremental runs only)
+
+Skip this section entirely on a full run or a project's first audit — its
+absence means "no baseline to compare against", and it must not be faked with
+zeroes. On an incremental run, emit it immediately after the header, **before**
+the severity buckets, because "what changed" is the reason the reader re-ran the
+audit:
+
+```markdown
+## Changes since last audit
+
+Baseline: `20260709-1738` (2026-07-09 17:38 UTC) — 12 of 812 files changed,
+6 of 19 lanes re-run.
+
+| Status     | Count | Meaning                                              |
+|------------|------:|------------------------------------------------------|
+| NEW        |     3 | not present in the baseline                          |
+| REGRESSED  |     1 | previously fixed, found again                        |
+| REVERIFIED |    18 | re-scanned this run, still present                   |
+| CARRIED    |    24 | not re-scanned this run (see per-lane reasons below) |
+| FIXED      |     5 | re-scanned cleanly and gone, or their file was deleted |
+```
+
+Then list the NEW and REGRESSED findings by title with links to their blocks —
+these are what the reader must act on.
+
+### Step 2.8 — Emit "Fixed since last audit" (v1.30.0+)
+
+Findings with `status: FIXED` do NOT appear in the severity buckets (they are
+not open findings) and are not silently dropped either. Render them in their own
+section with what resolved them:
+
+```markdown
+## Fixed since last audit
+
+| Finding | File | Severity | First seen | Resolved by |
+|---------|------|----------|------------|-------------|
+| SQL injection in user lookup | `src/db.py` | HIGH | 20260527-2055 | not-found-on-rescan |
+| Hardcoded token | `old/legacy.py` | HIGH | 20260709-1738 | file-deleted |
+```
+
+`Resolved by` renders the finding's `resolution` verbatim — `not-found-on-rescan`
+(the lane re-ran cleanly and the finding was gone) or `file-deleted` (the file
+that carried it no longer exists). Do not editorialize these into "fixed by the
+developer": the pipeline knows the finding is gone, not why.
+
 ### Step 3 — Emit severity buckets
 
 Order: CRITICAL, then HIGH, then MEDIUM, then LOW. Within each bucket, order
@@ -179,6 +231,7 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
 ### <title>
 - **File:** `<file>:<line>`
 - **CWE:** <cwe>
+- **Status:** <status-line — see below>
 - **Origin:** <origin-line — see below>
 - **CVE(s):** <CVE lines — see below>
 - **Score:** <score> / 100 (<breakdown>, confidence: <confidence>)
@@ -192,6 +245,25 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
   - <reference_url>
   - <CVE advisory URLs>
 ```
+
+Status line (v1.30.0+): built from the finding's `status`, `first_seen`,
+`last_verified_at`, `stale` and `carried_reason` fields. Omit the line entirely
+on a full run (every finding is trivially "current"; the line would be noise).
+On an incremental run render exactly one of:
+
+| `status`     | Status line                                                              |
+|--------------|--------------------------------------------------------------------------|
+| `NEW`        | `NEW — first seen this run`                                              |
+| `REGRESSED`  | `REGRESSED — previously fixed in <previously_fixed_in>, found again`     |
+| `REVERIFIED` | `re-verified this run (first seen <first_seen>)`                         |
+| `CARRIED`    | `CARRIED — not re-verified this run: <carried_reason> (first seen <first_seen>, last verified <last_verified_at>)` |
+
+The `CARRIED` wording is mandatory and must contain the literal phrase **"not
+re-verified this run"**. A carried finding is one this audit did not re-check;
+rendering it identically to a freshly-confirmed finding would misrepresent how
+much of the report is current — the single most misleading thing an incremental
+report could do. When `stale: true` (the lane ran but its tool was unavailable),
+append `— lane degraded, findings unverified`.
 
 Origin line: built from the finding's `origin` and `tool` fields when
 present. Render exactly one of:
@@ -387,6 +459,10 @@ comma-separated list (truncate to the first three entries plus an
 - State home: <absolute path resolved by SKILL.md §1.5>
 - Run id: <YYYYMMDD-HHMM>
 - Previous run: <YYYYMMDD-HHMM (YYYY-MM-DD HH:MM UTC)> or "none — first audit"
+- Mode: <"full" | "incremental (baseline <run id>)">
+- Files: <n> changed (<a> added, <m> modified, <d> deleted), <u> unchanged
+- Lanes re-run: <lane (reason), ...>
+- Lanes carried: <lane (reason), ...>   <!-- omit both lines on a full run -->
 - Reference packs loaded: <comma-separated list from inventory or orchestrator>
 - sec-expert runs: <n>
 - Lanes dispatched: <comma-separated list of lane keys that actually ran>
