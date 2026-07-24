@@ -2433,11 +2433,25 @@ Order the report by descending score, CRITICAL first.
 ## 6. Report — dispatch report-writer
 
 Dispatch the `report-writer` agent (`agents/report-writer.md`, pinned to
-sonnet) with the triaged findings, the cve-enricher output, and the
-inventory. The agent writes
-`<target_path>/sec-audit-report-YYYYMMDD-HHMM.md` (timestamp in UTC) and
-returns the absolute path to stdout so the orchestrator can confirm
-placement.
+sonnet) with the triaged findings, the cve-enricher output, the inventory, and
+the `state_home` resolved in §1.5. The agent writes
+`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` (timestamp in UTC) plus the
+`<state_home>/latest.md` pointer, and returns the absolute report path to stdout
+so the orchestrator can confirm placement.
+
+**Nothing is written into `target_path`** (v1.29.0+). If `state_home` is
+missing, stop — do not let the agent fall back to the audited tree.
+
+After the report is written, append the run record to the state store:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/statestore.py" append-run <state_home>
+```
+
+with the run JSON on stdin (`run_id`, `started_at`, `finished_at`,
+`plugin_version`, `mode`, `lanes_ran`, `lanes_carried`, `counts`, `deltas`,
+`cost`). This is what makes the next run incremental — skipping it silently
+turns every future audit back into a full one.
 
 ### 6.5 Optional SARIF output (`--sarif`)
 
@@ -2449,7 +2463,7 @@ the markdown report):
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" \
     < "$TMPDIR/secaudit-scored.json" \
-    > "<target_path>/sec-audit-report-YYYYMMDD-HHMM.sarif"
+    > "<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif"
 ```
 
 Use the **same** `YYYYMMDD-HHMM` UTC timestamp as the markdown report so the

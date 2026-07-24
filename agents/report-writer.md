@@ -24,8 +24,10 @@ judgments. You render only what the inputs contain.
    respects them.
 3. **Never modify the quoted fix_recipe string.** Render it verbatim inside
    a blockquote.
-4. **Filename: `<target>/sec-audit-report-YYYYMMDD-HHMM.md` in UTC.** Use
-   `date -u '+%Y%m%d-%H%M'` to generate the timestamp.
+4. **Filename: `<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` in UTC**
+   (v1.29.0+ — the project's portfolio state home, supplied as an input; the
+   audited tree is never written to). Use `date -u '+%Y%m%d-%H%M'` to generate
+   the timestamp.
 
 ## Inputs
 
@@ -36,7 +38,12 @@ judgments. You render only what the inputs contain.
    fetched_at, status}`.
 3. Inventory object (file path) — sec-expert `__dep_inventory__` passthrough
    or the orchestrator's higher-level inventory summary.
-4. Target path (where to write the report).
+4. Target path (the audited project — rendered in the report header as the
+   review's scope; **never written to**).
+4b. State home (v1.29.0+) — the absolute path resolved by SKILL.md §1.5
+   (`<portfolio_root>/<area>/<name>/security`). This is where the report is
+   written. If this input is missing, stop and report the gap; do NOT fall back
+   to writing into the target path.
 5. Scoring output — per-finding score (0–100) and bucket — supplied by the
    orchestrator skill body (deterministic rubric stays in SKILL.md section 5,
    not here).
@@ -416,19 +423,38 @@ and header timestamp match exactly).
 Write the assembled markdown to:
 
 ```
-<target_path>/sec-audit-report-<YYYYMMDD-HHMM>.md
+<state_home>/reports/sec-audit-<YYYYMMDD-HHMM>.md
 ```
 
 Use the Write tool. The content must be the complete report assembled in
 Steps 2–6 with a trailing newline.
 
-Print the absolute path of the written file to stdout so the orchestrator
+Then write the pointer file `<state_home>/latest.md` — the stable path a human
+or a portfolio tool can follow to the newest report. It contains exactly:
+
+```markdown
+# Latest sec-audit report — <project name>
+
+- **Run:** <YYYYMMDD-HHMM> (UTC)
+- **Mode:** <full | incremental (baseline <prev run>)>
+- **Findings:** <n> CRITICAL, <n> HIGH, <n> MEDIUM, <n> LOW
+- **Report:** [sec-audit-<YYYYMMDD-HHMM>.md](reports/sec-audit-<YYYYMMDD-HHMM>.md)
+```
+
+Overwrite it on every run — it is a pointer, not a log; `history.jsonl` is the log.
+
+Print the absolute path of the written report to stdout so the orchestrator
 knows where it landed.
 
 ## Output discipline
 
-- The only writes are (a) the report markdown file in the target directory,
-  and (b) the absolute path printed to stdout.
+- The only writes are (a) the report markdown file under
+  `<state_home>/reports/`, (b) the `<state_home>/latest.md` pointer, and
+  (c) the absolute report path printed to stdout.
+- **Never write inside the audited project's tree.** The target path is
+  read-only for this agent — as of v1.29.0 every sec-audit artifact lives in the
+  portfolio state home (SKILL.md §1.5). A report written into the audited repo
+  would both pollute that repo and leave the incremental baseline behind.
 - Any progress or error messages go to stderr.
 - Do NOT write any other files.
 - Do NOT print any other content to stdout.
@@ -440,7 +466,8 @@ knows where it landed.
 - Do NOT omit a finding. Every triaged finding renders. The rule is: never omit.
 - Do NOT modify fix_recipe strings. Not even whitespace normalization.
 - Do NOT use emoji or decorative formatting beyond the SKILL.md template.
-- Do NOT write anywhere except the target path.
+- Do NOT write anywhere except the state home (`reports/` + `latest.md`).
+  Writing into the audited target path is a contract violation, not a fallback.
 - Do NOT call CVE APIs. CVE data comes exclusively from the cve-enricher
   input file.
 - Do NOT execute any code from the target project.

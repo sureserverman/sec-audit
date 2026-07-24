@@ -24,7 +24,7 @@ Parse `$ARGUMENTS` into:
    network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
    not run.
 5. **`--sarif`** (optional, opt-in) — additionally emit a SARIF 2.1.0 log
-   (`<target>/sec-audit-report-YYYYMMDD-HHMM.sarif`, same timestamp as the
+   (`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif`, same timestamp as the
    markdown report) for GitHub code-scanning / IDE consumption (§6.5). This is
    NOT a `--only`/`--skip` lane name — it is a separate opt-in flag. Absent ⇒
    no `.sarif` file is written.

@@ -154,5 +154,20 @@ assert len(run["results"]) == 2 and len(run["tool"]["driver"]["rules"]) == 1, \
 print("  same-id dedup: 2 results, 1 rule OK")
 PY
 
+# v1.29: the SARIF log is written beside the markdown report INSIDE the state
+# home (§6.5), never into the audited tree. sarif.py itself writes to stdout, so
+# the contract lives in the documented redirect target — assert the skill's §6.5
+# names <state_home>/reports/ and that no in-target path survives anywhere.
+echo "=== §6.5 SARIF output path derives from the state home ==="
+grep -q 'state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif' skills/sec-audit/SKILL.md \
+    || { echo "FAIL: SKILL.md §6.5 does not write the SARIF into <state_home>/reports/"; exit 1; }
+grep -nE '(<target_path>|<target>)/sec-audit-report-YYYYMMDD-HHMM\.sarif' \
+    skills/sec-audit/SKILL.md commands/sec-audit.md \
+    && { echo "FAIL: an in-target SARIF path survives"; exit 1; }
+# The pairing rule (same UTC timestamp as the markdown report) must survive the move.
+grep -q 'same' <(sed -n '/6.5 Optional SARIF/,/^## /p' skills/sec-audit/SKILL.md) \
+    || { echo "FAIL: §6.5 lost the same-timestamp pairing rule"; exit 1; }
+echo "  SARIF path: <state_home>/reports/, timestamp-paired OK"
+
 echo ""
 echo "script-sarif: OK"

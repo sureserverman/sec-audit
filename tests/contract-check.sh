@@ -1482,6 +1482,24 @@ if grep -qE '`(full|state-dir)`.*(lane|Canonical lane names)' commands/sec-audit
 fi
 echo "state-home: --full/--state-dir documented as flags; SKILL.md §1.5 present with no-fallback rule"
 
+# --- report relocation to the state home (v1.29.0 Stage 1 Task 1.4):
+# report-writer must write ONLY under <state_home>; every in-target write path
+# must be gone. This is a hard contract: a stray in-target write would pollute
+# audited repos and split the incremental baseline across two locations.
+check agents/report-writer.md 'state_home>/reports/sec-audit-' "report-writer missing state-home report path"
+check agents/report-writer.md 'latest.md' "report-writer missing latest.md pointer write"
+check agents/report-writer.md 'Never write inside the audited project' \
+    "report-writer output discipline missing the read-only-target rule"
+check skills/sec-audit/SKILL.md 'state_home>/reports/sec-audit-' "SKILL.md §6 missing state-home report path"
+check skills/sec-audit/SKILL.md 'append-run' \
+    "SKILL.md §6 missing the append-run step that makes the next run incremental"
+if grep -nE '(<target_path>|<target>)/sec-audit-report' agents/report-writer.md \
+        skills/sec-audit/SKILL.md commands/sec-audit.md; then
+    echo "CONTRACT FAIL: an in-target report path survives (v1.29 writes only to the state home)" >&2
+    fail=1
+fi
+echo "report-relocation: report + SARIF + latest.md write under the state home only"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
