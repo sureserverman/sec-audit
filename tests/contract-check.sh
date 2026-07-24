@@ -1459,6 +1459,29 @@ check commands/sec-audit.md "mutually exclusive" "commands/sec-audit.md missing 
 check commands/sec-audit.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-audit.md missing canonical lane list"
 echo "cli-flags: commands/sec-audit.md documents --only/--skip with mutual-exclusion"
 
+# --- state home + incremental flags (v1.29.0 Stage 1 Task 1.3):
+# The command must document --full / --state-dir, they must NOT be lane names,
+# and SKILL.md must carry §1.5 with the no-fallback rule (a silent fallback to
+# writing inside the audited tree is the failure this section exists to prevent).
+check commands/sec-audit.md '\-\-full' "commands/sec-audit.md missing --full flag"
+check commands/sec-audit.md '\-\-state-dir' "commands/sec-audit.md missing --state-dir flag"
+check commands/sec-audit.md 'incremental by default' "commands/sec-audit.md missing incremental-by-default rule"
+check commands/sec-audit.md '`--full`, and `--state-dir` are flags, not lane names' \
+    "commands/sec-audit.md must exclude --full/--state-dir from the lane vocabulary"
+check skills/sec-audit/SKILL.md '^## 1.5 State home' "SKILL.md missing §1.5 State home"
+check skills/sec-audit/SKILL.md 'statehome.py' "SKILL.md §1.5 missing statehome.py invocation"
+check skills/sec-audit/SKILL.md 'confirm_required' "SKILL.md §1.5 missing confirm_required handling"
+check skills/sec-audit/SKILL.md 'does not fall back to writing inside the audited project' \
+    "SKILL.md §1.5 missing the no-fallback rule"
+check skills/sec-audit/SKILL.md 'Never write anything into `target_path`' \
+    "SKILL.md §1.5 missing the read-only-target invariant"
+# The lane vocabulary must not have grown: --full/--state-dir are flags.
+if grep -qE '`(full|state-dir)`.*(lane|Canonical lane names)' commands/sec-audit.md; then
+    echo "CONTRACT FAIL: --full/--state-dir appear in the canonical lane list" >&2
+    fail=1
+fi
+echo "state-home: --full/--state-dir documented as flags; SKILL.md §1.5 present with no-fallback rule"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors

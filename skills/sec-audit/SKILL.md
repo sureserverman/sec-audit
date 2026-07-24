@@ -39,13 +39,20 @@ code analysis; this skill orchestrates and enriches.
   to 5000/hr. Read from `$GITHUB_TOKEN` env var if unset.
 - `nvd_api_key` (optional) — raises NVD rate limit from ~5/30s to 50/30s.
   Read from `$NVD_API_KEY` env var if unset.
+- `full` (optional, v1.29.0+) — `true` when the caller passed `--full`. Forces a
+  complete re-audit and rewrites the incremental baseline. Absent ⇒ the run is
+  incremental whenever prior state exists (§2.5).
+- `state_dir` (optional, v1.29.0+) — explicit state-home path from
+  `--state-dir=`. Overrides portfolio resolution (§1.5).
 
 ## Output
 
 A markdown report written to
-`<target_path>/sec-audit-report-YYYYMMDD-HHMM.md`. The report is the
-single user-facing deliverable — everything else (JSONL, CVE JSON blobs)
-is internal working state.
+`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` — the project's **portfolio**
+home, resolved in §1.5 (v1.29.0+; earlier versions wrote into the audited tree).
+The report is the single user-facing deliverable; the state store, advisory
+cache, and run history live beside it, and everything else (JSONL, CVE JSON
+blobs) is internal working state. **Nothing is written into `target_path`.**
 
 ---
 
@@ -80,6 +87,48 @@ Before touching anything, fix the scope and confirm it out loud.
 
 State the final scope (paths included, paths excluded) in the report's
 header block so the review is reproducible.
+
+## 1.5 State home (v1.29.0+)
+
+Every audit persists its outputs — the report, the SARIF log, the run history,
+and the incremental state that makes §2.5 possible — into the audited project's
+**portfolio home**, never into the audited tree:
+
+```
+<state_home>/                      # <portfolio_root>/<area>/<name>/security
+  audit-state.json                 # incremental baseline (manifest, findings, deps, feeds)
+  advisory-cache.json              # cached advisory projections
+  history.jsonl                    # one line per run
+  latest.md                        # pointer to the newest report
+  reports/sec-audit-<ts>.md        # the user-facing deliverable
+  reports/sec-audit-<ts>.sarif     # only when --sarif
+```
+
+Resolve it deterministically — do not guess the path:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/statehome.py" <target_path> \
+    [--state-dir <path>]      # --state-dir only when the caller passed it
+```
+
+The script emits `{"home", "project", "source", "exists", "confirm_required"}`,
+resolving in this order: `--state-dir` override → `projects-registry.yaml`
+longest-prefix match → `<dev_root>/<area>/<name>` inference → deterministic
+`_adhoc/<slug>` fallback.
+
+Skill-level invariants:
+
+- **`confirm_required: true`** — the target is not in the portfolio registry, so
+  this would create a new portfolio directory. Ask the user once before
+  proceeding, showing the resolved path. Do not auto-register the project.
+- **Exit code 3 (state root missing / unwritable)** — surface the error and
+  **stop**. sec-audit does not fall back to writing inside the audited project:
+  a silent fallback would scatter reports into audited trees and lose the
+  incremental baseline. The message names `--state-dir`, which is the way out.
+- **Echo the resolved home** to the user alongside the §1 scope confirmation, so
+  the destination is visible before any work starts.
+- **Never write anything into `target_path`.** The audited tree is read-only for
+  the whole pipeline (§6 report-writer enforces this too).
 
 ## 2. Inventory
 
