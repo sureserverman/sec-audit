@@ -1459,6 +1459,98 @@ check commands/sec-audit.md "mutually exclusive" "commands/sec-audit.md missing 
 check commands/sec-audit.md "sec-expert.*sast.*dast.*webext.*rust.*android.*ios.*linux.*macos.*windows\|Canonical lane names" "commands/sec-audit.md missing canonical lane list"
 echo "cli-flags: commands/sec-audit.md documents --only/--skip with mutual-exclusion"
 
+# --- state home + incremental flags (v1.29.0 Stage 1 Task 1.3):
+# The command must document --full / --state-dir, they must NOT be lane names,
+# and SKILL.md must carry §1.5 with the no-fallback rule (a silent fallback to
+# writing inside the audited tree is the failure this section exists to prevent).
+check commands/sec-audit.md '\-\-full' "commands/sec-audit.md missing --full flag"
+check commands/sec-audit.md '\-\-state-dir' "commands/sec-audit.md missing --state-dir flag"
+check commands/sec-audit.md 'incremental by default' "commands/sec-audit.md missing incremental-by-default rule"
+check commands/sec-audit.md '`--full`, and `--state-dir` are flags, not lane names' \
+    "commands/sec-audit.md must exclude --full/--state-dir from the lane vocabulary"
+check skills/sec-audit/SKILL.md '^## 1.5 State home' "SKILL.md missing §1.5 State home"
+check skills/sec-audit/SKILL.md 'statehome.py' "SKILL.md §1.5 missing statehome.py invocation"
+check skills/sec-audit/SKILL.md 'confirm_required' "SKILL.md §1.5 missing confirm_required handling"
+check skills/sec-audit/SKILL.md 'does not fall back to writing inside the audited project' \
+    "SKILL.md §1.5 missing the no-fallback rule"
+check skills/sec-audit/SKILL.md 'Never write anything into `target_path`' \
+    "SKILL.md §1.5 missing the read-only-target invariant"
+# The lane vocabulary must not have grown: --full/--state-dir are flags.
+if grep -qE '`(full|state-dir)`.*(lane|Canonical lane names)' commands/sec-audit.md; then
+    echo "CONTRACT FAIL: --full/--state-dir appear in the canonical lane list" >&2
+    fail=1
+fi
+echo "state-home: --full/--state-dir documented as flags; SKILL.md §1.5 present with no-fallback rule"
+
+# --- report relocation to the state home (v1.29.0 Stage 1 Task 1.4):
+# report-writer must write ONLY under <state_home>; every in-target write path
+# must be gone. This is a hard contract: a stray in-target write would pollute
+# audited repos and split the incremental baseline across two locations.
+check agents/report-writer.md 'state_home>/reports/sec-audit-' "report-writer missing state-home report path"
+check agents/report-writer.md 'latest.md' "report-writer missing latest.md pointer write"
+check agents/report-writer.md 'Never write inside the audited project' \
+    "report-writer output discipline missing the read-only-target rule"
+check skills/sec-audit/SKILL.md 'state_home>/reports/sec-audit-' "SKILL.md §6 missing state-home report path"
+check skills/sec-audit/SKILL.md 'append-run' \
+    "SKILL.md §6 missing the append-run step that makes the next run incremental"
+if grep -nE '(<target_path>|<target>)/sec-audit-report' agents/report-writer.md \
+        skills/sec-audit/SKILL.md commands/sec-audit.md; then
+    echo "CONTRACT FAIL: an in-target report path survives (v1.29 writes only to the state home)" >&2
+    fail=1
+fi
+echo "report-relocation: report + SARIF + latest.md write under the state home only"
+
+# --- run provenance in the report (v1.29.0 Stage 1 Task 1.5):
+check agents/report-writer.md '^- State home:' "report-writer metadata missing State home"
+check agents/report-writer.md '^- Run id:' "report-writer metadata missing Run id"
+check agents/report-writer.md '^- Previous run:' "report-writer metadata missing Previous run"
+check agents/report-writer.md 'none — first audit' \
+    "report-writer must render an explicit first-audit marker, not an omitted line"
+echo "run-provenance: report metadata carries state home + run id + previous run"
+
+# --- incremental wiring (v1.30.0 Stage 2 Task 2.4):
+# §2.5 must compute the changeset and §4.9 must merge BEFORE §5 scores, so
+# carried and fresh findings go through one identical rubric pass. The
+# ordering is the contract — a merge after scoring would score them twice
+# under different inputs.
+check skills/sec-audit/SKILL.md '^## 2.5 Changeset' "SKILL.md missing §2.5 Changeset"
+check skills/sec-audit/SKILL.md '^## 4.9 Merge & classify' "SKILL.md missing §4.9 Merge & classify"
+check skills/sec-audit/SKILL.md 'changeset.py' "SKILL.md §2.5 missing changeset.py invocation"
+check skills/sec-audit/SKILL.md 'deltas.py' "SKILL.md §4.9 missing deltas.py invocation"
+check skills/sec-audit/SKILL.md 'fingerprint.py' "SKILL.md missing fingerprint.py invocation"
+check skills/sec-audit/SKILL.md 'lane-status' "SKILL.md §4.9 missing the mandatory --lane-status input"
+check skills/sec-audit/SKILL.md 'Incremental filter' "SKILL.md §3.0 missing the incremental dispatch filter"
+check skills/sec-audit/SKILL.md 'suppresses state-based resolution' \
+    "SKILL.md §2.5 missing the --diff/--full interaction rule"
+check skills/sec-audit/SKILL.md 'Exit code 5 is a conservation failure' \
+    "SKILL.md §4.9 missing the conservation-failure stop rule"
+# Ordering: §2.5 before §3, §4.9 before §5.
+python3 - <<'PY' || fail=1
+import re, sys
+src = open("skills/sec-audit/SKILL.md", encoding="utf-8").read()
+def at(pat):
+    m = re.search(pat, src, re.M)
+    return m.start() if m else -1
+cs, disp = at(r'^## 2\.5 Changeset'), at(r'^## 3\. Code analysis')
+merge, score = at(r'^## 4\.9 Merge & classify'), at(r'^## 5\. Prioritize')
+ok = 0 < cs < disp and 0 < merge < score
+if not ok:
+    print("CONTRACT FAIL: incremental sections are out of order "
+          f"(2.5@{cs} < 3@{disp}, 4.9@{merge} < 5@{score})", file=sys.stderr)
+    sys.exit(1)
+PY
+echo "incremental-wiring: §2.5 precedes dispatch, §4.9 merges before §5 scores"
+
+# --- deterministic dep inventory (v1.31.0 Stage 3 Task 3.3):
+check skills/sec-audit/SKILL.md 'depinv.py' "SKILL.md §4 missing depinv.py invocation"
+check skills/sec-audit/SKILL.md 'union fallback, not the source' \
+    "SKILL.md §4 missing the depinv-over-sec-expert precedence rule"
+check skills/sec-audit/SKILL.md 'deterministic parser wins' \
+    "SKILL.md §4 missing the version-conflict resolution rule"
+check skills/sec-audit/SKILL.md 'never silently reconciled' \
+    "SKILL.md §4 must require the discrepancy to be surfaced"
+echo "dep-inventory: depinv.py is the source of truth; sec-expert is a union fallback"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
@@ -2629,6 +2721,42 @@ if [ "$bare_bash" -ne 0 ]; then
          "scope each to Bash(tool:*) per docs/plans-notes/bash-scope-inventory.md" >&2
     fail=1
 fi
+
+# --- feed-driven incrementality (v1.32.0 Stage 5):
+# The querybatch call must NEVER be cached — it is the "did this unchanged
+# version become vulnerable overnight?" probe, and caching it would silently
+# turn every re-audit into a replay of the last one.
+check skills/sec-audit/SKILL.md 'advisory-cache.json' "SKILL.md §4 missing the advisory cache wiring"
+check skills/sec-audit/SKILL.md 'Never cached' "SKILL.md §4 missing the never-cache rule"
+check skills/sec-audit/SKILL.md 'Never add it to the cache' "SKILL.md §4 missing the explicit querybatch prohibition"
+check skills/sec-audit/SKILL.md 'never as fixed' "SKILL.md §4 missing the withdrawn-is-not-fixed rule"
+check agents/report-writer.md 'New since last audit — dependency feeds' "report-writer missing the feed-delta section"
+check agents/report-writer.md 'Escalated' "report-writer missing the escalation table"
+check agents/report-writer.md 'Withdrawn' "report-writer missing the withdrawn table"
+check agents/report-writer.md 'is mandatory' "report-writer missing the (unchanged) marker rule"
+check scripts/secaudit/cve_enricher.py 'NEVER cached' "cve_enricher missing the never-cache contract in code"
+if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; then
+    echo "CONTRACT FAIL: querybatch is being cached — the newly-published-advisory probe must always run" >&2
+    fail=1
+fi
+echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
+
+# --- docs closeout (v1.32 Stage 6 Task 6.1):
+check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \
+    "COVERAGE.md missing the state-home / incremental section"
+check skills/sec-audit/references/COVERAGE.md 'What makes a lane re-run' \
+    "COVERAGE.md missing the rerun-trigger matrix"
+check skills/sec-audit/references/COVERAGE.md 'Package status vocabulary' \
+    "COVERAGE.md missing the VULNERABLE/SAFE/UNKNOWN vocabulary"
+check skills/sec-audit/references/COVERAGE.md 'UNKNOWN is returned instead of SAFE' \
+    "COVERAGE.md missing the unknown-over-safe rule"
+check skills/sec-audit/references/COVERAGE.md 'Finding status vocabulary' \
+    "COVERAGE.md missing the finding status vocabulary"
+check README.md 'Incremental audits & version safety' "README missing the incremental section"
+check README.md '\-\-state-dir' "README missing --state-dir"
+check README.md '\-\-full' "README missing --full"
+check README.md 'nothing is written into the audited' "README missing the no-in-repo-writes statement"
+echo "docs-closeout: COVERAGE.md + README document the state home, rerun matrix and status vocabularies"
 
 if [ "$fail" -ne 0 ]; then
     echo "contract-check: FAIL" >&2

@@ -24,8 +24,10 @@ judgments. You render only what the inputs contain.
    respects them.
 3. **Never modify the quoted fix_recipe string.** Render it verbatim inside
    a blockquote.
-4. **Filename: `<target>/sec-audit-report-YYYYMMDD-HHMM.md` in UTC.** Use
-   `date -u '+%Y%m%d-%H%M'` to generate the timestamp.
+4. **Filename: `<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` in UTC**
+   (v1.29.0+ — the project's portfolio state home, supplied as an input; the
+   audited tree is never written to). Use `date -u '+%Y%m%d-%H%M'` to generate
+   the timestamp.
 
 ## Inputs
 
@@ -36,7 +38,12 @@ judgments. You render only what the inputs contain.
    fetched_at, status}`.
 3. Inventory object (file path) — sec-expert `__dep_inventory__` passthrough
    or the orchestrator's higher-level inventory summary.
-4. Target path (where to write the report).
+4. Target path (the audited project — rendered in the report header as the
+   review's scope; **never written to**).
+4b. State home (v1.29.0+) — the absolute path resolved by SKILL.md §1.5
+   (`<portfolio_root>/<area>/<name>/security`). This is where the report is
+   written. If this input is missing, stop and report the gap; do NOT fall back
+   to writing into the target path.
 5. Scoring output — per-finding score (0–100) and bucket — supplied by the
    orchestrator skill body (deterministic rubric stays in SKILL.md section 5,
    not here).
@@ -121,6 +128,12 @@ and severity tallies, before the severity-bucket sections. One row
 per dispatched lane; lanes filtered out by `--only` / `--skip` do
 NOT appear here but are noted in Step 6 Review metadata instead.
 
+On an incremental run (v1.30.0+) add a `Re-run` column carrying the changeset's
+verdict and reason verbatim — `yes (9 applicable files changed)` or
+`no (no applicable file changed since 20260709-1738)`. A lane that was carried
+is NOT the same as a lane that was out of scope or excluded by `--only`/`--skip`;
+the three must remain visually distinct.
+
 ```markdown
 ## Per-lane summary
 
@@ -155,6 +168,89 @@ Do NOT add a row for a lane that did not dispatch (whether due to
 absent inventory key, filter, or runner crash). Absent-entirely
 lanes are listed under Step 6 "Lanes dispatched" metadata.
 
+### Step 2.7 — Emit "Changes since last audit" (v1.30.0+, incremental runs only)
+
+Skip this section entirely on a full run or a project's first audit — its
+absence means "no baseline to compare against", and it must not be faked with
+zeroes. On an incremental run, emit it immediately after the header, **before**
+the severity buckets, because "what changed" is the reason the reader re-ran the
+audit:
+
+```markdown
+## Changes since last audit
+
+Baseline: `20260709-1738` (2026-07-09 17:38 UTC) — 12 of 812 files changed,
+6 of 19 lanes re-run.
+
+| Status     | Count | Meaning                                              |
+|------------|------:|------------------------------------------------------|
+| NEW        |     3 | not present in the baseline                          |
+| REGRESSED  |     1 | previously fixed, found again                        |
+| REVERIFIED |    18 | re-scanned this run, still present                   |
+| CARRIED    |    24 | not re-scanned this run (see per-lane reasons below) |
+| FIXED      |     5 | re-scanned cleanly and gone, or their file was deleted |
+```
+
+Then list the NEW and REGRESSED findings by title with links to their blocks —
+these are what the reader must act on.
+
+### Step 2.75 — Emit "New since last audit — dependency feeds" (v1.32.0+)
+
+Incremental runs only, immediately after Step 2.7. This section carries what a
+file hash can never show: the code did not move, but what is *known* about it
+did. Render from `advisory_deltas`, omitting any sub-table that is empty:
+
+```markdown
+## New since last audit — dependency feeds
+
+### Newly published advisories affecting unchanged dependencies
+
+| Package | Installed | Advisory | CVSS | Since |
+|---------|-----------|----------|-----:|-------|
+| django | 2.2.0 (unchanged) | CVE-2026-5555 | 9.8 | 20260709-1738 |
+
+### Escalated — the exploit signal moved on an advisory you already had
+
+| Package | Advisory | Change |
+|---------|----------|--------|
+| urllib3 | CVE-2023-4321 | added to CISA KEV on 2026-07-20 |
+| urllib3 | CVE-2023-4321 | EPSS 0.20 → 0.62 (crossed the 0.5 band) |
+
+### Withdrawn — no longer returned by the feeds
+
+| Package | Advisory | Note |
+|---------|----------|------|
+| left-pad | CVE-2019-0000 | withdrawn from the feeds — **not** fixed in your code |
+```
+
+Two rules:
+
+- **`(unchanged)` after the installed version is mandatory** when
+  `dep_unchanged` is true. The reader's first instinct on seeing a new advisory
+  is "what did I change?" — the answer is nothing, and saying so is the point.
+- **A withdrawn advisory is never rendered as fixed.** Nothing about the code
+  changed; the feed changed its mind. Keep it in its own table with the note.
+
+### Step 2.8 — Emit "Fixed since last audit" (v1.30.0+)
+
+Findings with `status: FIXED` do NOT appear in the severity buckets (they are
+not open findings) and are not silently dropped either. Render them in their own
+section with what resolved them:
+
+```markdown
+## Fixed since last audit
+
+| Finding | File | Severity | First seen | Resolved by |
+|---------|------|----------|------------|-------------|
+| SQL injection in user lookup | `src/db.py` | HIGH | 20260527-2055 | not-found-on-rescan |
+| Hardcoded token | `old/legacy.py` | HIGH | 20260709-1738 | file-deleted |
+```
+
+`Resolved by` renders the finding's `resolution` verbatim — `not-found-on-rescan`
+(the lane re-ran cleanly and the finding was gone) or `file-deleted` (the file
+that carried it no longer exists). Do not editorialize these into "fixed by the
+developer": the pipeline knows the finding is gone, not why.
+
 ### Step 3 — Emit severity buckets
 
 Order: CRITICAL, then HIGH, then MEDIUM, then LOW. Within each bucket, order
@@ -172,6 +268,7 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
 ### <title>
 - **File:** `<file>:<line>`
 - **CWE:** <cwe>
+- **Status:** <status-line — see below>
 - **Origin:** <origin-line — see below>
 - **CVE(s):** <CVE lines — see below>
 - **Score:** <score> / 100 (<breakdown>, confidence: <confidence>)
@@ -185,6 +282,25 @@ For each finding, emit exactly this shape (from SKILL.md section 6):
   - <reference_url>
   - <CVE advisory URLs>
 ```
+
+Status line (v1.30.0+): built from the finding's `status`, `first_seen`,
+`last_verified_at`, `stale` and `carried_reason` fields. Omit the line entirely
+on a full run (every finding is trivially "current"; the line would be noise).
+On an incremental run render exactly one of:
+
+| `status`     | Status line                                                              |
+|--------------|--------------------------------------------------------------------------|
+| `NEW`        | `NEW — first seen this run`                                              |
+| `REGRESSED`  | `REGRESSED — previously fixed in <previously_fixed_in>, found again`     |
+| `REVERIFIED` | `re-verified this run (first seen <first_seen>)`                         |
+| `CARRIED`    | `CARRIED — not re-verified this run: <carried_reason> (first seen <first_seen>, last verified <last_verified_at>)` |
+
+The `CARRIED` wording is mandatory and must contain the literal phrase **"not
+re-verified this run"**. A carried finding is one this audit did not re-check;
+rendering it identically to a freshly-confirmed finding would misrepresent how
+much of the report is current — the single most misleading thing an incremental
+report could do. When `stale: true` (the lane ran but its tool was unavailable),
+append `— lane degraded, findings unverified`.
 
 Origin line: built from the finding's `origin` and `tool` fields when
 present. Render exactly one of:
@@ -277,6 +393,77 @@ Sources: always include `reference_url`. Also include each CVE advisory URL
 from the matched enricher entries (the `references` array of each CVE entry).
 
 ### Step 5 — Emit dependency CVE summary
+
+#### Dependency version safety (v1.31.0+)
+
+Before the CVE summary, emit `## Dependency version safety` — the section that
+answers, per package, *which versions are vulnerable and which are safe*. Every
+package in the inventory appears in **exactly one** of the three tables, driven
+by the `version_safety` verdict cve-enricher attaches. Never move a package
+between tables on your own judgement.
+
+```markdown
+## Dependency version safety
+
+_As of <fetched_at> UTC, feeds consulted: OSV, NVD, GHSA, KEV, EPSS._
+
+### Vulnerable
+
+| Package | Eco | Installed | Vulnerable ranges | Fixed in | Min safe | Min safe (same major) | Max CVSS | Max EPSS | KEV |
+|---------|-----|-----------|-------------------|----------|----------|-----------------------|---------:|---------:|-----|
+| django | PyPI | 2.2.0 | >=2.2, <2.2.28 · >=3.0, <=3.1.9 | 2.2.28 | 2.2.28 | 2.2.28 | 9.8 | 0.976 | yes |
+
+### Verified safe
+
+| Package | Eco | Installed | Advisories checked | Feeds |
+|---------|-----|-----------|-------------------:|-------|
+| urllib3 | PyPI | 2.2.3 | 4 | OSV, GHSA, NVD |
+
+### Unknown — no claim made
+
+| Package | Eco | Installed | Why |
+|---------|-----|-----------|-----|
+| rangepkg | PyPI | `>=1.0` | no exact installed version (declared) — a range cannot be evaluated against advisory ranges |
+```
+
+Rules, in order of importance:
+
+1. **`Min safe` is rendered verbatim from `version_safety.min_safe`.** It is the
+   smallest advisory-named fixed version that clears *every* advisory affecting
+   the package — which is often NOT the nearest fixed version. Never substitute
+   a "closer" one, and never invent a version string: if `min_safe` is null,
+   write `none published` and say so plainly.
+   Note the value comes from the advisories, so it can occasionally name a
+   version the registry has not published yet (observed: GHSA advisories citing
+   lodash 4.18.0 while npm's latest is 4.17.21). That is the feed's claim, not
+   ours — always render the contributing advisory IDs beside it so the reader
+   can check, and never "correct" it to a version you believe exists.
+2. **`Min safe (same major)` is null when no in-major fix exists.** Write
+   `— (requires major upgrade)`. Do not fall back to the cross-major version in
+   that column; the whole point of the column is to show whether a non-breaking
+   fix is available.
+3. **The Verified-safe heading is a claim about the consulted feeds at a point
+   in time, never about the code.** Keep the `_As of … feeds consulted …_` line
+   directly under the section heading. Do not write "this version is secure".
+4. **Anything the pipeline could not evaluate goes in Unknown, with the reason
+   verbatim** from `version_safety.reason` — an offline feed, a declared range,
+   an unsupported ecosystem, or an approximate comparison. An unevaluated
+   package must never appear in Verified safe.
+5. Sort Vulnerable by descending Max CVSS, then package name; sort the other two
+   alphabetically.
+
+#### Program & runtime versions (v1.31.0+)
+
+When the inventory carries `programs` entries (base images, OS package pins, CI
+action pins, toolchain pins), emit `## Program & runtime versions` with the same
+three-way split. Two extra rules:
+
+- An entry with `pinned: false` has **no version** — render `Installed` as
+  `unpinned (<note>)` and place it in Unknown, never in Verified safe. A moving
+  tag cannot be cleared.
+- An entry whose `ecosystem` is null is not covered by the consulted feeds.
+  Place it in Unknown with `not covered by the consulted feeds` — do not imply
+  the absence of advisories means safety.
 
 Emit a `## Dependency CVE summary` section with this table:
 
@@ -377,6 +564,13 @@ comma-separated list (truncate to the first three entries plus an
 ## Review metadata
 
 - Plugin version: sec-audit <version>
+- State home: <absolute path resolved by SKILL.md §1.5>
+- Run id: <YYYYMMDD-HHMM>
+- Previous run: <YYYYMMDD-HHMM (YYYY-MM-DD HH:MM UTC)> or "none — first audit"
+- Mode: <"full" | "incremental (baseline <run id>)">
+- Files: <n> changed (<a> added, <m> modified, <d> deleted), <u> unchanged
+- Lanes re-run: <lane (reason), ...>
+- Lanes carried: <lane (reason), ...>   <!-- omit both lines on a full run -->
 - Reference packs loaded: <comma-separated list from inventory or orchestrator>
 - sec-expert runs: <n>
 - Lanes dispatched: <comma-separated list of lane keys that actually ran>
@@ -404,6 +598,11 @@ listed here — they appear instead in the `Lane filter applied` line
 so the reader can distinguish "lane was out of scope" from "lane
 was explicitly excluded by the caller."
 
+`State home`, `Run id`, and `Previous run` (v1.29.0+) come from the orchestrator:
+the §1.5 resolution and the state store's `runs[]`. On a project's first audit
+write `none — first audit` for `Previous run` — never omit the line, because its
+absence and "no prior audit" must not look the same to a reader.
+
 All values must come from the inputs. If a value is not supplied, write
 `unknown` rather than inventing a number.
 
@@ -416,19 +615,38 @@ and header timestamp match exactly).
 Write the assembled markdown to:
 
 ```
-<target_path>/sec-audit-report-<YYYYMMDD-HHMM>.md
+<state_home>/reports/sec-audit-<YYYYMMDD-HHMM>.md
 ```
 
 Use the Write tool. The content must be the complete report assembled in
 Steps 2–6 with a trailing newline.
 
-Print the absolute path of the written file to stdout so the orchestrator
+Then write the pointer file `<state_home>/latest.md` — the stable path a human
+or a portfolio tool can follow to the newest report. It contains exactly:
+
+```markdown
+# Latest sec-audit report — <project name>
+
+- **Run:** <YYYYMMDD-HHMM> (UTC)
+- **Mode:** <full | incremental (baseline <prev run>)>
+- **Findings:** <n> CRITICAL, <n> HIGH, <n> MEDIUM, <n> LOW
+- **Report:** [sec-audit-<YYYYMMDD-HHMM>.md](reports/sec-audit-<YYYYMMDD-HHMM>.md)
+```
+
+Overwrite it on every run — it is a pointer, not a log; `history.jsonl` is the log.
+
+Print the absolute path of the written report to stdout so the orchestrator
 knows where it landed.
 
 ## Output discipline
 
-- The only writes are (a) the report markdown file in the target directory,
-  and (b) the absolute path printed to stdout.
+- The only writes are (a) the report markdown file under
+  `<state_home>/reports/`, (b) the `<state_home>/latest.md` pointer, and
+  (c) the absolute report path printed to stdout.
+- **Never write inside the audited project's tree.** The target path is
+  read-only for this agent — as of v1.29.0 every sec-audit artifact lives in the
+  portfolio state home (SKILL.md §1.5). A report written into the audited repo
+  would both pollute that repo and leave the incremental baseline behind.
 - Any progress or error messages go to stderr.
 - Do NOT write any other files.
 - Do NOT print any other content to stdout.
@@ -440,7 +658,8 @@ knows where it landed.
 - Do NOT omit a finding. Every triaged finding renders. The rule is: never omit.
 - Do NOT modify fix_recipe strings. Not even whitespace normalization.
 - Do NOT use emoji or decorative formatting beyond the SKILL.md template.
-- Do NOT write anywhere except the target path.
+- Do NOT write anywhere except the state home (`reports/` + `latest.md`).
+  Writing into the audited target path is a contract violation, not a fallback.
 - Do NOT call CVE APIs. CVE data comes exclusively from the cve-enricher
   input file.
 - Do NOT execute any code from the target project.

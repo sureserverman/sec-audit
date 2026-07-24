@@ -39,13 +39,20 @@ code analysis; this skill orchestrates and enriches.
   to 5000/hr. Read from `$GITHUB_TOKEN` env var if unset.
 - `nvd_api_key` (optional) — raises NVD rate limit from ~5/30s to 50/30s.
   Read from `$NVD_API_KEY` env var if unset.
+- `full` (optional, v1.29.0+) — `true` when the caller passed `--full`. Forces a
+  complete re-audit and rewrites the incremental baseline. Absent ⇒ the run is
+  incremental whenever prior state exists (§2.5).
+- `state_dir` (optional, v1.29.0+) — explicit state-home path from
+  `--state-dir=`. Overrides portfolio resolution (§1.5).
 
 ## Output
 
 A markdown report written to
-`<target_path>/sec-audit-report-YYYYMMDD-HHMM.md`. The report is the
-single user-facing deliverable — everything else (JSONL, CVE JSON blobs)
-is internal working state.
+`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` — the project's **portfolio**
+home, resolved in §1.5 (v1.29.0+; earlier versions wrote into the audited tree).
+The report is the single user-facing deliverable; the state store, advisory
+cache, and run history live beside it, and everything else (JSONL, CVE JSON
+blobs) is internal working state. **Nothing is written into `target_path`.**
 
 ---
 
@@ -80,6 +87,48 @@ Before touching anything, fix the scope and confirm it out loud.
 
 State the final scope (paths included, paths excluded) in the report's
 header block so the review is reproducible.
+
+## 1.5 State home (v1.29.0+)
+
+Every audit persists its outputs — the report, the SARIF log, the run history,
+and the incremental state that makes §2.5 possible — into the audited project's
+**portfolio home**, never into the audited tree:
+
+```
+<state_home>/                      # <portfolio_root>/<area>/<name>/security
+  audit-state.json                 # incremental baseline (manifest, findings, deps, feeds)
+  advisory-cache.json              # cached advisory projections
+  history.jsonl                    # one line per run
+  latest.md                        # pointer to the newest report
+  reports/sec-audit-<ts>.md        # the user-facing deliverable
+  reports/sec-audit-<ts>.sarif     # only when --sarif
+```
+
+Resolve it deterministically — do not guess the path:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/statehome.py" <target_path> \
+    [--state-dir <path>]      # --state-dir only when the caller passed it
+```
+
+The script emits `{"home", "project", "source", "exists", "confirm_required"}`,
+resolving in this order: `--state-dir` override → `projects-registry.yaml`
+longest-prefix match → `<dev_root>/<area>/<name>` inference → deterministic
+`_adhoc/<slug>` fallback.
+
+Skill-level invariants:
+
+- **`confirm_required: true`** — the target is not in the portfolio registry, so
+  this would create a new portfolio directory. Ask the user once before
+  proceeding, showing the resolved path. Do not auto-register the project.
+- **Exit code 3 (state root missing / unwritable)** — surface the error and
+  **stop**. sec-audit does not fall back to writing inside the audited project:
+  a silent fallback would scatter reports into audited trees and lose the
+  incremental baseline. The message names `--state-dir`, which is the way out.
+- **Echo the resolved home** to the user alongside the §1 scope confirmation, so
+  the destination is visible before any work starts.
+- **Never write anything into `target_path`.** The audited tree is read-only for
+  the whole pipeline (§6 report-writer enforces this too).
 
 ## 2. Inventory
 
@@ -748,6 +797,49 @@ or `"webext": ["chrome-mv3", "firefox-amo"]` for a cross-browser
 extension (one whose manifest has both a top-level MV3 shape and a
 `browser_specific_settings.gecko.id`).
 
+## 2.5 Changeset — what to re-analyse (v1.30.0+)
+
+**Incremental is the default.** When the state home (§1.5) already holds a
+baseline for this target, re-analyse only what changed and carry the rest
+forward. A project's first audit is always full, and `--full` forces a full one.
+
+Hash the tree, then ask `changeset.py` what must re-run:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/fingerprint.py" manifest <target_path> \
+    [--files "$TMPDIR/secaudit-changed.txt"] > "$TMPDIR/secaudit-manifest.json"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/changeset.py" \
+    --manifest "$TMPDIR/secaudit-manifest.json" \
+    --state    "<state_home>/audit-state.json" \
+    --lanes    "$TMPDIR/secaudit-inventory.json" \
+    [--full] > "$TMPDIR/secaudit-changeset.json"
+```
+
+The changeset names, per lane, `rerun` (bool) and a `reason` string. Both are
+carried into the report — a reader must always be able to see *why* something
+was or was not re-checked.
+
+Skill-level invariants:
+
+- **Dispatch only lanes with `rerun: true`** (§3.0). For a lane with
+  `rerun: false`, inject its stored findings into the stream instead — do not
+  re-derive them, and do not drop them.
+- **Scope each re-run lane to its changed files** by passing `--files` with the
+  lane's `files` list, exactly as `--diff` mode already does. The `secrets` lane
+  is never file-scoped (gitleaks scans the tree, trufflehog scans history) and
+  is always re-run.
+- **Never widen a skip.** `changeset.py` is fail-safe by construction (unknown
+  lane, missing digest, degraded previous run, stale TTL ⇒ re-run). Do not
+  second-guess a `rerun: true` into a skip because the change "looks harmless".
+- **`--full` and `--diff` interact explicitly.** `--diff` scopes to git changes
+  and **suppresses state-based resolution** for anything outside the diff: a
+  PR-time run must never claim findings elsewhere in the tree were fixed, because
+  it did not look at them. `--full` overrides both.
+- **A refused state file stops the run** (§1.5) rather than silently downgrading
+  to a full audit — the user asked for an incremental audit and must be told why
+  they are not getting one.
+
 ## 3. Code analysis — dispatch sec-expert subagent(s)
 
 For each detected stack (usually one, multiple for monorepos), dispatch the
@@ -774,6 +866,14 @@ The agent returns JSONL findings per the schema documented in
 inventory feeds step 4.
 
 ### 3.0 Dispatch discipline (multi-stack default)
+
+**Incremental filter (v1.30.0+).** Before applying the multi-stack and
+`only_lanes`/`skip_lanes` rules below, drop every lane the §2.5 changeset marked
+`rerun: false`; its stored findings are injected at §4.9 instead of being
+re-derived. A lane skipped this way is reported as *carried*, distinct from
+"out of scope" and from "excluded by the caller" — three different reasons a
+lane produced no fresh output, and the report must not conflate them.
+
 
 Multi-stack dispatch is the default behaviour. When §2 Inventory
 detects ≥2 lane keys simultaneously (e.g. a Tauri app with `rust`
@@ -2221,8 +2321,37 @@ findings. Every finding carries `origin: "php"`, `tool: "phpcs"`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
+**The dependency inventory is deterministic as of v1.31.0.** Run `depinv.py`
+first; it is the source of truth for what is installed:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/depinv.py" <target_path> \
+    > "$TMPDIR/secaudit-depinv.json"
+```
+
+It parses resolved lockfiles first and declared manifests only as a fallback,
+labelling each package `lockfile` / `pinned` / `declared` / `unparsed`, and
+additionally emits `programs` (base images, apt/apk pins, CI action pins,
+toolchain pins). Feed its `ecosystems` array to cve-enricher.
+
+**sec-expert's `__dep_inventory__` remains a union fallback, not the source.**
+Merge the two on `(ecosystem, name)`:
+
+- In **both** ⇒ keep it once, `source: "both"`. If the versions disagree, the
+  deterministic parser wins (it read the lockfile; the agent read prose) and the
+  discrepancy is noted in Review metadata — never silently reconciled.
+- Only in **depinv** ⇒ `source: "depinv"`.
+- Only in **sec-expert** ⇒ `source: "sec-expert"`, kept because it may cover an
+  ecosystem the parser does not (a vendored dependency, an exotic manifest).
+  Its version is treated as `declared` — an LLM-read version is never exact
+  enough to support a "this version is safe" claim.
+
+Why this ordering matters: a package set that varies run to run cannot be
+diffed, so §2.5's dependency deltas and §4.9's classification would be noise,
+and a version-safety table built on a guessed version would be worse than none.
+
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
-haiku). It consumes the dep inventory emitted by sec-expert and returns a
+haiku). It consumes that merged inventory and returns a
 structured JSON document — one object per package with its CVEs and a
 `status` field (`ok` / `offline` / `capped`). Moving CVE enrichment into a
 haiku-pinned agent keeps the main skill context small and makes the
@@ -2235,6 +2364,32 @@ OSV doesn't cover. Endpoint URLs live in `references/cve-feeds.md` —
 `cve-enricher` reads them at runtime; they are NOT inlined here or in
 the agent body. That file is the single choke-point when feed schemas
 change.
+
+**Advisory cache (v1.32.0+).** Pass the state home's cache so per-advisory
+detail fetches are reused across runs:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/cve_enricher.py" \
+    --cache "<state_home>/advisory-cache.json" < inventory.json
+```
+
+What is and is not cached is a correctness rule, not an optimization:
+
+- **Cached:** per-advisory detail GETs, for `SECAUDIT_ADVISORY_TTL_DAYS` (7).
+  These scale with the dependency count and dominate the request budget.
+- **Never cached:** the OSV `querybatch` discovery call. It is one request for
+  up to 1000 packages *and* it is precisely the "did this unchanged version
+  become vulnerable overnight?" probe. Caching it would defeat the entire point
+  of re-auditing unchanged code. **Never add it to the cache.**
+- A corrupt cache is discarded with a warning and the run proceeds at full cost.
+  A damaged cache must never be able to hide an advisory.
+
+**Feed-driven deltas (v1.32.0+).** Pass the enricher output to §4.9 via
+`--cve-output`; `deltas.py` then classifies what the *feeds* changed —
+newly-published advisories on unchanged dependencies, KEV/EPSS escalations on
+advisories you already had, and withdrawals. Persist the returned `state_deps`
+in §6 so the next run can do the same. A withdrawal is reported as withdrawn,
+**never as fixed** — nothing about the code changed.
 
 Skill-level invariants the orchestrator still enforces (the agent
 reports these states; the skill decides what to do with them):
@@ -2325,6 +2480,47 @@ the normal additive rubric off its HIGH/MEDIUM severity. Render `deep-deps` find
 dependency` entries by `(ecosystem, name, version)` — a package flagged by the
 feed AND confirmed by the diff appears once, annotated with both signals.
 
+## 4.9 Merge & classify — carried vs fresh (v1.30.0+)
+
+Runs **before** §5 scoring, so carried and freshly-found findings are scored by
+one identical rubric pass and a carried CRITICAL cannot drift below a fresh one.
+
+First stamp fingerprints on the fresh stream, then merge it with the baseline:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/fingerprint.py" findings \
+    "$TMPDIR/secaudit-triaged.jsonl" > "$TMPDIR/secaudit-fp.jsonl"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/deltas.py" \
+    --state       "<state_home>/audit-state.json" \
+    --changeset   "$TMPDIR/secaudit-changeset.json" \
+    --findings    "$TMPDIR/secaudit-fp.jsonl" \
+    --lane-status "$TMPDIR/secaudit-lane-status.json" \
+    --run-id      "<YYYYMMDD-HHMM>" > "$TMPDIR/secaudit-merged.json"
+```
+
+`--lane-status` maps each dispatched lane to the sentinel state it reported
+(`ok` / `partial` / `unavailable`). Supplying it is **not optional**: it is what
+stops a lane whose tool was missing from silently "fixing" every finding it can
+no longer see.
+
+Output: `findings` (every finding with a `status` of NEW / REVERIFIED / CARRIED /
+FIXED / REGRESSED), `deltas` (the counts), and `state_findings` (the map to
+persist in §6).
+
+Skill-level invariants:
+
+- **Exit code 5 is a conservation failure** — the merge could not account for
+  every baseline finding. Stop the run and report it. Never publish a report
+  built on a finding set that lost entries.
+- **Feed the whole merged set to §5**, not just the fresh part. FIXED findings
+  are excluded from scoring (they are rendered in their own report section);
+  everything else scores normally.
+- **Persist `state_findings` in §6** via statestore, together with the new file
+  manifest and the per-lane `lane_state` (`last_run`, `last_run_at`, `status`,
+  `digest`, `tool_versions`, `findings` count). Skipping the persist step makes
+  the next run full again and silently discards this run's classifications.
+
 ## 5. Prioritize
 
 Compute a numeric score 0–100 per finding and bucket it. This is
@@ -2384,11 +2580,25 @@ Order the report by descending score, CRITICAL first.
 ## 6. Report — dispatch report-writer
 
 Dispatch the `report-writer` agent (`agents/report-writer.md`, pinned to
-sonnet) with the triaged findings, the cve-enricher output, and the
-inventory. The agent writes
-`<target_path>/sec-audit-report-YYYYMMDD-HHMM.md` (timestamp in UTC) and
-returns the absolute path to stdout so the orchestrator can confirm
-placement.
+sonnet) with the triaged findings, the cve-enricher output, the inventory, and
+the `state_home` resolved in §1.5. The agent writes
+`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` (timestamp in UTC) plus the
+`<state_home>/latest.md` pointer, and returns the absolute report path to stdout
+so the orchestrator can confirm placement.
+
+**Nothing is written into `target_path`** (v1.29.0+). If `state_home` is
+missing, stop — do not let the agent fall back to the audited tree.
+
+After the report is written, append the run record to the state store:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/statestore.py" append-run <state_home>
+```
+
+with the run JSON on stdin (`run_id`, `started_at`, `finished_at`,
+`plugin_version`, `mode`, `lanes_ran`, `lanes_carried`, `counts`, `deltas`,
+`cost`). This is what makes the next run incremental — skipping it silently
+turns every future audit back into a full one.
 
 ### 6.5 Optional SARIF output (`--sarif`)
 
@@ -2400,7 +2610,7 @@ the markdown report):
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" \
     < "$TMPDIR/secaudit-scored.json" \
-    > "<target_path>/sec-audit-report-YYYYMMDD-HHMM.sarif"
+    > "<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif"
 ```
 
 Use the **same** `YYYYMMDD-HHMM` UTC timestamp as the markdown report so the

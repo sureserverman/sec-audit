@@ -24,7 +24,7 @@ Parse `$ARGUMENTS` into:
    network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
    not run.
 5. **`--sarif`** (optional, opt-in) — additionally emit a SARIF 2.1.0 log
-   (`<target>/sec-audit-report-YYYYMMDD-HHMM.sarif`, same timestamp as the
+   (`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif`, same timestamp as the
    markdown report) for GitHub code-scanning / IDE consumption (§6.5). This is
    NOT a `--only`/`--skip` lane name — it is a separate opt-in flag. Absent ⇒
    no `.sarif` file is written.
@@ -35,14 +35,28 @@ Parse `$ARGUMENTS` into:
    repository (else the run errors). This is NOT a `--only`/`--skip` lane name
    — it is a separate opt-in flag. Absent ⇒ whole-tree review.
 
+7. **`--full`** (optional, v1.29.0+) — force a complete re-audit and rewrite
+   the incremental baseline. Absent ⇒ the run is **incremental by default**
+   whenever a prior audit state exists for this target (§1.5 / §2.5); the first
+   audit of a project is always full regardless. Use `--full` after changing
+   scanner versions, when a state file is refused as corrupt, or when you want
+   an unconditional from-scratch review. This is NOT a `--only`/`--skip` lane
+   name — it is a separate flag.
+8. **`--state-dir=<path>`** (optional, v1.29.0+) — write the audit state,
+   reports, and run history to `<path>` instead of the project's portfolio home.
+   The escape hatch for an unmounted vault, a CI runner, or an ad-hoc target you
+   do not want recorded in the portfolio. Absent ⇒ the home is resolved from
+   `~/.claude/projects-registry.yaml` (§1.5). This is NOT a `--only`/`--skip`
+   lane name — it is a separate flag.
+
 **Canonical lane names (26 total):** `sec-expert`, `sast`, `dast`,
 `webext`, `rust`, `android`, `ios`, `linux`, `macos`, `windows`,
 `k8s`, `iac`, `gh-actions`, `virt`, `c-cpp`, `go`, `shell`, `python`,
 `php`, `ansible`, `netcfg`, `image`, `ai-tools`, `webapp`,
 `supply-chain`, `secrets`.
 Reject any invocation that names a lane outside this list. (`--deep-deps`,
-`--sarif`, and `--diff` are flags, not lane names, and are not accepted in
-`--only`/`--skip`.)
+`--sarif`, `--diff`, `--full`, and `--state-dir` are flags, not lane names, and
+are not accepted in `--only`/`--skip`.)
 
 **Mutual exclusion:** `--only` and `--skip` MUST NOT both be set. The
 two flags are mutually exclusive. If the caller passed both, refuse
@@ -103,6 +117,8 @@ Invoke the `sec-audit` skill (see `skills/sec-audit/SKILL.md`) with:
 - `sarif` — `true` when `--sarif` was passed; omit (falsy) otherwise
 - `diff` — `true` when `--diff` / `--diff=ref` was passed; omit (falsy) otherwise
 - `diff_ref` — the `ref` from `--diff=ref`, or omit for bare `--diff`
+- `full` — `true` when `--full` was passed; omit (falsy) otherwise
+- `state_dir` — the path from `--state-dir=`, or omit when absent
 - `target_url`, `github_token`, `nvd_api_key` — read from env vars
   as before (see SKILL.md Inputs)
 
@@ -118,9 +134,12 @@ The skill is responsible for:
    GHSA.
 6. Prioritizing by the deterministic CVSS + exposure + exploit +
    auth rubric defined in the skill.
-7. Writing the report to
-   `<target>/sec-audit-report-YYYYMMDD-HHMM.md`.
+7. Writing the report to the project's portfolio state home,
+   `<state_home>/reports/sec-audit-YYYYMMDD-HHMM.md` (v1.29.0+ — **nothing is
+   written into the audited project's tree**).
 
 After the skill completes, print the report's absolute path and a
 one-line summary of how many findings were produced per severity
-bucket, plus which lanes dispatched and which were filtered out.
+bucket, plus which lanes dispatched and which were filtered out. When the run
+was incremental, also print the baseline run it compared against and the
+new / fixed / carried counts.
