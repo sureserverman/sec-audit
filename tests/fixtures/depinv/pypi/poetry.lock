@@ -1,0 +1,8 @@
+[[package]]
+name = "django"
+version = "2.2.0"
+description = "web framework"
+
+[[package]]
+name = "urllib3"
+version = "2.2.3"

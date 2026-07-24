@@ -2321,8 +2321,37 @@ findings. Every finding carries `origin: "php"`, `tool: "phpcs"`.
 
 ## 4. CVE enrichment — dispatch cve-enricher
 
+**The dependency inventory is deterministic as of v1.31.0.** Run `depinv.py`
+first; it is the source of truth for what is installed:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/depinv.py" <target_path> \
+    > "$TMPDIR/secaudit-depinv.json"
+```
+
+It parses resolved lockfiles first and declared manifests only as a fallback,
+labelling each package `lockfile` / `pinned` / `declared` / `unparsed`, and
+additionally emits `programs` (base images, apt/apk pins, CI action pins,
+toolchain pins). Feed its `ecosystems` array to cve-enricher.
+
+**sec-expert's `__dep_inventory__` remains a union fallback, not the source.**
+Merge the two on `(ecosystem, name)`:
+
+- In **both** ⇒ keep it once, `source: "both"`. If the versions disagree, the
+  deterministic parser wins (it read the lockfile; the agent read prose) and the
+  discrepancy is noted in Review metadata — never silently reconciled.
+- Only in **depinv** ⇒ `source: "depinv"`.
+- Only in **sec-expert** ⇒ `source: "sec-expert"`, kept because it may cover an
+  ecosystem the parser does not (a vendored dependency, an exotic manifest).
+  Its version is treated as `declared` — an LLM-read version is never exact
+  enough to support a "this version is safe" claim.
+
+Why this ordering matters: a package set that varies run to run cannot be
+diffed, so §2.5's dependency deltas and §4.9's classification would be noise,
+and a version-safety table built on a guessed version would be worse than none.
+
 Dispatch the `cve-enricher` agent (`agents/cve-enricher.md`, pinned to
-haiku). It consumes the dep inventory emitted by sec-expert and returns a
+haiku). It consumes that merged inventory and returns a
 structured JSON document — one object per package with its CVEs and a
 `status` field (`ok` / `offline` / `capped`). Moving CVE enrichment into a
 haiku-pinned agent keeps the main skill context small and makes the

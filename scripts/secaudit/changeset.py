@@ -159,6 +159,61 @@ def diff_manifests(old, new):
             "unchanged": unchanged}
 
 
+def diff_deps(old, new):
+    """Classify the dependency set added / removed / version_changed / unchanged.
+
+    Keyed by `ecosystem|name`, because the same package name in two ecosystems
+    is two different packages. A version change is detected even when the
+    manifest FILE hash is unchanged — a transitive bump inside a regenerated
+    lockfile still moves a version, and that alone justifies re-querying the
+    feeds for that package."""
+    old = old or {}
+    new = new or {}
+    added, removed, changed, unchanged = [], [], [], []
+    for key, meta in sorted(new.items()):
+        if key not in old:
+            added.append({"package": key, "version": meta.get("version")})
+        elif old[key].get("version") != meta.get("version"):
+            changed.append({"package": key, "from": old[key].get("version"),
+                            "to": meta.get("version")})
+        else:
+            unchanged.append(key)
+    for key, meta in sorted(old.items()):
+        if key not in new:
+            removed.append({"package": key, "version": meta.get("version")})
+    return {"added": added, "removed": removed, "version_changed": changed,
+            "unchanged": len(unchanged),
+            # Every package whose identity moved needs a fresh advisory lookup;
+            # unchanged ones are still re-queried in batch (§5), but these are
+            # the ones whose CACHED verdict is definitely invalid.
+            "requery": sorted({d["package"] for d in added}
+                              | {d["package"] for d in changed})}
+
+
+def deps_from_depinv(doc):
+    """Flatten a depinv.py document into {`eco|name`: {version, ...}}."""
+    out = {}
+    for eco in (doc or {}).get("ecosystems", []) or []:
+        name_eco = eco.get("ecosystem")
+        for p in eco.get("packages", []) or []:
+            out[f"{name_eco}|{p.get('name')}"] = {
+                "version": p.get("version"),
+                "resolution": p.get("resolution"),
+                "manifest": eco.get("manifest"),
+            }
+    return out
+
+
+def programs_from_depinv(doc):
+    out = {}
+    for g in (doc or {}).get("programs", []) or []:
+        out[f"{g.get('kind')}|{g.get('name')}|{g.get('source')}"] = {
+            "version": g.get("version"), "ecosystem": g.get("ecosystem"),
+            "pinned": g.get("pinned"),
+        }
+    return out
+
+
 def _parse_ts(value):
     if not value:
         return None
@@ -170,7 +225,7 @@ def _parse_ts(value):
 
 def compute(state, new_manifest, applicable_lanes, *, full=False, now=None,
             staleness_days=DEFAULT_STALENESS_DAYS, tool_versions=None,
-            plugin_root=PLUGIN_ROOT):
+            plugin_root=PLUGIN_ROOT, depinv=None):
     now = now or datetime.now(timezone.utc)
     tool_versions = tool_versions or {}
     state = state or {}
@@ -263,13 +318,17 @@ def compute(state, new_manifest, applicable_lanes, *, full=False, now=None,
 
         decide(False, f"no applicable file changed since {baseline}")
 
-    return {"mode": mode,
-            "baseline_run": baseline,
-            "staleness_days": staleness_days,
-            "files": {"added": files["added"], "modified": files["modified"],
-                      "deleted": files["deleted"], "unchanged": len(files["unchanged"])},
-            "lanes": lanes,
-            "invalidations": invalidations}
+    out = {"mode": mode,
+           "baseline_run": baseline,
+           "staleness_days": staleness_days,
+           "files": {"added": files["added"], "modified": files["modified"],
+                     "deleted": files["deleted"], "unchanged": len(files["unchanged"])},
+           "lanes": lanes,
+           "invalidations": invalidations}
+    if depinv is not None:
+        out["deps"] = diff_deps(state.get("deps"), deps_from_depinv(depinv))
+        out["programs"] = diff_deps(state.get("programs"), programs_from_depinv(depinv))
+    return out
 
 
 def _load(path):
@@ -312,6 +371,8 @@ def main(argv):
     else:
         applicable = sorted(set(LANE_PATTERNS) | set(ALWAYS_ON))
     tool_versions = _load(args["tool-versions"]) if args.get("tool-versions") else {}
+    depinv = _load(args["depinv"]) if args.get("depinv") and os.path.exists(args["depinv"]) \
+        else None
 
     out = compute(
         state, new_manifest, applicable,
@@ -319,7 +380,8 @@ def main(argv):
         now=_parse_ts(args.get("now")),
         staleness_days=int(args.get("staleness-days", DEFAULT_STALENESS_DAYS)),
         tool_versions=tool_versions,
-        plugin_root=args.get("plugin-root", PLUGIN_ROOT))
+        plugin_root=args.get("plugin-root", PLUGIN_ROOT),
+        depinv=depinv)
     sys.stdout.write(json.dumps(out, indent=2, sort_keys=True) + "\n")
     return 0
 

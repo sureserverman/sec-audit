@@ -1,0 +1,7 @@
+# comment
+requests==2.31.0
+flask>=2.0,<3.0
+bare-package
+package[extra]==1.2.3
+conditional==4.0 ; python_version < "3.9"
+-r other.txt

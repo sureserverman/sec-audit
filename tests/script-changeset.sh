@@ -172,5 +172,73 @@ out=$(run)
 echo "$out" | q "['lanes']['python']['reason']" | grep -qi 'first run is always full' || { echo "FAIL: reason"; exit 1; }
 echo "  first audit: OK"
 
+echo "=== dependency deltas: added / removed / version_changed / unchanged ==="
+# Baseline deps in state vs a fresh depinv document. Note the manifest FILE is
+# unchanged in the manifest hash — a transitive bump inside a regenerated
+# lockfile must still be detected.
+python3 - > "$scratch/state.json" <<'PY'
+import json
+print(json.dumps({
+  "schema": 1, "runs": [{"run_id": "20260701-1200", "mode": "full"}],
+  "manifest": {"src/a.py": {"sha256": "aaa", "size": 1}},
+  "lane_state": {},
+  "deps": {
+    "PyPI|django":  {"version": "2.2.0"},
+    "PyPI|urllib3": {"version": "2.2.3"},
+    "PyPI|dropped": {"version": "1.0.0"},
+  },
+  "programs": {"base-image|nginx|Dockerfile": {"version": "1.25.2"}},
+}))
+PY
+mkmanifest "src/a.py=aaa"
+lanes_json python
+cat > "$scratch/depinv.json" <<'JSON'
+{"ecosystems":[{"ecosystem":"PyPI","manifest":"poetry.lock","packages":[
+   {"name":"django","version":"3.2.25","resolution":"lockfile"},
+   {"name":"urllib3","version":"2.2.3","resolution":"lockfile"},
+   {"name":"brandnew","version":"0.1.0","resolution":"lockfile"}]}],
+ "programs":[{"kind":"base-image","name":"nginx","version":"1.27.0","source":"Dockerfile","ecosystem":null,"pinned":true}]}
+JSON
+out=$(run --depinv "$scratch/depinv.json")
+echo "$out" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)['deps']
+assert [a['package'] for a in d['added']] == ['PyPI|brandnew'], d['added']
+assert [r['package'] for r in d['removed']] == ['PyPI|dropped'], d['removed']
+ch = d['version_changed']
+assert len(ch) == 1 and ch[0]['package'] == 'PyPI|django', ch
+assert ch[0]['from'] == '2.2.0' and ch[0]['to'] == '3.2.25', ch
+assert d['unchanged'] == 1, d
+# a bumped or added package must be queued for a fresh advisory lookup
+assert set(d['requery']) == {'PyPI|brandnew', 'PyPI|django'}, d['requery']
+print('  deps: +brandnew, -dropped, django 2.2.0->3.2.25, urllib3 unchanged OK')
+print('  requery set: %s OK' % d['requery'])
+"
+echo "$out" | python3 -c "
+import json,sys
+p = json.load(sys.stdin)['programs']
+assert p['version_changed'][0]['to'] == '1.27.0', p
+print('  programs: nginx 1.25.2->1.27.0 detected OK')
+"
+
+echo "=== a version bump with an UNCHANGED manifest hash is still detected ==="
+# (same run as above: src/a.py did not change, no lockfile is in the manifest at
+# all, yet django's bump was found — deps are diffed from depinv, not from hashes)
+echo "$out" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+assert d['files']['added'] == [] and d['files']['modified'] == [], d['files']
+assert d['deps']['version_changed'], 'dep bump missed when no file hash moved'
+print('  dep delta is independent of file hashes OK')
+"
+
+echo "=== no --depinv -> no deps block (absence, not a fake empty diff) ==="
+run | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+assert 'deps' not in d, 'deps reported without a dependency inventory'
+print('  omitted when not supplied OK')
+"
+
 echo ""
 echo "script-changeset: OK"

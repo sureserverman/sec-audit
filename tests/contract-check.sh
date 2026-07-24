@@ -1541,6 +1541,16 @@ if not ok:
 PY
 echo "incremental-wiring: §2.5 precedes dispatch, §4.9 merges before §5 scores"
 
+# --- deterministic dep inventory (v1.31.0 Stage 3 Task 3.3):
+check skills/sec-audit/SKILL.md 'depinv.py' "SKILL.md §4 missing depinv.py invocation"
+check skills/sec-audit/SKILL.md 'union fallback, not the source' \
+    "SKILL.md §4 missing the depinv-over-sec-expert precedence rule"
+check skills/sec-audit/SKILL.md 'deterministic parser wins' \
+    "SKILL.md §4 missing the version-conflict resolution rule"
+check skills/sec-audit/SKILL.md 'never silently reconciled' \
+    "SKILL.md §4 must require the discrepancy to be surfaced"
+echo "dep-inventory: depinv.py is the source of truth; sec-expert is a union fallback"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
