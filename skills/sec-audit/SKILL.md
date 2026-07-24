@@ -797,6 +797,49 @@ or `"webext": ["chrome-mv3", "firefox-amo"]` for a cross-browser
 extension (one whose manifest has both a top-level MV3 shape and a
 `browser_specific_settings.gecko.id`).
 
+## 2.5 Changeset — what to re-analyse (v1.30.0+)
+
+**Incremental is the default.** When the state home (§1.5) already holds a
+baseline for this target, re-analyse only what changed and carry the rest
+forward. A project's first audit is always full, and `--full` forces a full one.
+
+Hash the tree, then ask `changeset.py` what must re-run:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/fingerprint.py" manifest <target_path> \
+    [--files "$TMPDIR/secaudit-changed.txt"] > "$TMPDIR/secaudit-manifest.json"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/changeset.py" \
+    --manifest "$TMPDIR/secaudit-manifest.json" \
+    --state    "<state_home>/audit-state.json" \
+    --lanes    "$TMPDIR/secaudit-inventory.json" \
+    [--full] > "$TMPDIR/secaudit-changeset.json"
+```
+
+The changeset names, per lane, `rerun` (bool) and a `reason` string. Both are
+carried into the report — a reader must always be able to see *why* something
+was or was not re-checked.
+
+Skill-level invariants:
+
+- **Dispatch only lanes with `rerun: true`** (§3.0). For a lane with
+  `rerun: false`, inject its stored findings into the stream instead — do not
+  re-derive them, and do not drop them.
+- **Scope each re-run lane to its changed files** by passing `--files` with the
+  lane's `files` list, exactly as `--diff` mode already does. The `secrets` lane
+  is never file-scoped (gitleaks scans the tree, trufflehog scans history) and
+  is always re-run.
+- **Never widen a skip.** `changeset.py` is fail-safe by construction (unknown
+  lane, missing digest, degraded previous run, stale TTL ⇒ re-run). Do not
+  second-guess a `rerun: true` into a skip because the change "looks harmless".
+- **`--full` and `--diff` interact explicitly.** `--diff` scopes to git changes
+  and **suppresses state-based resolution** for anything outside the diff: a
+  PR-time run must never claim findings elsewhere in the tree were fixed, because
+  it did not look at them. `--full` overrides both.
+- **A refused state file stops the run** (§1.5) rather than silently downgrading
+  to a full audit — the user asked for an incremental audit and must be told why
+  they are not getting one.
+
 ## 3. Code analysis — dispatch sec-expert subagent(s)
 
 For each detected stack (usually one, multiple for monorepos), dispatch the
@@ -823,6 +866,14 @@ The agent returns JSONL findings per the schema documented in
 inventory feeds step 4.
 
 ### 3.0 Dispatch discipline (multi-stack default)
+
+**Incremental filter (v1.30.0+).** Before applying the multi-stack and
+`only_lanes`/`skip_lanes` rules below, drop every lane the §2.5 changeset marked
+`rerun: false`; its stored findings are injected at §4.9 instead of being
+re-derived. A lane skipped this way is reported as *carried*, distinct from
+"out of scope" and from "excluded by the caller" — three different reasons a
+lane produced no fresh output, and the report must not conflate them.
+
 
 Multi-stack dispatch is the default behaviour. When §2 Inventory
 detects ≥2 lane keys simultaneously (e.g. a Tauri app with `rust`
@@ -2373,6 +2424,47 @@ the normal additive rubric off its HIGH/MEDIUM severity. Render `deep-deps` find
 `Deep-dependency diff` sub-header, deduplicated against §4's `Malicious
 dependency` entries by `(ecosystem, name, version)` — a package flagged by the
 feed AND confirmed by the diff appears once, annotated with both signals.
+
+## 4.9 Merge & classify — carried vs fresh (v1.30.0+)
+
+Runs **before** §5 scoring, so carried and freshly-found findings are scored by
+one identical rubric pass and a carried CRITICAL cannot drift below a fresh one.
+
+First stamp fingerprints on the fresh stream, then merge it with the baseline:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/fingerprint.py" findings \
+    "$TMPDIR/secaudit-triaged.jsonl" > "$TMPDIR/secaudit-fp.jsonl"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/deltas.py" \
+    --state       "<state_home>/audit-state.json" \
+    --changeset   "$TMPDIR/secaudit-changeset.json" \
+    --findings    "$TMPDIR/secaudit-fp.jsonl" \
+    --lane-status "$TMPDIR/secaudit-lane-status.json" \
+    --run-id      "<YYYYMMDD-HHMM>" > "$TMPDIR/secaudit-merged.json"
+```
+
+`--lane-status` maps each dispatched lane to the sentinel state it reported
+(`ok` / `partial` / `unavailable`). Supplying it is **not optional**: it is what
+stops a lane whose tool was missing from silently "fixing" every finding it can
+no longer see.
+
+Output: `findings` (every finding with a `status` of NEW / REVERIFIED / CARRIED /
+FIXED / REGRESSED), `deltas` (the counts), and `state_findings` (the map to
+persist in §6).
+
+Skill-level invariants:
+
+- **Exit code 5 is a conservation failure** — the merge could not account for
+  every baseline finding. Stop the run and report it. Never publish a report
+  built on a finding set that lost entries.
+- **Feed the whole merged set to §5**, not just the fresh part. FIXED findings
+  are excluded from scoring (they are rendered in their own report section);
+  everything else scores normally.
+- **Persist `state_findings` in §6** via statestore, together with the new file
+  manifest and the per-lane `lane_state` (`last_run`, `last_run_at`, `status`,
+  `digest`, `tool_versions`, `findings` count). Skipping the persist step makes
+  the next run full again and silently discards this run's classifications.
 
 ## 5. Prioritize
 

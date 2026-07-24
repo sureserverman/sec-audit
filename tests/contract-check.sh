@@ -1508,6 +1508,39 @@ check agents/report-writer.md 'none — first audit' \
     "report-writer must render an explicit first-audit marker, not an omitted line"
 echo "run-provenance: report metadata carries state home + run id + previous run"
 
+# --- incremental wiring (v1.30.0 Stage 2 Task 2.4):
+# §2.5 must compute the changeset and §4.9 must merge BEFORE §5 scores, so
+# carried and fresh findings go through one identical rubric pass. The
+# ordering is the contract — a merge after scoring would score them twice
+# under different inputs.
+check skills/sec-audit/SKILL.md '^## 2.5 Changeset' "SKILL.md missing §2.5 Changeset"
+check skills/sec-audit/SKILL.md '^## 4.9 Merge & classify' "SKILL.md missing §4.9 Merge & classify"
+check skills/sec-audit/SKILL.md 'changeset.py' "SKILL.md §2.5 missing changeset.py invocation"
+check skills/sec-audit/SKILL.md 'deltas.py' "SKILL.md §4.9 missing deltas.py invocation"
+check skills/sec-audit/SKILL.md 'fingerprint.py' "SKILL.md missing fingerprint.py invocation"
+check skills/sec-audit/SKILL.md 'lane-status' "SKILL.md §4.9 missing the mandatory --lane-status input"
+check skills/sec-audit/SKILL.md 'Incremental filter' "SKILL.md §3.0 missing the incremental dispatch filter"
+check skills/sec-audit/SKILL.md 'suppresses state-based resolution' \
+    "SKILL.md §2.5 missing the --diff/--full interaction rule"
+check skills/sec-audit/SKILL.md 'Exit code 5 is a conservation failure' \
+    "SKILL.md §4.9 missing the conservation-failure stop rule"
+# Ordering: §2.5 before §3, §4.9 before §5.
+python3 - <<'PY' || fail=1
+import re, sys
+src = open("skills/sec-audit/SKILL.md", encoding="utf-8").read()
+def at(pat):
+    m = re.search(pat, src, re.M)
+    return m.start() if m else -1
+cs, disp = at(r'^## 2\.5 Changeset'), at(r'^## 3\. Code analysis')
+merge, score = at(r'^## 4\.9 Merge & classify'), at(r'^## 5\. Prioritize')
+ok = 0 < cs < disp and 0 < merge < score
+if not ok:
+    print("CONTRACT FAIL: incremental sections are out of order "
+          f"(2.5@{cs} < 3@{disp}, 4.9@{merge} < 5@{score})", file=sys.stderr)
+    sys.exit(1)
+PY
+echo "incremental-wiring: §2.5 precedes dispatch, §4.9 merges before §5 scores"
+
 # --- orchestrator §3.8 wire-up (v0.6.0 Stage 2 Task 2.3):
 # SKILL.md must declare §3.8, reference webext-runner, and document all
 # three sentinel states (ok / partial / unavailable). Shape mirrors
