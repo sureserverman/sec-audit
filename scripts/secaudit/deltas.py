@@ -231,6 +231,29 @@ def _state_rec(finding, lane, status, prev, run_id, ts, touch=True):
     return rec
 
 
+def feeds_only_changeset(state):
+    """The changeset a feed-only run implies (§4.10, v1.35).
+
+    A feed-only re-audit dispatches no code lane at all: it asks "did anything
+    become known about the dependencies we already had?". So nothing in the tree
+    moved and no lane re-ran — which, under invariant (a), means every baseline
+    finding must CARRY. Synthesising this rather than accepting a caller-supplied
+    changeset is deliberate: a changeset claiming a lane re-ran would let a
+    feed-only run mark code findings FIXED without any scanner having looked.
+    """
+    lanes = sorted({(rec.get("lane") or "unknown")
+                    for rec in (state.get("findings") or {}).values()})
+    return {
+        "mode": "feeds-only",
+        "baseline_run": (state.get("runs") or [{}])[-1].get("run_id")
+        if state.get("runs") else None,
+        "files": {"added": [], "modified": [], "deleted": [], "unchanged": 0},
+        "lanes": {ln: {"rerun": False,
+                       "reason": "feed-only run — no code lane was dispatched"}
+                  for ln in lanes},
+    }
+
+
 def apply_acceptances(findings, new_state, prev_state, register, run_id, today=None):
     """Overlay the accepted-risk register onto classified findings (§5.5, BL-004).
 
@@ -430,20 +453,41 @@ def main(argv):
             key = a[2:]
             if "=" in key:
                 key, val = key.split("=", 1)
-            else:
+            elif i + 1 < len(argv) and not argv[i + 1].startswith("--"):
                 i += 1
-                val = argv[i] if i < len(argv) else ""
+                val = argv[i]
+            else:
+                # Valueless (boolean) flag. Without this branch a flag like
+                # --feeds-only would swallow the NEXT option as its value,
+                # silently dropping it — e.g. `--feeds-only --cve-output f`
+                # parsed as feeds-only="--cve-output" and no cve-output at all.
+                val = ""
             args[key] = val
         i += 1
-    if "changeset" not in args or "run-id" not in args:
-        sys.stderr.write("usage: deltas.py --state <f> --changeset <f> --run-id <id> "
-                         "[--findings <f>] [--lane-status <f>] [--cve-output <f>] "
-                         "[--accepted <f>] [--now ISO]\n")
+    feeds_only = "feeds-only" in args
+    usage = ("usage: deltas.py --state <f> --changeset <f> --run-id <id> "
+             "[--findings <f>] [--lane-status <f>] [--cve-output <f>] "
+             "[--accepted <f>] [--now ISO]\n"
+             "       deltas.py --state <f> --run-id <id> --feeds-only "
+             "--cve-output <f> [--accepted <f>] [--now ISO]\n")
+    if "run-id" not in args or ("changeset" not in args and not feeds_only):
+        sys.stderr.write(usage)
+        return 2
+    if feeds_only and args.get("findings"):
+        # A feed-only run dispatched no scanner, so there is no fresh stream to
+        # merge. Accepting one would let scanner output ride in under a mode
+        # whose whole premise is that no code lane ran.
+        sys.stderr.write("deltas: --feeds-only takes no --findings (no code lane ran)\n")
+        return 2
+    if feeds_only and args.get("changeset"):
+        sys.stderr.write("deltas: --feeds-only synthesises its own changeset; "
+                         "--changeset is not accepted\n")
         return 2
 
     state = json.load(open(args["state"], encoding="utf-8")) if args.get("state") and \
         os.path.exists(args["state"]) else {}
-    changeset = json.load(open(args["changeset"], encoding="utf-8"))
+    changeset = (feeds_only_changeset(state) if feeds_only
+                 else json.load(open(args["changeset"], encoding="utf-8")))
     fresh = _read_findings(args.get("findings"))
     lane_status = json.load(open(args["lane-status"], encoding="utf-8")) \
         if args.get("lane-status") else {}
@@ -459,6 +503,11 @@ def main(argv):
         return 5
 
     doc = {"findings": findings, "deltas": deltas, "state_findings": new_state}
+    if feeds_only:
+        # The run record's mode. Everything a feed-only run reports comes from
+        # advisory_deltas below; the finding set is carried verbatim.
+        doc["mode"] = "feeds"
+        doc["changeset"] = changeset
     if args.get("accepted"):
         today = now.date() if now else None
         register = accepted_mod.load(args["accepted"], today)

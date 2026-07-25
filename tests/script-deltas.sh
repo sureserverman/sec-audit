@@ -499,5 +499,71 @@ assert info["accepted"] == 1, info
 print("  apply_acceptances is finding-count preserving OK")
 PY
 
+echo "=== --feeds-only: no code lane ran, so nothing may be fixed (BL-006) ==="
+# A feed-only re-audit asks "did anything become KNOWN about the deps we already
+# had?". No scanner ran, so under invariant (a) every baseline finding must
+# carry — and the changeset is synthesised, never caller-supplied, so a bad
+# changeset cannot let a feed-only run mark code findings FIXED.
+mkstate
+cat > "$scratch/feedcve.json" <<'JSON'
+[{"ecosystem":"PyPI","name":"django","version":"2.2.0","resolution":"lockfile","status":"ok",
+  "cves":[{"id":"CVE-2026-5555","cve":"CVE-2026-5555","cvss":9.8,"epss":0.7,"kev":false}],
+  "malicious":[]}]
+JSON
+out=$(python3 "$dl" --state "$scratch/state.json" --run-id 20260724-1200 --now "$NOW" \
+        --feeds-only --cve-output "$scratch/feedcve.json")
+echo "$out" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['mode']=='feeds', d.get('mode')
+st={f['fingerprint']:f['status'] for f in d['findings']}
+assert st['$FP_SQLI']=='CARRIED' and st['$FP_SHELL']=='CARRIED', st
+assert d['deltas']['fixed']==0 and d['deltas']['new']==0, d['deltas']
+assert d['deltas']['carried']==2 and d['deltas']['total_open']==2, d['deltas']
+# the synthesised changeset marks every baseline lane as not-rerun, with a reason
+cs=d['changeset']
+assert cs['mode']=='feeds-only', cs
+assert set(cs['lanes'])=={'python','shell'}, cs['lanes']
+assert all(not v['rerun'] and 'feed-only' in v['reason'] for v in cs['lanes'].values()), cs['lanes']
+# and the feed half actually ran
+assert 'advisory_deltas' in d and 'state_deps' in d, sorted(d)
+assert d['state_deps']['PyPI|django']['advisories']==['CVE-2026-5555'], d['state_deps']
+print('  feeds-only: all baseline findings CARRIED, 0 fixed, feed deltas present OK')
+"
+
+echo "=== --feeds-only refuses inputs that contradict its premise ==="
+set +e
+python3 "$dl" --state "$scratch/state.json" --run-id r --feeds-only \
+    --findings "$scratch/fresh.jsonl" >/dev/null 2>"$scratch/fo1.err"; rc1=$?
+python3 "$dl" --state "$scratch/state.json" --run-id r --feeds-only \
+    --changeset "$scratch/cs.json" >/dev/null 2>"$scratch/fo2.err"; rc2=$?
+python3 "$dl" --state "$scratch/state.json" --feeds-only >/dev/null 2>"$scratch/fo3.err"; rc3=$?
+set -e
+[ "$rc1" = 2 ] && grep -q 'no code lane ran' "$scratch/fo1.err" \
+  || { echo "FAIL: --feeds-only accepted --findings"; exit 1; }
+[ "$rc2" = 2 ] && grep -q 'synthesises its own changeset' "$scratch/fo2.err" \
+  || { echo "FAIL: --feeds-only accepted --changeset"; exit 1; }
+[ "$rc3" = 2 ] || { echo "FAIL: --feeds-only without --run-id did not exit 2"; exit 1; }
+echo "  --findings / --changeset / missing --run-id all rejected with exit 2 OK"
+
+echo "=== --feeds-only still honours the accepted register ==="
+# An accepted finding stays accepted when only the feeds moved.
+cat > "$scratch/acc.json" <<JSON
+{"schema": 1, "accepted": [
+ {"fingerprint": "$FP_SQLI", "reason": "still mitigated", "accepted": "2026-07-20",
+  "expires": "2026-09-01"}]}
+JSON
+python3 "$dl" --state "$scratch/state.json" --run-id 20260724-1200 --now "$NOW" \
+    --feeds-only --cve-output "$scratch/feedcve.json" --accepted "$scratch/acc.json" \
+ | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+f={x['fingerprint']:x for x in d['findings']}['$FP_SQLI']
+assert f['status']=='ACCEPTED' and f['suppressed_status']=='CARRIED', f
+assert d['deltas']['accepted']==1, d['deltas']
+assert d['mode']=='feeds', d.get('mode')
+print('  feeds-only + register: acceptance still applies over a carried finding OK')
+"
+
 echo ""
 echo "script-deltas: OK"
