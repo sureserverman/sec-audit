@@ -2630,6 +2630,26 @@ metadata section; when the flag is absent, skip this step entirely and write no
 `.sarif` file. Upload path and fingerprint behavior are documented in
 `references/sast-tools.md`.
 
+**Which mode to upload from where (this rule is not optional).** GitHub code
+scanning maintains a repo's alert set by *diffing uploads*: an alert present in
+an earlier upload but absent from the newest one for the same category/ref is
+auto-closed. sec-audit's `new` mode is a second, independent suppression on top
+of that:
+
+- **Default branch / baseline upload ⇒ `--sarif` (`all`).** This is the upload
+  that owns the repo's alert state. It **must not** be a `new`-mode log: a
+  `new`-mode run legitimately omits every CARRIED and REVERIFIED finding, so
+  uploading it from the **default branch** would tell GitHub those alerts are
+  gone and mass-close the project's real, still-open backlog — a silent
+  false-clean across the whole Security tab.
+- **PR check ⇒ `--sarif=new`.** Scoped to a PR ref, the double-suppression is
+  exactly the wanted behavior: the check fails on what the PR introduced and
+  stays green on pre-existing findings the PR did not touch. Pair it with
+  `--diff=<base>` for the cheap PR-time gate.
+
+If you only ever run one of the two, run `all` — over-reporting is recoverable,
+a mass-closed alert set is not.
+
 This section documents the report template so it remains readable in the
 skill source — but generation is **delegated** to the agent. Keeping the
 template here is for humans reading the skill; the agent is the single

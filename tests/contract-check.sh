@@ -2756,7 +2756,33 @@ if ! grep -qE '`--sarif`.*(are|is) flags, not lane names|`--deep-deps`,[^.]*`--s
     echo "CONTRACT FAIL: commands/sec-audit.md lost the '--sarif is a flag, not a lane' assertion" >&2
     fail=1
 fi
+# The double-suppression rule is the whole reason BL-007 was deferred: `new`
+# mode + GitHub's own upload-diff baselining would mass-close a repo's carried
+# alerts if `new` were ever uploaded from the default branch. Both the skill and
+# the README must carry the prohibition in the imperative, not as a hint.
+# Scope each grep to the owning SECTION — a whole-file 'must not' match is
+# vacuous (the phrase occurs elsewhere in SKILL.md) and would keep passing after
+# the rule was deleted.
+sarif_skill_sec=$(sed -n '/### 6.5 Optional SARIF/,/^### /p' skills/sec-audit/SKILL.md)
+sarif_readme_sec=$(sed -n '/^### Delta mode: /,/^## /p' README.md)
+for pair in "SKILL.md §6.5|$sarif_skill_sec" "README delta-mode|$sarif_readme_sec"; do
+    label="${pair%%|*}"; body="${pair#*|}"
+    [ -n "$body" ] || { echo "CONTRACT FAIL: $label section not found" >&2; fail=1; continue; }
+    echo "$body" | grep -qi 'must not' \
+        || { echo "CONTRACT FAIL: $label lost the imperative --sarif=new prohibition" >&2; fail=1; }
+    echo "$body" | grep -qi 'default branch' \
+        || { echo "CONTRACT FAIL: $label does not name the default branch as the forbidden target" >&2; fail=1; }
+    echo "$body" | grep -qi 'mass-close' \
+        || { echo "CONTRACT FAIL: $label does not explain the mass-close hazard" >&2; fail=1; }
+done
+# The README's --sarif=new example must be a PR-scoped invocation, never a bare
+# baseline upload — a copy-pasteable wrong example is worse than no example.
+if ! grep -qE '^/sec-audit .*--diff=[^ ]+ --sarif=new' README.md; then
+    echo "CONTRACT FAIL: README --sarif=new example is not PR-scoped (expected --diff=<base> --sarif=new)" >&2
+    fail=1
+fi
 echo "sarif-modes: --sarif=new parsed, sarif_mode threaded to --mode, flags-not-lanes intact"
+echo "sarif-baselining: default-branch prohibition + mass-close rationale + PR-scoped example present"
 
 # --- docs closeout (v1.32 Stage 6 Task 6.1):
 check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \

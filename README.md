@@ -1823,6 +1823,28 @@ them deliberately. Raw REST `/code-scanning/sarifs` uploads do **not**
 get auto-fingerprinting; compute them yourself on that path. GitHub
 caps a run at 25 000 results / 10 MB gzipped.
 
+### Delta mode: `--sarif=new` (v1.33.0)
+
+`--sarif=new` emits only the findings the run *introduced* — delta status
+NEW or REGRESSED (a finding with no delta classification counts as new,
+so a missing field can never hide one). Everything the project was
+already carrying is left out:
+
+```text
+/sec-audit . --diff=origin/main --sarif=new    # PR check
+/sec-audit . --sarif                           # baseline upload (= --sarif=all)
+```
+
+**Use `new` for PR checks only — you must not upload it from the default
+branch.** GitHub maintains a repo's alert set by diffing uploads: an
+alert missing from the newest upload for a ref is auto-closed. A
+`new`-mode log deliberately omits every carried finding, so uploading it
+as the baseline would mass-close the project's real open backlog. On the
+default branch always upload `--sarif` (`all`); on a PR ref, `new` is
+what makes the check fail on what the PR added rather than on the whole
+backlog. When in doubt, upload `all` — over-reporting is recoverable, a
+mass-closed alert set is not.
+
 ## Diff-scoped mode (v1.23.0)
 
 Pass `--diff` to scope the review to changed files only — cheap enough
