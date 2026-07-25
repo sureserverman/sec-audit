@@ -1823,6 +1823,28 @@ them deliberately. Raw REST `/code-scanning/sarifs` uploads do **not**
 get auto-fingerprinting; compute them yourself on that path. GitHub
 caps a run at 25 000 results / 10 MB gzipped.
 
+### Delta mode: `--sarif=new` (v1.33.0)
+
+`--sarif=new` emits only the findings the run *introduced* — delta status
+NEW or REGRESSED (a finding with no delta classification counts as new,
+so a missing field can never hide one). Everything the project was
+already carrying is left out:
+
+```text
+/sec-audit . --diff=origin/main --sarif=new    # PR check
+/sec-audit . --sarif                           # baseline upload (= --sarif=all)
+```
+
+**Use `new` for PR checks only — you must not upload it from the default
+branch.** GitHub maintains a repo's alert set by diffing uploads: an
+alert missing from the newest upload for a ref is auto-closed. A
+`new`-mode log deliberately omits every carried finding, so uploading it
+as the baseline would mass-close the project's real open backlog. On the
+default branch always upload `--sarif` (`all`); on a PR ref, `new` is
+what makes the check fail on what the PR added rather than on the whole
+backlog. When in doubt, upload `all` — over-reporting is recoverable, a
+mass-closed alert set is not.
+
 ## Diff-scoped mode (v1.23.0)
 
 Pass `--diff` to scope the review to changed files only — cheap enough
@@ -1843,17 +1865,110 @@ sees only the changed files), and the `sec-expert` prompt is scoped to
 the same list. The target must be a git repository; a non-git target
 errors rather than silently scanning everything.
 
-### PR-time audit (`--diff` + `--sarif`)
+### PR-time audit (`--diff` + `--sarif=new`)
 
 The two flags compose into a fast, machine-readable pull-request gate:
 
 ```text
-/sec-audit . --diff=origin/main --sarif
+/sec-audit . --diff=origin/main --sarif=new
 ```
 
 scans only what the PR changed and writes a SARIF log you can upload to
 the GitHub Security tab with `github/codeql-action/upload-sarif` — a
 scoped, low-cost review on every push rather than a periodic full audit.
+
+The two flags narrow different axes and you want both on a PR: `--diff`
+scopes which *files are scanned*, while `--sarif=new` scopes which
+*findings are reported* to the ones this run introduced. Use plain
+`--sarif` here only if you want the PR check to fail on the project's
+pre-existing findings too — and never upload a `new`-mode log from the
+default branch (see [Delta mode](#delta-mode---sarifnew-v1330) above).
+
+## Accepted risks (`accepted.json`, v1.34.0)
+
+Some findings you will not fix — there is a compensating control, or the
+fix is upstream. Record that decision instead of re-reading the same
+finding every audit. Create `accepted.json` in the project's state home
+(`<portfolio>/<area>/<name>/security/`), keyed by the finding's
+fingerprint as printed in the report:
+
+```json
+{"schema": 1, "accepted": [
+  {"fingerprint": "v1:8e21af43…",
+   "reason":      "mitigated by the WAF rule in front of this service",
+   "accepted":    "2026-07-20",
+   "expires":     "2026-10-01",
+   "accepted_by": "alice"}]}
+```
+
+A matching finding then renders as **ACCEPTED**: excluded from the
+severity buckets, listed in its own "Accepted risks" report section with
+your reason and expiry, and marked `suppressions[]` in the SARIF so a
+code-scanning gate shows it as dismissed rather than failing on it.
+
+This is the one file sec-audit lets you use to lower a report's volume, so
+it is deliberately hard to misuse:
+
+- **`expires` is mandatory.** An acceptance with no end date is a
+  permanent blind spot; such an entry is rejected and the finding keeps
+  full severity.
+- **A CRITICAL is capped at 30 days per acceptance**, measured from
+  `accepted`. A longer `expires` is clamped — the report shows both the
+  enforced date and what you asked for. Renewing is a deliberate act, so
+  "accept a CRITICAL and forget" cannot happen.
+- **Nothing is ever removed.** Acceptance changes presentation only. The
+  finding stays in the pipeline, in the state store, and in the open
+  count — `total_open` does not shrink.
+- **A FIXED or REGRESSED finding cannot be accepted.** There is nothing to
+  accept about a resolved finding, and a *reintroduced* one was never
+  covered by the decision on file — it comes back at full severity and
+  asks you to re-accept it explicitly.
+- **sec-audit never writes this file**, not even to drop an expired entry.
+  Expiry is enforced when the file is read. A corrupt or malformed
+  register never fails the audit and is never silently ignored either: it
+  degrades to zero acceptances plus a loud warning in the report, because
+  a suppression you *think* is in place but is not matters more than the
+  findings.
+
+## Feed-only re-audit (`--feeds-only`, v1.35.0)
+
+A dependency does not have to change to become dangerous. `--feeds-only`
+re-checks the **dependency feeds alone** — no code lane, no changeset
+hashing, no scoring of fresh findings — and answers one question: *did
+anything become known about the dependencies I already had?*
+
+```text
+/sec-audit /path/to/repo --feeds-only
+```
+
+It requires a prior audit (there is no baseline to compare feeds against
+otherwise, and it refuses rather than silently running a full audit you
+did not ask for). Every existing finding is carried forward untouched and
+**nothing can be marked fixed**, because no scanner ran — the run history
+records it as `mode: "feeds"` so a later reader can tell a feed check from
+a real audit.
+
+**Quiet by default.** When no advisory moved, it prints one line, writes
+no report, and leaves `latest.md` alone — but still appends its
+`history.jsonl` line, so "we checked and nothing had changed" stays in the
+audit trail. Only a real change (`NEW (feed-driven)` / `ESCALATED` /
+`WITHDRAWN`) produces a report.
+
+### Scheduling it
+
+Scheduling and notification are **your** policy, not the plugin's — it
+ships the entry point and the quiet mode, and stays out of the rest. Two
+ways to drive it:
+
+```text
+/loop 12h /sec-audit ~/dev/web/myapp --feeds-only
+```
+
+runs it on an interval in the current session. For an unattended cadence,
+register it as a scheduled agent instead (`/schedule`), pointing at the
+same command. Because the quiet path writes nothing, a daily check on a
+quiet project costs one history line a day and stays silent until the day
+a feed actually moves — which is the day you want to hear from it.
 
 ## License
 

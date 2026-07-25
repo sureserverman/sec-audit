@@ -1466,8 +1466,18 @@ echo "cli-flags: commands/sec-audit.md documents --only/--skip with mutual-exclu
 check commands/sec-audit.md '\-\-full' "commands/sec-audit.md missing --full flag"
 check commands/sec-audit.md '\-\-state-dir' "commands/sec-audit.md missing --state-dir flag"
 check commands/sec-audit.md 'incremental by default' "commands/sec-audit.md missing incremental-by-default rule"
-check commands/sec-audit.md '`--full`, and `--state-dir` are flags, not lane names' \
-    "commands/sec-audit.md must exclude --full/--state-dir from the lane vocabulary"
+# Newline-insensitive and flag-list-agnostic: the assertion is that EVERY
+# orchestration flag is named as a non-lane, not that the list reads a fixed way
+# (it grows). Checked per flag so adding one cannot quietly drop another.
+lane_excl=$(tr '\n' ' ' < commands/sec-audit.md \
+            | grep -oE '`--deep-deps`[^.]*are flags, not lane names' || true)
+[ -n "$lane_excl" ] || { echo "CONTRACT FAIL: commands/sec-audit.md lost the flags-are-not-lane-names assertion" >&2; fail=1; }
+for fl in deep-deps sarif diff full feeds-only state-dir; do
+    case "$lane_excl" in
+        *"\`--$fl\`"*) ;;
+        *) echo "CONTRACT FAIL: commands/sec-audit.md does not exclude --$fl from the lane vocabulary" >&2; fail=1 ;;
+    esac
+done
 check skills/sec-audit/SKILL.md '^## 1.5 State home' "SKILL.md missing §1.5 State home"
 check skills/sec-audit/SKILL.md 'statehome.py' "SKILL.md §1.5 missing statehome.py invocation"
 check skills/sec-audit/SKILL.md 'confirm_required' "SKILL.md §1.5 missing confirm_required handling"
@@ -2740,6 +2750,254 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
     fail=1
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
+
+# --- unused WebFetch grants (v1.36.0, BL-001, CWE-693 least-privilege):
+# cve-enricher, dep-diff-analyst and sec-expert each carried a WebFetch grant
+# none of them ever invoked — all three reach the network another way (the python
+# engine, scoped curl) or are forbidden from reaching it at all. A standing
+# unused egress capability in a security tool is exactly the finding sec-audit
+# reports about other people's agents.
+webfetch_allow='commands/sec-audit.md'
+wf_bad=0
+while IFS= read -r offender; do
+    [ -n "$offender" ] || continue
+    f="${offender%%:*}"
+    case "$f" in
+        $webfetch_allow) ;;
+        *) echo "CONTRACT FAIL: $offender grants WebFetch — remove it unless the body demonstrably fetches (BL-001)" >&2
+           wf_bad=$((wf_bad + 1)) ;;
+    esac
+done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
+         | grep -E '\bWebFetch\b' || true)
+[ "$wf_bad" -eq 0 ] || fail=1
+# The one allowlisted grant must stay JUSTIFIED, not just tolerated. The command
+# never invokes WebFetch and the skill it dispatches never instructs one (all
+# feed egress is delegated to sub-agents and the python engine), so this entry is
+# a known over-scope kept only because removing it changes the tool surface of a
+# live audit path that cannot be exercised by the hermetic suite. Tracked, not
+# blessed — see the Sub-plan 2 notes.
+grep -q 'WebFetch' commands/sec-audit.md \
+    || echo "  note: commands/sec-audit.md no longer grants WebFetch — drop it from webfetch_allow"
+if grep -n 'WebFetch' skills/sec-audit/SKILL.md | grep -qv 'prompt-injection'; then
+    if grep -qE '^\s*WebFetch|invoke WebFetch|call WebFetch' skills/sec-audit/SKILL.md; then
+        echo "CONTRACT FAIL: SKILL.md now instructs a WebFetch — the command's grant is no longer dead, update BL-001 notes" >&2
+        fail=1
+    fi
+fi
+echo "webfetch-scope: 0 unjustified WebFetch grants (1 tracked exception: the command entry point)"
+
+# --- feed-only re-audit (v1.35.0, BL-006):
+# The danger of a mode that runs no scanner is that it looks like an audit. Every
+# rule here keeps a feed-only run from being mistaken for one.
+check commands/sec-audit.md 'feeds-only' "command does not parse --feeds-only"
+check commands/sec-audit.md 'feeds_only' "command does not pass the feeds_only skill input"
+check skills/sec-audit/SKILL.md 'feeds_only' "SKILL.md does not declare the feeds_only input"
+check skills/sec-audit/SKILL.md '2.7 Feed-only re-audit' "SKILL.md missing the §2.7 feed-only path"
+check skills/sec-audit/SKILL.md '2.75 Quiet mode' "SKILL.md missing the §2.75 quiet-mode rules"
+fo_sec=$(sed -n '/^## 2.7 Feed-only re-audit/,/^## 3\./p' skills/sec-audit/SKILL.md)
+[ -n "$fo_sec" ] || { echo "CONTRACT FAIL: SKILL.md §2.7 section not found" >&2; fail=1; }
+# Nothing may be resolved by a run that dispatched no scanner.
+echo "$fo_sec" | grep -qi 'Never mark anything FIXED' \
+    || { echo "CONTRACT FAIL: §2.7 does not forbid marking findings FIXED in a feed-only run" >&2; fail=1; }
+# No baseline => nothing to compare; must refuse rather than silently upgrade.
+echo "$fo_sec" | grep -qi 'Refuse when there is no prior state' \
+    || { echo "CONTRACT FAIL: §2.7 does not refuse a feed-only run without prior state" >&2; fail=1; }
+echo "$fo_sec" | grep -qi 'Do NOT silently promote' \
+    || { echo "CONTRACT FAIL: §2.7 does not forbid silently promoting a feed-only run to a full audit" >&2; fail=1; }
+# The history line must distinguish a feed check from a real audit.
+echo "$fo_sec" | grep -q 'mode: "feeds"' \
+    || { echo "CONTRACT FAIL: §2.7 does not record mode: \"feeds\" in the run history" >&2; fail=1; }
+# Quiet mode: silent on no-change, but NEVER silent in the audit trail.
+echo "$fo_sec" | grep -qi 'Still append the .history.jsonl. run line' \
+    || { echo "CONTRACT FAIL: §2.75 quiet mode does not still append a history line (silence would be indistinguishable from never running)" >&2; fail=1; }
+echo "$fo_sec" | grep -qi 'Write \*\*no\*\* report file' \
+    || { echo "CONTRACT FAIL: §2.75 quiet mode does not suppress the report file on a no-change run" >&2; fail=1; }
+# Scheduling policy stays the user's — BL-006 deferred on exactly that, so the
+# README must document a recipe without the plugin adopting a cadence.
+check README.md 'feeds-only' "README does not document the feed-only re-audit"
+readme_fo=$(sed -n '/^## Feed-only re-audit/,/^## /p' README.md)
+[ -n "$readme_fo" ] || { echo "CONTRACT FAIL: README feed-only section not found" >&2; fail=1; }
+echo "$readme_fo" | grep -qi 'your\*\* policy\|your policy' \
+    || { echo "CONTRACT FAIL: README does not state that scheduling policy is the user's, not the plugin's" >&2; fail=1; }
+echo "$readme_fo" | grep -qE '/loop|/schedule' \
+    || { echo "CONTRACT FAIL: README feed-only section gives no scheduling recipe" >&2; fail=1; }
+check skills/sec-audit/references/COVERAGE.md 'feeds-only' \
+    "COVERAGE.md flag inventory does not record --feeds-only"
+# history.jsonl is read across repo boundaries (the portfolio security roll-up),
+# so its shape is a published contract, not an internal detail.
+check skills/sec-audit/SKILL.md '1.5.1 Consumer contract' \
+    "SKILL.md missing the history.jsonl consumer contract"
+hist_sec=$(sed -n '/^### 1.5.1 Consumer contract/,/^## /p' skills/sec-audit/SKILL.md)
+[ -n "$hist_sec" ] || { echo "CONTRACT FAIL: SKILL.md §1.5.1 not found" >&2; fail=1; }
+echo "$hist_sec" | grep -qi 'tolerate' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not require consumers to tolerate unknown keys/values" >&2; fail=1; }
+echo "$hist_sec" | grep -qi 'never .0.\|never \`0\`' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not state optional fields normalise to null, never 0" >&2; fail=1; }
+echo "$hist_sec" | grep -q 'total_open - accepted' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not define open-and-not-suppressed as total_open - accepted" >&2; fail=1; }
+echo "feed-only: --feeds-only parsed, no-FIXED + no-baseline refusal, mode:feeds, quiet mode keeps the audit trail"
+echo "history-contract: §1.5.1 publishes the run-record shape consumers may rely on"
+
+# --- accepted-risk register rendering (v1.34.0, BL-004):
+# A suppression the reader cannot see is the failure mode this feature must not
+# have, so every rule that keeps an acceptance VISIBLE is contract-checked.
+acc_sec=$(sed -n '/^### Step 2.85/,/^### Step /p' agents/report-writer.md)
+check agents/report-writer.md 'Accepted risks' "report-writer missing the accepted-risks section"
+check agents/report-writer.md 'ACCEPTED' "report-writer missing the ACCEPTED status vocabulary"
+check agents/report-writer.md 'suppressed_status' "report-writer does not render the underlying status of an accepted finding"
+check agents/report-writer.md 'accepted_clamped_from' "report-writer does not surface a clamped CRITICAL expiry"
+check agents/report-writer.md 'acceptance_not_applied' "report-writer does not render refused acceptances"
+check agents/report-writer.md 'previously_accepted' "report-writer does not mention previously_accepted"
+# Scoped, and keyed on the field it actually guards: `previously_accepted` also
+# appears in the Inputs list, so a whole-file grep for it would still pass with
+# the rendering rule deleted. `acceptances.lapsed` is the DIFFERENT mechanism —
+# a cap that expired with no prior run to lapse from — and has no other mention.
+echo "$acc_sec" | grep -q 'acceptances.lapsed' \
+    || { echo "CONTRACT FAIL: report-writer does not render acceptances.lapsed (cap-expired acceptances would return unexplained)" >&2; fail=1; }
+echo "$acc_sec" | grep -q 'enforced_expiry' \
+    || { echo "CONTRACT FAIL: report-writer does not render the enforced expiry of a lapsed acceptance" >&2; fail=1; }
+[ -n "$acc_sec" ] || { echo "CONTRACT FAIL: report-writer Step 2.85 (accepted risks) not found" >&2; fail=1; }
+# The section must say acceptance is NOT resolution — the one confusion that
+# would let a live vulnerability read as dealt with.
+echo "$acc_sec" | grep -qi 'not because they were fixed\|not resolved' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not distinguish acceptance from resolution" >&2; fail=1; }
+echo "$acc_sec" | grep -qi 'verbatim' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not require the reason be rendered verbatim" >&2; fail=1; }
+# Register problems must never be swallowed.
+echo "$acc_sec" | grep -qi 'never swallow\|never omit\|never drop' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not forbid dropping register warnings" >&2; fail=1; }
+status_tbl=$(sed -n '/| `status`     | Status line/,/^$/p' agents/report-writer.md)
+echo "$status_tbl" | grep -q 'ACCEPTED' \
+    || { echo "CONTRACT FAIL: report-writer status-line table has no ACCEPTED row" >&2; fail=1; }
+echo "accepted-register: report renders accepted risks, clamps, refusals, lapses and register problems"
+
+# Skill-level wiring: the register must be READ every run, excluded from scoring
+# like FIXED, never written by the tool, and never re-raised as a SARIF alert.
+check skills/sec-audit/SKILL.md 'accepted.json' "SKILL.md state layout does not list accepted.json"
+# Scope to the ACTUAL deltas.py invocation: '--accepted' also appears in §4.95
+# prose, so a whole-file grep would pass even with the flag dropped from the call.
+deltas_call=$(sed -n '/scripts\/secaudit\/deltas.py" \\/,/^```/p' skills/sec-audit/SKILL.md)
+echo "$deltas_call" | grep -q -- '--accepted' \
+    || { echo "CONTRACT FAIL: SKILL.md §4.9 deltas.py invocation does not pass --accepted" >&2; fail=1; }
+echo "$deltas_call" | grep -q -- '--lane-status' \
+    || { echo "CONTRACT FAIL: SKILL.md §4.9 deltas.py invocation lost --lane-status" >&2; fail=1; }
+check skills/sec-audit/SKILL.md '4.95' "SKILL.md is missing the §4.95 accepted-risk register section"
+acc_skill=$(sed -n '/^### 4.95 Accepted-risk register/,/^### /p' skills/sec-audit/SKILL.md)
+[ -n "$acc_skill" ] || { echo "CONTRACT FAIL: SKILL.md §4.95 section not found" >&2; fail=1; }
+for rule in 'Expiry is mandatory' '30 days' 'FIXED or REGRESSED' 'never fails the audit'; do
+    echo "$acc_skill" | grep -qi -- "$rule" \
+        || { echo "CONTRACT FAIL: SKILL.md §4.95 lost the '$rule' rule" >&2; fail=1; }
+done
+# The tool must never rewrite the user's suppression list.
+grep -qi 'never creates, rewrites or prunes it' skills/sec-audit/SKILL.md \
+    || { echo "CONTRACT FAIL: SKILL.md does not forbid sec-audit writing accepted.json" >&2; fail=1; }
+# ACCEPTED excluded from scoring, exactly like FIXED, and still counted open.
+# Newline-insensitive: the sentence wraps in the source.
+if ! tr '\n' ' ' < skills/sec-audit/SKILL.md \
+     | grep -qE 'FIXED and +ACCEPTED findings are excluded from scoring'; then
+    echo "CONTRACT FAIL: SKILL.md does not exclude ACCEPTED from scoring alongside FIXED" >&2
+    fail=1
+fi
+if ! tr '\n' ' ' < skills/sec-audit/SKILL.md \
+     | grep -qE 'still counts in +.deltas.total_open'; then
+    echo "CONTRACT FAIL: SKILL.md does not state ACCEPTED still counts in total_open" >&2
+    fail=1
+fi
+# An accepted risk must never be re-raised as a code-scanning alert in ANY mode.
+check scripts/secaudit/sarif.py 'SUPPRESSED' "sarif.py lost the mode-independent suppression set"
+# The code is right, but §6.5's PROSE must say so too — it is the section a
+# future editor reads before changing SARIF behaviour, and without this a doc
+# change could contradict the code with nothing to catch it.
+sec65=$(sed -n '/### 6.5 Optional SARIF/,/^### /p' skills/sec-audit/SKILL.md)
+echo "$sec65" | grep -qi 'marked suppressed, never dropped' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not document ACCEPTED as suppressed-not-dropped" >&2; fail=1; }
+echo "$sec65" | grep -q 'suppressions' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not name the SARIF suppressions[] mechanism" >&2; fail=1; }
+# The reason omission is wrong must stay written down: it is not obvious, and a
+# future editor "simplifying" to a drop would silently close live alerts.
+echo "$sec65" | grep -qi 'Do \*\*not\*\* simply omit' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 lost the prohibition on omitting accepted findings" >&2; fail=1; }
+check scripts/secaudit/sarif.py 'suppressions' "sarif.py no longer emits SARIF suppressions[]"
+# The feature must be documented for the humans who write the file, not only in
+# the skill prose the model reads.
+check README.md 'accepted.json' "README does not document the accepted-risk register"
+readme_acc=$(sed -n '/^## Accepted risks/,/^## /p' README.md)
+[ -n "$readme_acc" ] || { echo "CONTRACT FAIL: README accepted-risks section not found" >&2; fail=1; }
+for rule in 'mandatory' '30 days' 'never writes this file' 'Nothing is ever removed'; do
+    echo "$readme_acc" | grep -qi -- "$rule" \
+        || { echo "CONTRACT FAIL: README accepted-risks section lost the '$rule' rule" >&2; fail=1; }
+done
+python3 - <<'PY' || { echo "CONTRACT FAIL: sarif.py suppression sets are malformed" >&2; fail=1; }
+import sys
+sys.path.insert(0, "scripts")
+from secaudit.sarif import SUPPRESSED, NOT_INTRODUCED
+assert "ACCEPTED" in SUPPRESSED, SUPPRESSED
+assert "ACCEPTED" not in NOT_INTRODUCED, NOT_INTRODUCED
+assert not (SUPPRESSED & NOT_INTRODUCED), (SUPPRESSED, NOT_INTRODUCED)
+PY
+echo "accepted-wiring: --accepted passed every run, excluded from scoring + SARIF, register never written"
+
+# --- SARIF delta modes (v1.33.0, BL-007):
+# --sarif=new exists so a PR check fails on what the PR added, not on the
+# project's whole backlog. The flag must reach sarif.py as --mode, and bare
+# --sarif must keep meaning "everything" — a silent switch to `new` on the
+# default branch would mass-close a repo's carried code-scanning alerts.
+check commands/sec-audit.md 'sarif=new' "command does not parse --sarif=new"
+check commands/sec-audit.md 'sarif_mode' "command does not pass the sarif_mode skill input"
+check skills/sec-audit/SKILL.md 'sarif_mode' "SKILL.md does not declare the sarif_mode input"
+check skills/sec-audit/SKILL.md 'sarif.py" --mode=' "SKILL.md §6.5 does not invoke sarif.py with --mode"
+check scripts/secaudit/sarif.py 'INTRODUCED' "sarif.py lost the introduced-status filter"
+# (--sarif's presence in that same assertion is covered per-flag above.)
+# The double-suppression rule is the whole reason BL-007 was deferred: `new`
+# mode + GitHub's own upload-diff baselining would mass-close a repo's carried
+# alerts if `new` were ever uploaded from the default branch. Both the skill and
+# the README must carry the prohibition in the imperative, not as a hint.
+# Scope each grep to the owning SECTION — a whole-file 'must not' match is
+# vacuous (the phrase occurs elsewhere in SKILL.md) and would keep passing after
+# the rule was deleted.
+sarif_skill_sec=$(sed -n '/### 6.5 Optional SARIF/,/^### /p' skills/sec-audit/SKILL.md)
+sarif_readme_sec=$(sed -n '/^### Delta mode: /,/^## /p' README.md)
+for pair in "SKILL.md §6.5|$sarif_skill_sec" "README delta-mode|$sarif_readme_sec"; do
+    label="${pair%%|*}"; body="${pair#*|}"
+    [ -n "$body" ] || { echo "CONTRACT FAIL: $label section not found" >&2; fail=1; continue; }
+    # Key on the prohibition ITSELF, not a bare "must not" — the section contains
+    # other imperatives, so a whole-section 'must not' grep stayed green when the
+    # actual rule was softened to "is best not to".
+    # `*` tolerates markdown emphasis around the imperative (**must not**).
+    echo "$body" | grep -qiE 'must not[*]* be a [`]*new[`]*-mode log|must not upload it from the default' \
+        || { echo "CONTRACT FAIL: $label lost the imperative --sarif=new prohibition (softened wording?)" >&2; fail=1; }
+    echo "$body" | grep -qi 'default branch' \
+        || { echo "CONTRACT FAIL: $label does not name the default branch as the forbidden target" >&2; fail=1; }
+    echo "$body" | grep -qi 'mass-close' \
+        || { echo "CONTRACT FAIL: $label does not explain the mass-close hazard" >&2; fail=1; }
+done
+# The README's --sarif=new example must be a PR-scoped invocation, never a bare
+# baseline upload — a copy-pasteable wrong example is worse than no example.
+if ! grep -qE '^/sec-audit .*--diff=[^ ]+ --sarif=new' README.md; then
+    echo "CONTRACT FAIL: README --sarif=new example is not PR-scoped (expected --diff=<base> --sarif=new)" >&2
+    fail=1
+fi
+echo "sarif-modes: --sarif=new parsed, sarif_mode threaded to --mode, flags-not-lanes intact"
+# SKILL.md §6.5 delegates upload behavior to references/sast-tools.md, so that
+# doc must not be silent on WHICH mode may be uploaded from where — a reader
+# following the pointer for upload behavior would otherwise never meet the rule.
+sast_upload_sec=$(sed -n '/^## SARIF output/,/^## /p' skills/sec-audit/references/sast-tools.md)
+echo "$sast_upload_sec" | grep -qi 'default branch' \
+    || { echo "CONTRACT FAIL: sast-tools.md SARIF section does not carry the default-branch mode rule" >&2; fail=1; }
+echo "$sast_upload_sec" | grep -qi 'mass-close' \
+    || { echo "CONTRACT FAIL: sast-tools.md SARIF section does not explain the mass-close hazard" >&2; fail=1; }
+# The PR-time recipe must recommend the delta mode, not bare --sarif: a
+# copy-pasteable example that contradicts the rule above is worse than none.
+pr_sec=$(sed -n '/^### PR-time audit/,/^## /p' README.md)
+[ -n "$pr_sec" ] || { echo "CONTRACT FAIL: README PR-time audit section not found" >&2; fail=1; }
+if echo "$pr_sec" | grep -qE '^/sec-audit .*--sarif$'; then
+    echo "CONTRACT FAIL: README PR-time example still recommends bare --sarif (should be --sarif=new)" >&2
+    fail=1
+fi
+check skills/sec-audit/references/COVERAGE.md 'sarif=new\|=new` added v1.33' \
+    "COVERAGE.md flag inventory does not record the v1.33 --sarif=new mode"
+echo "sarif-baselining: default-branch prohibition + mass-close rationale + PR-scoped example present"
+echo "sarif-crossrefs: sast-tools.md upload rule + README PR recipe + COVERAGE.md inventory in sync"
 
 # --- docs closeout (v1.32 Stage 6 Task 6.1):
 check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \

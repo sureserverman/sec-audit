@@ -13,6 +13,12 @@ Severity mapping (SARIF `level` vocabulary): CRITICAL/HIGH -> error,
 MEDIUM -> warning, LOW/INFO -> note. GitHub ranks security alerts by
 `rule.properties.security-severity` (0.0-10.0): the CVSS base score when present,
 else the sec-audit 0-100 priority score scaled to 0-10.
+
+Modes (`--mode`, default `all`): `all` emits every open finding — the baseline
+upload that maintains a repo's alert set. `new` emits only what this run
+introduced (delta status NEW or REGRESSED), for a PR check that should fail on
+what the PR added rather than on the project's whole backlog. See the §6.5
+default-branch rule in the skill: `new` must never feed the baseline upload.
 """
 import json
 import sys
@@ -20,6 +26,22 @@ import sys
 SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 LEVEL = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning",
          "LOW": "note", "INFO": "note"}
+MODES = ("all", "new")
+# Two ORTHOGONAL questions, deliberately not merged into one predicate:
+#
+#   SUPPRESSED     — "is this an accepted risk?" Such a finding is emitted with a
+#                    SARIF `suppressions[]` entry rather than DROPPED. Dropping it
+#                    would remove a real finding from the machine-readable feed
+#                    entirely — and because GitHub auto-closes alerts absent from
+#                    the newest upload, one hand-edit to accepted.json would close
+#                    a live alert with no trace. `suppressions[]` gets the wanted
+#                    behaviour (GitHub renders it as *dismissed*, so it does not
+#                    fail a check) while keeping the finding auditable.
+#   NOT_INTRODUCED — "did THIS run introduce it?", the --mode=new filter only.
+#                    A closed denylist, so an unrecognised or future status
+#                    fails OPEN (shown in the PR check) rather than vanishing.
+SUPPRESSED = {"ACCEPTED"}
+NOT_INTRODUCED = {"CARRIED", "REVERIFIED", "FIXED"}
 
 
 def _level(f):
@@ -61,11 +83,49 @@ def _is_sentinel(f):
     return any(isinstance(k, str) and k.startswith("__") for k in f)
 
 
-def to_sarif(findings):
+def _suppressed(f):
+    """True when the finding must not appear in ANY mode. Mode-independent."""
+    status = f.get("status")
+    return status is not None and str(status).upper() in SUPPRESSED
+
+
+def _introduced(f):
+    """True when this run introduced the finding. A finding with no `status`
+    key predates delta classification (or the run had no baseline) — treat it as
+    introduced so `--mode=new` fails open into the PR check. Silently dropping an
+    unclassified finding would turn a missing field into a false clean. The test
+    is a denylist so an unrecognised status also fails open.
+
+    For a suppressed finding the question is asked of the status it WOULD have
+    had (`suppressed_status`): an acceptance changes how a finding is presented,
+    not when it was introduced.
+    """
+    status = f.get("status")
+    if status is not None and str(status).upper() in SUPPRESSED:
+        status = f.get("suppressed_status")
+    if status is None:
+        return True
+    return str(status).upper() not in NOT_INTRODUCED
+
+
+def _suppression(f):
+    """SARIF 2.1.0 `suppressions[]` for an accepted risk. `kind: external`
+    is the correct vocabulary: the decision lives outside the tool, in a file a
+    human wrote."""
+    just = f.get("accepted_reason") or "accepted risk"
+    until = f.get("accepted_expires")
+    if until:
+        just = f"{just} (accepted until {until})"
+    return [{"kind": "external", "justification": just}]
+
+
+def to_sarif(findings, mode="all"):
     rules = {}
     results = []
     for f in findings:
         if _is_sentinel(f):
+            continue
+        if mode == "new" and not _introduced(f):
             continue
         rid = f.get("id") or "finding"
         if rid not in rules:
@@ -87,12 +147,15 @@ def to_sarif(findings):
         # (line 0, e.g. DAST/package-level) omit region entirely.
         if isinstance(line, int) and line > 0:
             phys["region"] = {"startLine": line}
-        results.append({
+        res = {
             "ruleId": rid,
             "level": _level(f),
             "message": {"text": _message(f)},
             "locations": [{"physicalLocation": phys}],
-        })
+        }
+        if _suppressed(f):
+            res["suppressions"] = _suppression(f)
+        results.append(res)
     return {
         "version": "2.1.0",
         "$schema": SCHEMA,
@@ -107,7 +170,28 @@ def to_sarif(findings):
     }
 
 
-def main():
+def main(argv):
+    mode = "all"
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a.startswith("--"):
+            key = a[2:]
+            if "=" in key:
+                key, val = key.split("=", 1)
+            else:
+                i += 1
+                val = argv[i] if i < len(argv) else ""
+            if key == "mode":
+                mode = val
+            else:
+                sys.stderr.write(f"usage: sarif.py [--mode={'|'.join(MODES)}]\n")
+                return 2
+        i += 1
+    if mode not in MODES:
+        sys.stderr.write(f"usage: sarif.py [--mode={'|'.join(MODES)}]\n")
+        return 2
+
     # Fail loudly on bad input: a security tool must not turn a broken pipe
     # (e.g. score.py crashed and its traceback landed on stdin) into a
     # false-clean, zero-result SARIF. Mirrors score.py's loud json.load.
@@ -115,13 +199,14 @@ def main():
         findings = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError) as e:
         sys.stderr.write(f"sarif.py: invalid JSON on stdin: {e}\n")
-        sys.exit(1)
+        return 1
     if not isinstance(findings, list):
         sys.stderr.write("sarif.py: expected a JSON array of findings on stdin\n")
-        sys.exit(1)
-    json.dump(to_sarif(findings), sys.stdout, indent=2)
+        return 1
+    json.dump(to_sarif(findings, mode), sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv))

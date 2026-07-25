@@ -154,6 +154,158 @@ assert len(run["results"]) == 2 and len(run["tool"]["driver"]["rules"]) == 1, \
 print("  same-id dedup: 2 results, 1 rule OK")
 PY
 
+echo "=== ACCEPTED is marked suppressed, never dropped (BL-004) ==="
+# An accepted risk must not FAIL a check — but it must not vanish from the
+# machine-readable feed either. Dropping it would remove a real finding from the
+# SARIF entirely, and since GitHub auto-closes alerts absent from the newest
+# upload, one edit to accepted.json would close a live alert with no trace.
+# SARIF `suppressions[]` gets both: GitHub renders it as dismissed, and the
+# finding stays auditable.
+cat > "$scratch/acc-findings.json" <<'JSON'
+[{"id":"f-acc-carried","severity":"CRITICAL","title":"accepted, was carried","file":"a.py","line":1,
+  "status":"ACCEPTED","suppressed_status":"CARRIED","accepted_reason":"WAF rule",
+  "accepted_expires":"2026-09-01"},
+ {"id":"f-acc-new","severity":"HIGH","title":"accepted, but new this run","file":"d.py","line":4,
+  "status":"ACCEPTED","suppressed_status":"NEW","accepted_reason":"pilot only",
+  "accepted_expires":"2026-09-30"},
+ {"id":"f-live","severity":"HIGH","title":"live","file":"b.py","line":2,"status":"NEW"},
+ {"id":"f-carried","severity":"HIGH","title":"carried","file":"c.py","line":3,"status":"CARRIED"}]
+JSON
+for m in all new; do
+  python3 scripts/secaudit/sarif.py --mode=$m < "$scratch/acc-findings.json" > "$scratch/acc-$m.sarif"
+done
+python3 - "$scratch/acc-all.sarif" "$scratch/acc-new.sarif" <<'PY'
+import json, sys
+allr = json.load(open(sys.argv[1]))["runs"][0]
+newr = json.load(open(sys.argv[2]))["runs"][0]
+
+by = {r["ruleId"]: r for r in allr["results"]}
+assert sorted(by) == ["f-acc-carried", "f-acc-new", "f-carried", "f-live"], sorted(by)
+# accepted findings are PRESENT and carry a suppression with the human's reason
+for rid in ("f-acc-carried", "f-acc-new"):
+    s = by[rid].get("suppressions")
+    assert s and s[0]["kind"] == "external", (rid, s)
+    assert "accepted until" in s[0]["justification"], s
+# a live finding must NOT be marked suppressed
+assert "suppressions" not in by["f-live"], by["f-live"]
+assert "suppressions" not in by["f-carried"], by["f-carried"]
+
+# --mode=new asks "did this run introduce it?" of the UNDERLYING status, so an
+# accepted-but-new finding still appears (suppressed); an accepted-but-carried
+# one does not, exactly like any other carried finding.
+nb = {r["ruleId"]: r for r in newr["results"]}
+assert sorted(nb) == ["f-acc-new", "f-live"], sorted(nb)
+assert nb["f-acc-new"].get("suppressions"), nb["f-acc-new"]
+print(f"  ACCEPTED emitted with suppressions[] in both modes; "
+      f"new-mode keys off suppressed_status OK")
+PY
+# The security property in one line: an accepted finding never disappears.
+python3 - "$scratch/acc-all.sarif" "$scratch/acc-findings.json" <<'PY'
+import json, sys
+res = json.load(open(sys.argv[1]))["runs"][0]["results"]
+src = json.load(open(sys.argv[2]))
+assert len(res) == len(src), (len(res), len(src))
+print("  every input finding still present in --mode=all output OK")
+PY
+
+# Tripwire: every status deltas.py can emit must be accounted for in exactly one
+# of SUPPRESSED / NOT_INTRODUCED / (introduced). A status added to deltas.py
+# without updating sarif.py fails HERE rather than silently leaking or hiding.
+python3 - <<'PY'
+import re, sys
+sys.path.insert(0, "scripts")
+from secaudit.sarif import SUPPRESSED, NOT_INTRODUCED
+src = open("scripts/secaudit/deltas.py").read()
+emitted = set(re.findall(r'"status":\s*"([A-Z]+)"', src))
+emitted |= set(re.findall(r'g\["status"\]\s*=\s*"([A-Z]+)"', src))
+emitted |= {"NEW", "REVERIFIED", "CARRIED", "FIXED", "REGRESSED", "ACCEPTED"}
+known = SUPPRESSED | NOT_INTRODUCED | {"NEW", "REGRESSED"}
+unaccounted = emitted - known
+assert not unaccounted, (
+    f"deltas.py can emit status {sorted(unaccounted)} that sarif.py does not "
+    f"classify — it would be treated as introduced by default. Add it to "
+    f"SUPPRESSED or NOT_INTRODUCED deliberately.")
+assert not (SUPPRESSED & NOT_INTRODUCED), "a status cannot be in both sets"
+print(f"  tripwire: all {len(emitted)} deltas statuses accounted for OK")
+PY
+
+echo "=== --mode=new: emit only what this run introduced (BL-007) ==="
+# deltas.py stamps `status` upstream of score.py, which preserves every key, so
+# sarif.py sees the delta class on its stdin. Fixture covers each status plus an
+# unclassified finding (no `status` key at all).
+cat > "$scratch/delta-findings.json" <<'JSON'
+[{"id":"f-new","severity":"HIGH","title":"new one","file":"a.py","line":1,"status":"NEW"},
+ {"id":"f-regressed","severity":"CRITICAL","title":"regressed one","file":"b.py","line":2,"status":"REGRESSED"},
+ {"id":"f-carried","severity":"HIGH","title":"carried one","file":"c.py","line":3,"status":"CARRIED"},
+ {"id":"f-reverified","severity":"MEDIUM","title":"reverified one","file":"d.py","line":4,"status":"REVERIFIED"},
+ {"id":"f-fixed","severity":"LOW","title":"fixed one","file":"e.py","line":5,"status":"FIXED"},
+ {"id":"f-nostatus","severity":"LOW","title":"unclassified","file":"f.py","line":6}]
+JSON
+
+python3 scripts/secaudit/sarif.py < "$scratch/delta-findings.json" > "$scratch/d-default.sarif"
+python3 scripts/secaudit/sarif.py --mode=all < "$scratch/delta-findings.json" > "$scratch/d-all.sarif"
+python3 scripts/secaudit/sarif.py --mode=new < "$scratch/delta-findings.json" > "$scratch/d-new.sarif"
+# space-separated form must parse identically to the = form
+python3 scripts/secaudit/sarif.py --mode new < "$scratch/delta-findings.json" > "$scratch/d-new2.sarif"
+
+# Back-compat: no flag == --mode=all, byte for byte. Existing CI consumers that
+# invoke sarif.py with no argv must see exactly the pre-BL-007 output.
+cmp -s "$scratch/d-default.sarif" "$scratch/d-all.sarif" \
+    || { echo "script-sarif: FAIL — default mode differs from --mode=all" >&2; exit 1; }
+cmp -s "$scratch/d-new.sarif" "$scratch/d-new2.sarif" \
+    || { echo "script-sarif: FAIL — --mode=new differs from '--mode new'" >&2; exit 1; }
+# The same back-compat check on the REAL scored pipeline fixture used above.
+python3 scripts/secaudit/score.py < "$scratch/findings.json" \
+    | python3 scripts/secaudit/sarif.py --mode=all > "$scratch/out-all.sarif"
+cmp -s "$scratch/out.sarif" "$scratch/out-all.sarif" \
+    || { echo "script-sarif: FAIL — pipeline default output changed under --mode=all" >&2; exit 1; }
+echo "  default == --mode=all (byte-identical, both fixtures) OK"
+
+python3 - "$scratch/d-all.sarif" "$scratch/d-new.sarif" <<'PY'
+import json, sys
+allr = json.load(open(sys.argv[1]))["runs"][0]
+newr = json.load(open(sys.argv[2]))["runs"][0]
+
+all_ids = [r["ruleId"] for r in allr["results"]]
+assert sorted(all_ids) == ["f-carried", "f-fixed", "f-new", "f-nostatus",
+                           "f-regressed", "f-reverified"], all_ids
+
+new_ids = sorted(r["ruleId"] for r in newr["results"])
+# NEW + REGRESSED are introduced; a finding with no status fails OPEN (never
+# silently dropped). CARRIED/REVERIFIED/FIXED are the project's backlog, not
+# what this run/PR added — they must not fail a PR check.
+assert new_ids == ["f-new", "f-nostatus", "f-regressed"], new_ids
+
+# Filtered findings must not leak in via rules[] either — a rule with no result
+# would still show up as a scanned rule in GitHub's ingest.
+rule_ids = sorted(r["id"] for r in newr["tool"]["driver"]["rules"])
+assert rule_ids == new_ids, (rule_ids, new_ids)
+print(f"  --mode=new: {len(new_ids)} of {len(all_ids)} results (NEW+REGRESSED+unclassified), rules match OK")
+PY
+
+# unknown mode -> exit 2 with usage on stderr (deltas.py convention)
+set +e
+printf '[]' | python3 scripts/secaudit/sarif.py --mode=bogus >"$scratch/bogus.out" 2>"$scratch/bogus.err"
+rc=$?
+set -e
+[ "$rc" = "2" ] || { echo "script-sarif: FAIL — unknown mode exit $rc, expected 2" >&2; exit 1; }
+grep -q 'usage: sarif.py' "$scratch/bogus.err" \
+    || { echo "script-sarif: FAIL — unknown mode printed no usage on stderr" >&2; exit 1; }
+# unknown flag likewise
+set +e
+printf '[]' | python3 scripts/secaudit/sarif.py --nope=1 >/dev/null 2>&1
+rc=$?
+set -e
+[ "$rc" = "2" ] || { echo "script-sarif: FAIL — unknown flag exit $rc, expected 2" >&2; exit 1; }
+echo "  unknown mode/flag -> exit 2 + usage OK"
+
+# Malformed stdin must STILL fail loudly under --mode=new: a broken pipe must
+# never become an empty "nothing new" PR check that passes.
+if printf 'not json' | python3 scripts/secaudit/sarif.py --mode=new >/dev/null 2>&1; then
+    echo "script-sarif: FAIL — malformed stdin passed under --mode=new" >&2; exit 1
+fi
+echo "  malformed stdin under --mode=new -> exit 1 OK"
+
 # v1.29: the SARIF log is written beside the markdown report INSIDE the state
 # home (§6.5), never into the audited tree. sarif.py itself writes to stdout, so
 # the contract lives in the documented redirect target — assert the skill's §6.5

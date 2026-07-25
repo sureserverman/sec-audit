@@ -128,10 +128,19 @@ names — they are rejected from `--only`/`--skip`:
   portfolio home (unmounted vault, CI runner, ad-hoc target).
 
 - **`--deep-deps[=N]`** (v1.16) — enable the release-diff pass (§4.5).
-- **`--sarif`** (v1.23) — additionally emit a GitHub-code-scanning SARIF 2.1.0
-  log (`sec-audit-report-*.sarif`) via `scripts/secaudit/sarif.py`, from the
-  scored findings array persisted in §5. Deterministic; not part of
-  report-writer (which stays markdown-only).
+- **`--sarif[=all|new]`** (v1.23; `=new` added v1.33) — additionally emit a
+  GitHub-code-scanning SARIF 2.1.0 log (`sec-audit-report-*.sarif`) via
+  `scripts/secaudit/sarif.py`, from the scored findings array persisted in §5.
+  Deterministic; not part of report-writer (which stays markdown-only). `all`
+  (the default, and what bare `--sarif` means) emits every open finding; `new`
+  emits only what the run introduced (NEW/REGRESSED), for PR checks — never
+  upload `new` from the default branch (SKILL §6.5).
+- **`--feeds-only`** (v1.35) — re-check the dependency feeds only (§2.7): run §4
+  (depinv + cve-enricher + feed deltas) and skip every code lane, §2.5 hashing,
+  §4.5 and the scoring of fresh findings. Requires prior state; carries every
+  baseline finding forward; can never mark anything FIXED. Records
+  `mode: "feeds"` in the run history and stays quiet (§2.75) when no advisory
+  moved. Mutually exclusive with `--only`/`--skip`/`--diff`/`--deep-deps`/`--full`.
 - **`--diff[=ref]`** (v1.23) — scope the whole review to changed files.
   `scripts/secaudit/diffscope.py` computes the changed set (working tree +
   untracked; plus `<ref>...HEAD` for `--diff=ref`); the list is threaded via
@@ -895,7 +904,7 @@ Dispatch discipline.
   `origin: "supply-chain"` findings (§3.27), deduped, capped at
   `deep_deps_max` (default 10). No flag / no candidates ⇒ does not run.
 - **Tool:** no external binary — the `dep-diff-analyst` sub-agent
-  (sonnet-pinned, tools Read + Bash + WebFetch) fetches version N and
+  (sonnet-pinned, tools Read + scoped Bash) fetches version N and
   N-1 artifacts registry-natively (PyPI JSON API + npm registry, no
   pip/npm install), runs a bounded `diff -ruN`, and classifies the
   diff benign / suspicious / malicious. Ports
