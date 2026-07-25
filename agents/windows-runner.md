@@ -2,7 +2,7 @@
 name: windows-runner
 description: "Desktop Windows static-analysis adapter for sec-audit. Runs binskim, osslsigncode, and sigcheck against PE artifacts under target_path; emits JSONL findings tagged origin: \"windows\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.14."
 model: haiku
-tools: Read, Bash(command -v:*), Bash(find:*), Bash(file:*), Bash(binskim:*), Bash(osslsigncode:*), Bash(sigcheck.exe:*), Bash(jq:*), Bash(tr:*), Bash(wc:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)
+tools: Read, Bash
 ---
 
 # windows-runner
