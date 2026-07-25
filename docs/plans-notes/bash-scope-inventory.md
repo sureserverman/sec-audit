@@ -134,3 +134,52 @@ mode BL-002's "needs-live-verification" tag exists to prevent.
   dispatched against real signing tools; finding 2 above applies to them by
   construction (it is a Bash-tool rule, not a platform one), but their remaining
   command surface is still verified-by-inspection.
+
+## Stage 3 outcome (2026-07-25): scoping BLOCKED, and not by grants
+
+Stage 3 reapplied the drafted scopes (`git revert` of the revert), then probed
+each lane's own commands against its own allowlist under strict enforcement.
+**The scopes were reverted again.** What stops them is structural:
+
+| Construct | Verdict under a scoped allowlist | Rejection message |
+|---|---|---|
+| `while … done` (any form) | **REFUSED** | `Contains while_statement` |
+| `for x in $(cat f)` | **REFUSED** | `Contains simple_expansion` |
+| `while IFS= read …` | **REFUSED** | `IFS assignment changes word-splitting — cannot model statically` |
+| `<(…)` process substitution | **REFUSED** | `Contains process_substitution` |
+| `find … -exec c {} +` | **REFUSED** | `find with '-exec' executes commands … cannot be auto-allowed by a Bash(find:*) prefix rule` |
+| `find … -print0 \| xargs -0 grep` | **ALLOWED** | — (validates the 886a60a rewrite) |
+| `command -v tool && …` | **ALLOWED** under each lane's real scope | — |
+| `xargs -I{} cmd` | **ALLOWED** | — |
+
+**The blocker is not a missing grant.** Under a per-tool allowlist the matcher
+must statically model the command; anything it cannot model is refused *no matter
+what is granted*. Adding `Bash(cat:*)` does not help a `while` loop.
+
+**Why these six and not the other 24.** The already-scoped runners
+(`sast`, `python`, `rust`, `go`, `shell`, …) contain **zero** `while`/`for` loops
+and **zero** command substitutions — plain one-command-per-line bodies, which is
+exactly why they scoped cleanly. The six host-OS runners are the loop-heavy ones:
+
+| Runner | `while` | `for` | `$( … )` |
+|---|---:|---:|---:|
+| macos | 4 | 0 | 6 |
+| windows | 3 | 0 | 7 |
+| ai-tools | 3 | 2 | 8 |
+| linux | 2 | 0 | 5 |
+| netcfg | 0 | 2 | 5 |
+| ios | 0 | 0 | 4 |
+
+**What scoping these actually costs.** Each runner body must be rewritten so every
+Bash call is a single statically-modellable command: per-artifact loops become
+`xargs -I{}` (verified ALLOWED), `$(…)`-captured values must be replaced by files
+or by the orchestrator passing values in, and macos' stapler/codesign/spctl/pkgutil
+per-artifact loops each need redesign while preserving per-artifact stderr
+attribution (the parser at Step 6 depends on it). That is a runner-body redesign,
+not a frontmatter edit — and it must be done per lane with the lane's tools
+present to re-verify behaviour.
+
+**Note the constructs already fail today under a scoped grant — but the runners
+ship UNSCOPED, and under the permissive/`auto` modes users actually run, loops and
+process substitution execute normally.** So this is not a live outage; it is the
+reason the lanes cannot simply be scoped.
