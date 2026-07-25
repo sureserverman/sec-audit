@@ -135,30 +135,47 @@ for fp in ("$FP_HIGH", "$FP_CRIT"):
     assert "accepted_reason" not in rec["finding"], rec["finding"]
 print("  state round-trip: accepted findings stored open, acceptance in triage OK")
 PY
-# scoring excludes ACCEPTED exactly like FIXED -> the buckets shrink to zero
-python3 -c "
-import json,sys
-d=json.load(open('$scratch/m2.json'))
-open('$scratch/scoreme.json','w').write(json.dumps(
-    [f for f in d['findings'] if f['status'] not in ('FIXED','ACCEPTED')]))"
-python3 "$S/score.py" < "$scratch/scoreme.json" > "$scratch/scored2.json"
-python3 -c "
-import json
-s=json.load(open('$scratch/scored2.json'))
-assert s == [], f'ACCEPTED findings reached the severity buckets: {s}'
-print('  severity buckets empty while both risks remain open OK')"
-# and neither is re-raised as a code-scanning alert, in either SARIF mode
-for m in all new; do
-  python3 "$S/sarif.py" --mode=$m < "$scratch/m2.json" >/dev/null 2>&1 || true
-  python3 -c "
-import json,subprocess,sys
-d=json.load(open('$scratch/m2.json'))
-p=subprocess.run(['python3','$S/sarif.py','--mode=$m'],input=json.dumps(d['findings']),
-                 capture_output=True,text=True,check=True)
-res=json.loads(p.stdout)['runs'][0]['results']
-assert res == [], f'--mode=$m re-raised an accepted risk: {res}'
-print('  --mode=$m emits no alert for an accepted risk OK')"
-done
+# Bucket exclusion is a SKILL-level rule (§4.9 feeds score.py the non-FIXED,
+# non-ACCEPTED set), so the engine cannot be asked to prove it. Assert the two
+# things that ARE engine facts and would make the rule impossible to apply:
+#   * every accepted finding carries the status the rule keys on, AND
+#   * score.py still ranks them normally if handed them — i.e. the exclusion
+#     genuinely has to happen upstream and is not accidentally baked into score.
+# (Filtering here and asserting "empty" would be circular — it would only prove
+# the test's own filter works.)
+python3 - "$scratch/m2.json" <<'PY'
+import json, sys, subprocess
+d = json.load(open(sys.argv[1]))
+acc = [f for f in d["findings"] if f["status"] == "ACCEPTED"]
+assert len(acc) == 2, len(acc)
+scored = json.loads(subprocess.run(
+    ["python3", "scripts/secaudit/score.py"], input=json.dumps(acc),
+    capture_output=True, text=True, check=True).stdout)
+assert len(scored) == 2 and all("score" in f for f in scored), scored
+assert all(f["status"] == "ACCEPTED" for f in scored), scored
+print("  ACCEPTED status survives scoring intact — exclusion is the caller's "
+      "job (§4.9) and every accepted finding carries the key it filters on OK")
+PY
+# What the report actually shows is contract-checked in tests/contract-check.sh
+# (the Step 2.85 rules); here we only prove the data supports those rules.
+# ... and each appears in the SARIF marked suppressed, never dropped: a
+# code-scanning gate must show it as dismissed, not lose it. Dropping would let
+# GitHub auto-close a live alert on the next upload with no trace.
+python3 - "$scratch/m2.json" <<'PYX'
+import json, subprocess, sys
+findings = json.load(open(sys.argv[1]))["findings"]
+out = subprocess.run(["python3", "scripts/secaudit/sarif.py", "--mode=all"],
+                     input=json.dumps(findings), capture_output=True,
+                     text=True, check=True)
+res = json.loads(out.stdout)["runs"][0]["results"]
+assert len(res) == len(findings), (len(res), len(findings))
+sup = [r for r in res if r.get("suppressions")]
+assert len(sup) == 2, sup
+for r in sup:
+    assert r["suppressions"][0]["kind"] == "external", r
+    assert "accepted until" in r["suppressions"][0]["justification"], r
+print("  both accepted risks present in SARIF with suppressions[], none dropped OK")
+PYX
 
 echo "=== run 3: the acceptances lapse on their own ==="
 # Nobody edits accepted.json. Time passes past BOTH the clamped CRITICAL expiry

@@ -1884,6 +1884,52 @@ scopes which *files are scanned*, while `--sarif=new` scopes which
 pre-existing findings too — and never upload a `new`-mode log from the
 default branch (see [Delta mode](#delta-mode---sarifnew-v1330) above).
 
+## Accepted risks (`accepted.json`, v1.34.0)
+
+Some findings you will not fix — there is a compensating control, or the
+fix is upstream. Record that decision instead of re-reading the same
+finding every audit. Create `accepted.json` in the project's state home
+(`<portfolio>/<area>/<name>/security/`), keyed by the finding's
+fingerprint as printed in the report:
+
+```json
+{"schema": 1, "accepted": [
+  {"fingerprint": "v1:8e21af43…",
+   "reason":      "mitigated by the WAF rule in front of this service",
+   "accepted":    "2026-07-20",
+   "expires":     "2026-10-01",
+   "accepted_by": "alice"}]}
+```
+
+A matching finding then renders as **ACCEPTED**: excluded from the
+severity buckets, listed in its own "Accepted risks" report section with
+your reason and expiry, and marked `suppressions[]` in the SARIF so a
+code-scanning gate shows it as dismissed rather than failing on it.
+
+This is the one file sec-audit lets you use to lower a report's volume, so
+it is deliberately hard to misuse:
+
+- **`expires` is mandatory.** An acceptance with no end date is a
+  permanent blind spot; such an entry is rejected and the finding keeps
+  full severity.
+- **A CRITICAL is capped at 30 days per acceptance**, measured from
+  `accepted`. A longer `expires` is clamped — the report shows both the
+  enforced date and what you asked for. Renewing is a deliberate act, so
+  "accept a CRITICAL and forget" cannot happen.
+- **Nothing is ever removed.** Acceptance changes presentation only. The
+  finding stays in the pipeline, in the state store, and in the open
+  count — `total_open` does not shrink.
+- **A FIXED or REGRESSED finding cannot be accepted.** There is nothing to
+  accept about a resolved finding, and a *reintroduced* one was never
+  covered by the decision on file — it comes back at full severity and
+  asks you to re-accept it explicitly.
+- **sec-audit never writes this file**, not even to drop an expired entry.
+  Expiry is enforced when the file is read. A corrupt or malformed
+  register never fails the audit and is never silently ignored either: it
+  degrades to zero acceptances plus a loud warning in the report, because
+  a suppression you *think* is in place but is not matters more than the
+  findings.
+
 ## Feed-only re-audit (`--feeds-only`, v1.35.0)
 
 A dependency does not have to change to become dangerous. `--feeds-only`

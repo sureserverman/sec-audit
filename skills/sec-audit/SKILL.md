@@ -2772,13 +2772,24 @@ of that:
 If you only ever run one of the two, run `all` — over-reporting is recoverable,
 a mass-closed alert set is not.
 
-**ACCEPTED findings never appear in either mode.** A risk someone explicitly
-accepted (§4.95) is dropped from `all` and `new` alike, mode-independently: an
-accepted finding re-raised as a code-scanning alert would make the acceptance
-meaningless, and it must not fail a PR check. This is the one suppression that
-applies to `all` — everything else `all` emits. The acceptance is still fully
-visible in the markdown report's "Accepted risks" section, so it is hidden from
-the alert feed, never from the reader.
+**ACCEPTED findings are marked suppressed, never dropped.** A risk someone
+explicitly accepted (§4.95) is emitted with a SARIF 2.1.0
+`suppressions: [{"kind": "external", "justification": …}]` entry carrying the
+acceptor's own reason and the enforced expiry. GitHub renders such a result as
+*dismissed*, so it does not fail a check — which is the behaviour an acceptance
+should buy — while the finding stays in the machine-readable feed.
+
+Do **not** simply omit an accepted finding instead. Omission would remove a real
+finding from the alert feed entirely, and because GitHub auto-closes alerts
+absent from the newest upload, a single hand-edit to `accepted.json` would close
+a live alert leaving no trace anywhere a machine can read. The whole point of the
+register is that a suppression stays visible and expires.
+
+In `--mode=new`, the "did this run introduce it?" test is applied to the
+finding's **underlying** `suppressed_status`: an acceptance changes how a finding
+is presented, not when it appeared. So an accepted-but-newly-introduced finding
+still shows (suppressed), and an accepted-but-carried one does not — the same
+rule every other carried finding follows.
 
 This section documents the report template so it remains readable in the
 skill source — but generation is **delegated** to the agent. Keeping the

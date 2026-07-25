@@ -29,10 +29,14 @@ LEVEL = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning",
 MODES = ("all", "new")
 # Two ORTHOGONAL questions, deliberately not merged into one predicate:
 #
-#   SUPPRESSED     — "should this leave the SARIF entirely, in every mode?"
-#                    An ACCEPTED finding is a risk a human explicitly accepted;
-#                    re-raising it as a code-scanning alert in `all` mode would
-#                    make the acceptance meaningless.
+#   SUPPRESSED     — "is this an accepted risk?" Such a finding is emitted with a
+#                    SARIF `suppressions[]` entry rather than DROPPED. Dropping it
+#                    would remove a real finding from the machine-readable feed
+#                    entirely — and because GitHub auto-closes alerts absent from
+#                    the newest upload, one hand-edit to accepted.json would close
+#                    a live alert with no trace. `suppressions[]` gets the wanted
+#                    behaviour (GitHub renders it as *dismissed*, so it does not
+#                    fail a check) while keeping the finding auditable.
 #   NOT_INTRODUCED — "did THIS run introduce it?", the --mode=new filter only.
 #                    A closed denylist, so an unrecognised or future status
 #                    fails OPEN (shown in the PR check) rather than vanishing.
@@ -90,11 +94,29 @@ def _introduced(f):
     key predates delta classification (or the run had no baseline) — treat it as
     introduced so `--mode=new` fails open into the PR check. Silently dropping an
     unclassified finding would turn a missing field into a false clean. The test
-    is a denylist so an unrecognised status also fails open."""
+    is a denylist so an unrecognised status also fails open.
+
+    For a suppressed finding the question is asked of the status it WOULD have
+    had (`suppressed_status`): an acceptance changes how a finding is presented,
+    not when it was introduced.
+    """
     status = f.get("status")
+    if status is not None and str(status).upper() in SUPPRESSED:
+        status = f.get("suppressed_status")
     if status is None:
         return True
     return str(status).upper() not in NOT_INTRODUCED
+
+
+def _suppression(f):
+    """SARIF 2.1.0 `suppressions[]` for an accepted risk. `kind: external`
+    is the correct vocabulary: the decision lives outside the tool, in a file a
+    human wrote."""
+    just = f.get("accepted_reason") or "accepted risk"
+    until = f.get("accepted_expires")
+    if until:
+        just = f"{just} (accepted until {until})"
+    return [{"kind": "external", "justification": just}]
 
 
 def to_sarif(findings, mode="all"):
@@ -102,8 +124,6 @@ def to_sarif(findings, mode="all"):
     results = []
     for f in findings:
         if _is_sentinel(f):
-            continue
-        if _suppressed(f):
             continue
         if mode == "new" and not _introduced(f):
             continue
@@ -127,12 +147,15 @@ def to_sarif(findings, mode="all"):
         # (line 0, e.g. DAST/package-level) omit region entirely.
         if isinstance(line, int) and line > 0:
             phys["region"] = {"startLine": line}
-        results.append({
+        res = {
             "ruleId": rid,
             "level": _level(f),
             "message": {"text": _message(f)},
             "locations": [{"physicalLocation": phys}],
-        })
+        }
+        if _suppressed(f):
+            res["suppressions"] = _suppression(f)
+        results.append(res)
     return {
         "version": "2.1.0",
         "$schema": SCHEMA,

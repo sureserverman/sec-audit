@@ -154,28 +154,59 @@ assert len(run["results"]) == 2 and len(run["tool"]["driver"]["rules"]) == 1, \
 print("  same-id dedup: 2 results, 1 rule OK")
 PY
 
-echo "=== ACCEPTED is suppressed in BOTH modes (BL-004) ==="
-# An accepted risk must not come back as a code-scanning alert in either mode —
-# in `all` because someone explicitly accepted it, in `new` because it is not new.
+echo "=== ACCEPTED is marked suppressed, never dropped (BL-004) ==="
+# An accepted risk must not FAIL a check — but it must not vanish from the
+# machine-readable feed either. Dropping it would remove a real finding from the
+# SARIF entirely, and since GitHub auto-closes alerts absent from the newest
+# upload, one edit to accepted.json would close a live alert with no trace.
+# SARIF `suppressions[]` gets both: GitHub renders it as dismissed, and the
+# finding stays auditable.
 cat > "$scratch/acc-findings.json" <<'JSON'
-[{"id":"f-accepted","severity":"CRITICAL","title":"accepted risk","file":"a.py","line":1,
-  "status":"ACCEPTED","suppressed_status":"CARRIED"},
+[{"id":"f-acc-carried","severity":"CRITICAL","title":"accepted, was carried","file":"a.py","line":1,
+  "status":"ACCEPTED","suppressed_status":"CARRIED","accepted_reason":"WAF rule",
+  "accepted_expires":"2026-09-01"},
+ {"id":"f-acc-new","severity":"HIGH","title":"accepted, but new this run","file":"d.py","line":4,
+  "status":"ACCEPTED","suppressed_status":"NEW","accepted_reason":"pilot only",
+  "accepted_expires":"2026-09-30"},
  {"id":"f-live","severity":"HIGH","title":"live","file":"b.py","line":2,"status":"NEW"},
  {"id":"f-carried","severity":"HIGH","title":"carried","file":"c.py","line":3,"status":"CARRIED"}]
 JSON
 for m in all new; do
   python3 scripts/secaudit/sarif.py --mode=$m < "$scratch/acc-findings.json" > "$scratch/acc-$m.sarif"
-  python3 - "$scratch/acc-$m.sarif" "$m" <<'PY'
-import json, sys
-run = json.load(open(sys.argv[1]))["runs"][0]
-ids = sorted(r["ruleId"] for r in run["results"])
-assert "f-accepted" not in ids, (sys.argv[2], ids)
-assert "f-accepted" not in [r["id"] for r in run["tool"]["driver"]["rules"]], ids
-expect = ["f-carried", "f-live"] if sys.argv[2] == "all" else ["f-live"]
-assert ids == expect, (sys.argv[2], ids, expect)
-print(f"  --mode={sys.argv[2]}: ACCEPTED absent from results AND rules OK")
-PY
 done
+python3 - "$scratch/acc-all.sarif" "$scratch/acc-new.sarif" <<'PY'
+import json, sys
+allr = json.load(open(sys.argv[1]))["runs"][0]
+newr = json.load(open(sys.argv[2]))["runs"][0]
+
+by = {r["ruleId"]: r for r in allr["results"]}
+assert sorted(by) == ["f-acc-carried", "f-acc-new", "f-carried", "f-live"], sorted(by)
+# accepted findings are PRESENT and carry a suppression with the human's reason
+for rid in ("f-acc-carried", "f-acc-new"):
+    s = by[rid].get("suppressions")
+    assert s and s[0]["kind"] == "external", (rid, s)
+    assert "accepted until" in s[0]["justification"], s
+# a live finding must NOT be marked suppressed
+assert "suppressions" not in by["f-live"], by["f-live"]
+assert "suppressions" not in by["f-carried"], by["f-carried"]
+
+# --mode=new asks "did this run introduce it?" of the UNDERLYING status, so an
+# accepted-but-new finding still appears (suppressed); an accepted-but-carried
+# one does not, exactly like any other carried finding.
+nb = {r["ruleId"]: r for r in newr["results"]}
+assert sorted(nb) == ["f-acc-new", "f-live"], sorted(nb)
+assert nb["f-acc-new"].get("suppressions"), nb["f-acc-new"]
+print(f"  ACCEPTED emitted with suppressions[] in both modes; "
+      f"new-mode keys off suppressed_status OK")
+PY
+# The security property in one line: an accepted finding never disappears.
+python3 - "$scratch/acc-all.sarif" "$scratch/acc-findings.json" <<'PY'
+import json, sys
+res = json.load(open(sys.argv[1]))["runs"][0]["results"]
+src = json.load(open(sys.argv[2]))
+assert len(res) == len(src), (len(res), len(src))
+print("  every input finding still present in --mode=all output OK")
+PY
 
 # Tripwire: every status deltas.py can emit must be accounted for in exactly one
 # of SUPPRESSED / NOT_INTRODUCED / (introduced). A status added to deltas.py

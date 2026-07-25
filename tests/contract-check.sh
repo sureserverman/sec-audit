@@ -2874,8 +2874,24 @@ check scripts/secaudit/sarif.py 'SUPPRESSED' "sarif.py lost the mode-independent
 # future editor reads before changing SARIF behaviour, and without this a doc
 # change could contradict the code with nothing to catch it.
 sec65=$(sed -n '/### 6.5 Optional SARIF/,/^### /p' skills/sec-audit/SKILL.md)
-echo "$sec65" | grep -qi 'ACCEPTED findings never appear in either mode' \
-    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not document that ACCEPTED is excluded from both SARIF modes" >&2; fail=1; }
+echo "$sec65" | grep -qi 'marked suppressed, never dropped' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not document ACCEPTED as suppressed-not-dropped" >&2; fail=1; }
+echo "$sec65" | grep -q 'suppressions' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not name the SARIF suppressions[] mechanism" >&2; fail=1; }
+# The reason omission is wrong must stay written down: it is not obvious, and a
+# future editor "simplifying" to a drop would silently close live alerts.
+echo "$sec65" | grep -qi 'Do \*\*not\*\* simply omit' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 lost the prohibition on omitting accepted findings" >&2; fail=1; }
+check scripts/secaudit/sarif.py 'suppressions' "sarif.py no longer emits SARIF suppressions[]"
+# The feature must be documented for the humans who write the file, not only in
+# the skill prose the model reads.
+check README.md 'accepted.json' "README does not document the accepted-risk register"
+readme_acc=$(sed -n '/^## Accepted risks/,/^## /p' README.md)
+[ -n "$readme_acc" ] || { echo "CONTRACT FAIL: README accepted-risks section not found" >&2; fail=1; }
+for rule in 'mandatory' '30 days' 'never writes this file' 'Nothing is ever removed'; do
+    echo "$readme_acc" | grep -qi -- "$rule" \
+        || { echo "CONTRACT FAIL: README accepted-risks section lost the '$rule' rule" >&2; fail=1; }
+done
 python3 - <<'PY' || { echo "CONTRACT FAIL: sarif.py suppression sets are malformed" >&2; fail=1; }
 import sys
 sys.path.insert(0, "scripts")
@@ -2909,8 +2925,12 @@ sarif_readme_sec=$(sed -n '/^### Delta mode: /,/^## /p' README.md)
 for pair in "SKILL.md §6.5|$sarif_skill_sec" "README delta-mode|$sarif_readme_sec"; do
     label="${pair%%|*}"; body="${pair#*|}"
     [ -n "$body" ] || { echo "CONTRACT FAIL: $label section not found" >&2; fail=1; continue; }
-    echo "$body" | grep -qi 'must not' \
-        || { echo "CONTRACT FAIL: $label lost the imperative --sarif=new prohibition" >&2; fail=1; }
+    # Key on the prohibition ITSELF, not a bare "must not" — the section contains
+    # other imperatives, so a whole-section 'must not' grep stayed green when the
+    # actual rule was softened to "is best not to".
+    # `*` tolerates markdown emphasis around the imperative (**must not**).
+    echo "$body" | grep -qiE 'must not[*]* be a [`]*new[`]*-mode log|must not upload it from the default' \
+        || { echo "CONTRACT FAIL: $label lost the imperative --sarif=new prohibition (softened wording?)" >&2; fail=1; }
     echo "$body" | grep -qi 'default branch' \
         || { echo "CONTRACT FAIL: $label does not name the default branch as the forbidden target" >&2; fail=1; }
     echo "$body" | grep -qi 'mass-close' \
