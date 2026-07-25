@@ -128,10 +128,13 @@ names — they are rejected from `--only`/`--skip`:
   portfolio home (unmounted vault, CI runner, ad-hoc target).
 
 - **`--deep-deps[=N]`** (v1.16) — enable the release-diff pass (§4.5).
-- **`--sarif`** (v1.23) — additionally emit a GitHub-code-scanning SARIF 2.1.0
-  log (`sec-audit-report-*.sarif`) via `scripts/secaudit/sarif.py`, from the
-  scored findings array persisted in §5. Deterministic; not part of
-  report-writer (which stays markdown-only).
+- **`--sarif[=all|new]`** (v1.23; `=new` added v1.33) — additionally emit a
+  GitHub-code-scanning SARIF 2.1.0 log (`sec-audit-report-*.sarif`) via
+  `scripts/secaudit/sarif.py`, from the scored findings array persisted in §5.
+  Deterministic; not part of report-writer (which stays markdown-only). `all`
+  (the default, and what bare `--sarif` means) emits every open finding; `new`
+  emits only what the run introduced (NEW/REGRESSED), for PR checks — never
+  upload `new` from the default branch (SKILL §6.5).
 - **`--diff[=ref]`** (v1.23) — scope the whole review to changed files.
   `scripts/secaudit/diffscope.py` computes the changed set (working tree +
   untracked; plus `<ref>...HEAD` for `--diff=ref`); the list is threaded via

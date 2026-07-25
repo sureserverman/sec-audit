@@ -311,3 +311,12 @@ uploads do NOT get auto-fingerprinting — compute them yourself on that path.
 GitHub limits: 20 runs/file, 25 000 results/run, 10 MB gzipped. `sarif.py`
 never emits a raw secret — `message.text` is the finding title (or the
 already-redacted evidence), never a plaintext credential.
+
+**Which mode you upload matters as much as how (v1.33.0).** `--sarif=new`
+emits only the findings a run introduced, so it omits every CARRIED and
+REVERIFIED finding by design. GitHub maintains a ref's alert set by diffing
+uploads and auto-closes whatever is missing from the newest one — so a
+`new`-mode log uploaded from the **default branch** would mass-close the
+project's real open backlog. Upload `--sarif` (`all`) from the default branch;
+use `--sarif=new` only on PR refs. The full rule, with rationale, is SKILL §6.5
+("Which mode to upload from where").

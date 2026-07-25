@@ -1865,17 +1865,24 @@ sees only the changed files), and the `sec-expert` prompt is scoped to
 the same list. The target must be a git repository; a non-git target
 errors rather than silently scanning everything.
 
-### PR-time audit (`--diff` + `--sarif`)
+### PR-time audit (`--diff` + `--sarif=new`)
 
 The two flags compose into a fast, machine-readable pull-request gate:
 
 ```text
-/sec-audit . --diff=origin/main --sarif
+/sec-audit . --diff=origin/main --sarif=new
 ```
 
 scans only what the PR changed and writes a SARIF log you can upload to
 the GitHub Security tab with `github/codeql-action/upload-sarif` — a
 scoped, low-cost review on every push rather than a periodic full audit.
+
+The two flags narrow different axes and you want both on a PR: `--diff`
+scopes which *files are scanned*, while `--sarif=new` scopes which
+*findings are reported* to the ones this run introduced. Use plain
+`--sarif` here only if you want the PR check to fail on the project's
+pre-existing findings too — and never upload a `new`-mode log from the
+default branch (see [Delta mode](#delta-mode---sarifnew-v1330) above).
 
 ## License
 

@@ -2782,7 +2782,26 @@ if ! grep -qE '^/sec-audit .*--diff=[^ ]+ --sarif=new' README.md; then
     fail=1
 fi
 echo "sarif-modes: --sarif=new parsed, sarif_mode threaded to --mode, flags-not-lanes intact"
+# SKILL.md §6.5 delegates upload behavior to references/sast-tools.md, so that
+# doc must not be silent on WHICH mode may be uploaded from where — a reader
+# following the pointer for upload behavior would otherwise never meet the rule.
+sast_upload_sec=$(sed -n '/^## SARIF output/,/^## /p' skills/sec-audit/references/sast-tools.md)
+echo "$sast_upload_sec" | grep -qi 'default branch' \
+    || { echo "CONTRACT FAIL: sast-tools.md SARIF section does not carry the default-branch mode rule" >&2; fail=1; }
+echo "$sast_upload_sec" | grep -qi 'mass-close' \
+    || { echo "CONTRACT FAIL: sast-tools.md SARIF section does not explain the mass-close hazard" >&2; fail=1; }
+# The PR-time recipe must recommend the delta mode, not bare --sarif: a
+# copy-pasteable example that contradicts the rule above is worse than none.
+pr_sec=$(sed -n '/^### PR-time audit/,/^## /p' README.md)
+[ -n "$pr_sec" ] || { echo "CONTRACT FAIL: README PR-time audit section not found" >&2; fail=1; }
+if echo "$pr_sec" | grep -qE '^/sec-audit .*--sarif$'; then
+    echo "CONTRACT FAIL: README PR-time example still recommends bare --sarif (should be --sarif=new)" >&2
+    fail=1
+fi
+check skills/sec-audit/references/COVERAGE.md 'sarif=new\|=new` added v1.33' \
+    "COVERAGE.md flag inventory does not record the v1.33 --sarif=new mode"
 echo "sarif-baselining: default-branch prohibition + mass-close rationale + PR-scoped example present"
+echo "sarif-crossrefs: sast-tools.md upload rule + README PR recipe + COVERAGE.md inventory in sync"
 
 # --- docs closeout (v1.32 Stage 6 Task 6.1):
 check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \
