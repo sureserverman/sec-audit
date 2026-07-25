@@ -49,7 +49,18 @@ Parse `$ARGUMENTS` into:
    scanner versions, when a state file is refused as corrupt, or when you want
    an unconditional from-scratch review. This is NOT a `--only`/`--skip` lane
    name — it is a separate flag.
-8. **`--state-dir=<path>`** (optional, v1.29.0+) — write the audit state,
+8. **`--feeds-only`** (optional, v1.35.0+) — re-check the **dependency feeds
+   only**: run §4 (dependency inventory + CVE/advisory enrichment + feed deltas)
+   and skip every code lane, the changeset hashing, and the triage/scoring of
+   fresh findings. Answers "did anything become *known* about the dependencies I
+   already had?" without re-scanning a line of code — cheap enough to schedule.
+   Requires prior audit state (there is no baseline to compare feeds against on a
+   first run; refuse with a clear error). Every baseline finding is carried
+   forward untouched and **nothing can be marked FIXED**, because no scanner ran.
+   Mutually exclusive with `--only`, `--skip`, `--diff`, `--deep-deps` and
+   `--full` — each of those presupposes dispatching code lanes. This is NOT a
+   `--only`/`--skip` lane name — it is a separate flag.
+9. **`--state-dir=<path>`** (optional, v1.29.0+) — write the audit state,
    reports, and run history to `<path>` instead of the project's portfolio home.
    The escape hatch for an unmounted vault, a CI runner, or an ad-hoc target you
    do not want recorded in the portfolio. Absent ⇒ the home is resolved from
@@ -62,8 +73,8 @@ Parse `$ARGUMENTS` into:
 `php`, `ansible`, `netcfg`, `image`, `ai-tools`, `webapp`,
 `supply-chain`, `secrets`.
 Reject any invocation that names a lane outside this list. (`--deep-deps`,
-`--sarif`, `--diff`, `--full`, and `--state-dir` are flags, not lane names, and
-are not accepted in `--only`/`--skip`.)
+`--sarif`, `--diff`, `--full`, `--feeds-only`, and `--state-dir` are flags, not
+lane names, and are not accepted in `--only`/`--skip`.)
 
 **Mutual exclusion:** `--only` and `--skip` MUST NOT both be set. The
 two flags are mutually exclusive. If the caller passed both, refuse
@@ -71,6 +82,13 @@ with this user-visible error BEFORE invoking the skill:
 
 > Error: `--only=` and `--skip=` are mutually exclusive. Use one or
 > the other, not both.
+
+`--feeds-only` MUST NOT be combined with `--only`, `--skip`, `--diff`,
+`--deep-deps` or `--full` — all of those presuppose dispatching code lanes,
+which `--feeds-only` exists not to do. Refuse before invoking the skill:
+
+> Error: `--feeds-only` runs no code lanes, so it cannot be combined with
+> `<flag>`. Drop one.
 
 Example valid invocations:
 
@@ -128,6 +146,7 @@ Invoke the `sec-audit` skill (see `skills/sec-audit/SKILL.md`) with:
 - `diff` — `true` when `--diff` / `--diff=ref` was passed; omit (falsy) otherwise
 - `diff_ref` — the `ref` from `--diff=ref`, or omit for bare `--diff`
 - `full` — `true` when `--full` was passed; omit (falsy) otherwise
+- `feeds_only` — `true` when `--feeds-only` was passed; omit (falsy) otherwise
 - `state_dir` — the path from `--state-dir=`, or omit when absent
 - `target_url`, `github_token`, `nvd_api_key` — read from env vars
   as before (see SKILL.md Inputs)

@@ -44,6 +44,9 @@ code analysis; this skill orchestrates and enriches.
   incremental whenever prior state exists (§2.5).
 - `state_dir` (optional, v1.29.0+) — explicit state-home path from
   `--state-dir=`. Overrides portfolio resolution (§1.5).
+- `feeds_only` (optional, v1.35.0+) — `true` when the caller passed
+  `--feeds-only`. Runs the §4 dependency + feed pass and nothing else (§2.7).
+  Requires prior state.
 - `sarif` (optional) — `true` when the caller passed `--sarif` in any form.
   Emits the SARIF 2.1.0 log in §6.5.
 - `sarif_mode` (optional, v1.33.0+) — `all` (default) or `new`. `all` emits every
@@ -851,6 +854,56 @@ Skill-level invariants:
 - **A refused state file stops the run** (§1.5) rather than silently downgrading
   to a full audit — the user asked for an incremental audit and must be told why
   they are not getting one.
+
+## 2.7 Feed-only re-audit (`--feeds-only`, v1.35.0+)
+
+When `feeds_only: true`, the run answers one question — *did anything become
+**known** about the dependencies this project already had?* — and touches no code
+at all. This is the cheap, schedulable half of incrementality: a dependency does
+not have to change to become dangerous.
+
+**Skip entirely:** §2 lane detection and dispatch, §2.5 changeset/manifest
+hashing, every §3.x lane (including the normally always-on `secrets` and `dast`
+lanes), §3.5 triage, §4.5 `--deep-deps`, and §5 scoring of fresh findings.
+
+**Still run, in order:** §1/§1.5 scope + state home → §4 `depinv.py` → the
+`cve-enricher` dispatch with the advisory cache → §4.9 `deltas.py --feeds-only
+--cve-output …` → §6 persist via `statestore append-run`.
+
+Hard requirements — a feed-only run is a *comparison*, so without a baseline it
+has nothing to say:
+
+- **Refuse when there is no prior state.** Report that the project must be fully
+  audited once first. Do NOT silently promote the run to a full audit: the user
+  asked for the cheap path and would not expect a full LLM-and-network run.
+- **Never mark anything FIXED.** No scanner ran, so no finding can be resolved —
+  `deltas.py --feeds-only` enforces this by synthesising its own changeset in
+  which no lane re-ran. Do not hand it a `--changeset` or `--findings`; it
+  refuses both.
+- **Carry every baseline finding forward untouched**, and say in the report that
+  the code was not re-examined this run.
+- **The run history line records `mode: "feeds"`**, so a later reader can tell a
+  feed-only check from a real audit and does not read its unchanged counts as
+  evidence the code was re-verified.
+
+### 2.75 Quiet mode — say nothing when nothing changed
+
+A scheduled check that reports "no change" every day trains its reader to ignore
+it. When a feed-only run finds **no** `advisory_deltas` — no `new`, no
+`escalated`, no `withdrawn` — then:
+
+- Emit exactly **one** summary line (what was checked, against how many
+  dependencies, and that nothing moved).
+- Write **no** report file and do **not** update `latest.md`. The previous
+  report is still the current one; replacing it with an identical copy would
+  churn the portfolio for no information.
+- **Still append the `history.jsonl` run line.** "We checked and nothing had
+  changed" is exactly the fact a later reader needs — silence in the history
+  would be indistinguishable from never having run.
+
+Any non-empty delta produces a normal report, labelled per the `advisory_deltas`
+classes (`NEW (feed-driven)` / `ESCALATED` / `WITHDRAWN`). Cache-hit accounting
+and offline behaviour are unchanged from §4.
 
 ## 3. Code analysis — dispatch sec-expert subagent(s)
 

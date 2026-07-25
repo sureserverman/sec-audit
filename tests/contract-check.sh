@@ -1466,8 +1466,18 @@ echo "cli-flags: commands/sec-audit.md documents --only/--skip with mutual-exclu
 check commands/sec-audit.md '\-\-full' "commands/sec-audit.md missing --full flag"
 check commands/sec-audit.md '\-\-state-dir' "commands/sec-audit.md missing --state-dir flag"
 check commands/sec-audit.md 'incremental by default' "commands/sec-audit.md missing incremental-by-default rule"
-check commands/sec-audit.md '`--full`, and `--state-dir` are flags, not lane names' \
-    "commands/sec-audit.md must exclude --full/--state-dir from the lane vocabulary"
+# Newline-insensitive and flag-list-agnostic: the assertion is that EVERY
+# orchestration flag is named as a non-lane, not that the list reads a fixed way
+# (it grows). Checked per flag so adding one cannot quietly drop another.
+lane_excl=$(tr '\n' ' ' < commands/sec-audit.md \
+            | grep -oE '`--deep-deps`[^.]*are flags, not lane names' || true)
+[ -n "$lane_excl" ] || { echo "CONTRACT FAIL: commands/sec-audit.md lost the flags-are-not-lane-names assertion" >&2; fail=1; }
+for fl in deep-deps sarif diff full feeds-only state-dir; do
+    case "$lane_excl" in
+        *"\`--$fl\`"*) ;;
+        *) echo "CONTRACT FAIL: commands/sec-audit.md does not exclude --$fl from the lane vocabulary" >&2; fail=1 ;;
+    esac
+done
 check skills/sec-audit/SKILL.md '^## 1.5 State home' "SKILL.md missing §1.5 State home"
 check skills/sec-audit/SKILL.md 'statehome.py' "SKILL.md §1.5 missing statehome.py invocation"
 check skills/sec-audit/SKILL.md 'confirm_required' "SKILL.md §1.5 missing confirm_required handling"
@@ -2741,6 +2751,34 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
 
+# --- feed-only re-audit (v1.35.0, BL-006):
+# The danger of a mode that runs no scanner is that it looks like an audit. Every
+# rule here keeps a feed-only run from being mistaken for one.
+check commands/sec-audit.md 'feeds-only' "command does not parse --feeds-only"
+check commands/sec-audit.md 'feeds_only' "command does not pass the feeds_only skill input"
+check skills/sec-audit/SKILL.md 'feeds_only' "SKILL.md does not declare the feeds_only input"
+check skills/sec-audit/SKILL.md '2.7 Feed-only re-audit' "SKILL.md missing the §2.7 feed-only path"
+check skills/sec-audit/SKILL.md '2.75 Quiet mode' "SKILL.md missing the §2.75 quiet-mode rules"
+fo_sec=$(sed -n '/^## 2.7 Feed-only re-audit/,/^## 3\./p' skills/sec-audit/SKILL.md)
+[ -n "$fo_sec" ] || { echo "CONTRACT FAIL: SKILL.md §2.7 section not found" >&2; fail=1; }
+# Nothing may be resolved by a run that dispatched no scanner.
+echo "$fo_sec" | grep -qi 'Never mark anything FIXED' \
+    || { echo "CONTRACT FAIL: §2.7 does not forbid marking findings FIXED in a feed-only run" >&2; fail=1; }
+# No baseline => nothing to compare; must refuse rather than silently upgrade.
+echo "$fo_sec" | grep -qi 'Refuse when there is no prior state' \
+    || { echo "CONTRACT FAIL: §2.7 does not refuse a feed-only run without prior state" >&2; fail=1; }
+echo "$fo_sec" | grep -qi 'Do NOT silently promote' \
+    || { echo "CONTRACT FAIL: §2.7 does not forbid silently promoting a feed-only run to a full audit" >&2; fail=1; }
+# The history line must distinguish a feed check from a real audit.
+echo "$fo_sec" | grep -q 'mode: "feeds"' \
+    || { echo "CONTRACT FAIL: §2.7 does not record mode: \"feeds\" in the run history" >&2; fail=1; }
+# Quiet mode: silent on no-change, but NEVER silent in the audit trail.
+echo "$fo_sec" | grep -qi 'Still append the .history.jsonl. run line' \
+    || { echo "CONTRACT FAIL: §2.75 quiet mode does not still append a history line (silence would be indistinguishable from never running)" >&2; fail=1; }
+echo "$fo_sec" | grep -qi 'Write \*\*no\*\* report file' \
+    || { echo "CONTRACT FAIL: §2.75 quiet mode does not suppress the report file on a no-change run" >&2; fail=1; }
+echo "feed-only: --feeds-only parsed, no-FIXED + no-baseline refusal, mode:feeds, quiet mode keeps the audit trail"
+
 # --- accepted-risk register rendering (v1.34.0, BL-004):
 # A suppression the reader cannot see is the failure mode this feature must not
 # have, so every rule that keeps an acceptance VISIBLE is contract-checked.
@@ -2834,11 +2872,7 @@ check commands/sec-audit.md 'sarif_mode' "command does not pass the sarif_mode s
 check skills/sec-audit/SKILL.md 'sarif_mode' "SKILL.md does not declare the sarif_mode input"
 check skills/sec-audit/SKILL.md 'sarif.py" --mode=' "SKILL.md §6.5 does not invoke sarif.py with --mode"
 check scripts/secaudit/sarif.py 'INTRODUCED' "sarif.py lost the introduced-status filter"
-# The flags-not-lanes assertion must still cover --sarif after the rename.
-if ! grep -qE '`--sarif`.*(are|is) flags, not lane names|`--deep-deps`,[^.]*`--sarif`' commands/sec-audit.md; then
-    echo "CONTRACT FAIL: commands/sec-audit.md lost the '--sarif is a flag, not a lane' assertion" >&2
-    fail=1
-fi
+# (--sarif's presence in that same assertion is covered per-flag above.)
 # The double-suppression rule is the whole reason BL-007 was deferred: `new`
 # mode + GitHub's own upload-diff baselining would mass-close a repo's carried
 # alerts if `new` were ever uploaded from the default branch. Both the skill and
