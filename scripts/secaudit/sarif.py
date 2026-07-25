@@ -13,6 +13,12 @@ Severity mapping (SARIF `level` vocabulary): CRITICAL/HIGH -> error,
 MEDIUM -> warning, LOW/INFO -> note. GitHub ranks security alerts by
 `rule.properties.security-severity` (0.0-10.0): the CVSS base score when present,
 else the sec-audit 0-100 priority score scaled to 0-10.
+
+Modes (`--mode`, default `all`): `all` emits every open finding — the baseline
+upload that maintains a repo's alert set. `new` emits only what this run
+introduced (delta status NEW or REGRESSED), for a PR check that should fail on
+what the PR added rather than on the project's whole backlog. See the §6.5
+default-branch rule in the skill: `new` must never feed the baseline upload.
 """
 import json
 import sys
@@ -20,6 +26,9 @@ import sys
 SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 LEVEL = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning",
          "LOW": "note", "INFO": "note"}
+MODES = ("all", "new")
+# Delta statuses (deltas.py) that mean "this run introduced it".
+INTRODUCED = {"NEW", "REGRESSED"}
 
 
 def _level(f):
@@ -61,11 +70,24 @@ def _is_sentinel(f):
     return any(isinstance(k, str) and k.startswith("__") for k in f)
 
 
-def to_sarif(findings):
+def _introduced(f):
+    """True when this run introduced the finding. A finding with no `status`
+    key predates delta classification (or the run had no baseline) — treat it as
+    introduced so `--mode=new` fails open into the PR check. Silently dropping an
+    unclassified finding would turn a missing field into a false clean."""
+    status = f.get("status")
+    if status is None:
+        return True
+    return str(status).upper() in INTRODUCED
+
+
+def to_sarif(findings, mode="all"):
     rules = {}
     results = []
     for f in findings:
         if _is_sentinel(f):
+            continue
+        if mode == "new" and not _introduced(f):
             continue
         rid = f.get("id") or "finding"
         if rid not in rules:
@@ -107,7 +129,28 @@ def to_sarif(findings):
     }
 
 
-def main():
+def main(argv):
+    mode = "all"
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a.startswith("--"):
+            key = a[2:]
+            if "=" in key:
+                key, val = key.split("=", 1)
+            else:
+                i += 1
+                val = argv[i] if i < len(argv) else ""
+            if key == "mode":
+                mode = val
+            else:
+                sys.stderr.write(f"usage: sarif.py [--mode={'|'.join(MODES)}]\n")
+                return 2
+        i += 1
+    if mode not in MODES:
+        sys.stderr.write(f"usage: sarif.py [--mode={'|'.join(MODES)}]\n")
+        return 2
+
     # Fail loudly on bad input: a security tool must not turn a broken pipe
     # (e.g. score.py crashed and its traceback landed on stdin) into a
     # false-clean, zero-result SARIF. Mirrors score.py's loud json.load.
@@ -115,13 +158,14 @@ def main():
         findings = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError) as e:
         sys.stderr.write(f"sarif.py: invalid JSON on stdin: {e}\n")
-        sys.exit(1)
+        return 1
     if not isinstance(findings, list):
         sys.stderr.write("sarif.py: expected a JSON array of findings on stdin\n")
-        sys.exit(1)
-    json.dump(to_sarif(findings), sys.stdout, indent=2)
+        return 1
+    json.dump(to_sarif(findings, mode), sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv))
