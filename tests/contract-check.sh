@@ -2777,6 +2777,17 @@ echo "$fo_sec" | grep -qi 'Still append the .history.jsonl. run line' \
     || { echo "CONTRACT FAIL: §2.75 quiet mode does not still append a history line (silence would be indistinguishable from never running)" >&2; fail=1; }
 echo "$fo_sec" | grep -qi 'Write \*\*no\*\* report file' \
     || { echo "CONTRACT FAIL: §2.75 quiet mode does not suppress the report file on a no-change run" >&2; fail=1; }
+# Scheduling policy stays the user's — BL-006 deferred on exactly that, so the
+# README must document a recipe without the plugin adopting a cadence.
+check README.md 'feeds-only' "README does not document the feed-only re-audit"
+readme_fo=$(sed -n '/^## Feed-only re-audit/,/^## /p' README.md)
+[ -n "$readme_fo" ] || { echo "CONTRACT FAIL: README feed-only section not found" >&2; fail=1; }
+echo "$readme_fo" | grep -qi 'your\*\* policy\|your policy' \
+    || { echo "CONTRACT FAIL: README does not state that scheduling policy is the user's, not the plugin's" >&2; fail=1; }
+echo "$readme_fo" | grep -qE '/loop|/schedule' \
+    || { echo "CONTRACT FAIL: README feed-only section gives no scheduling recipe" >&2; fail=1; }
+check skills/sec-audit/references/COVERAGE.md 'feeds-only' \
+    "COVERAGE.md flag inventory does not record --feeds-only"
 echo "feed-only: --feeds-only parsed, no-FIXED + no-baseline refusal, mode:feeds, quiet mode keeps the audit trail"
 
 # --- accepted-risk register rendering (v1.34.0, BL-004):

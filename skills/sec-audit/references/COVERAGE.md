@@ -135,6 +135,12 @@ names — they are rejected from `--only`/`--skip`:
   (the default, and what bare `--sarif` means) emits every open finding; `new`
   emits only what the run introduced (NEW/REGRESSED), for PR checks — never
   upload `new` from the default branch (SKILL §6.5).
+- **`--feeds-only`** (v1.35) — re-check the dependency feeds only (§2.7): run §4
+  (depinv + cve-enricher + feed deltas) and skip every code lane, §2.5 hashing,
+  §4.5 and the scoring of fresh findings. Requires prior state; carries every
+  baseline finding forward; can never mark anything FIXED. Records
+  `mode: "feeds"` in the run history and stays quiet (§2.75) when no advisory
+  moved. Mutually exclusive with `--only`/`--skip`/`--diff`/`--deep-deps`/`--full`.
 - **`--diff[=ref]`** (v1.23) — scope the whole review to changed files.
   `scripts/secaudit/diffscope.py` computes the changed set (working tree +
   untracked; plus `<ref>...HEAD` for `--diff=ref`); the list is threaded via

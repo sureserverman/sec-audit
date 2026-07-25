@@ -1884,6 +1884,46 @@ scopes which *files are scanned*, while `--sarif=new` scopes which
 pre-existing findings too — and never upload a `new`-mode log from the
 default branch (see [Delta mode](#delta-mode---sarifnew-v1330) above).
 
+## Feed-only re-audit (`--feeds-only`, v1.35.0)
+
+A dependency does not have to change to become dangerous. `--feeds-only`
+re-checks the **dependency feeds alone** — no code lane, no changeset
+hashing, no scoring of fresh findings — and answers one question: *did
+anything become known about the dependencies I already had?*
+
+```text
+/sec-audit /path/to/repo --feeds-only
+```
+
+It requires a prior audit (there is no baseline to compare feeds against
+otherwise, and it refuses rather than silently running a full audit you
+did not ask for). Every existing finding is carried forward untouched and
+**nothing can be marked fixed**, because no scanner ran — the run history
+records it as `mode: "feeds"` so a later reader can tell a feed check from
+a real audit.
+
+**Quiet by default.** When no advisory moved, it prints one line, writes
+no report, and leaves `latest.md` alone — but still appends its
+`history.jsonl` line, so "we checked and nothing had changed" stays in the
+audit trail. Only a real change (`NEW (feed-driven)` / `ESCALATED` /
+`WITHDRAWN`) produces a report.
+
+### Scheduling it
+
+Scheduling and notification are **your** policy, not the plugin's — it
+ships the entry point and the quiet mode, and stays out of the rest. Two
+ways to drive it:
+
+```text
+/loop 12h /sec-audit ~/dev/web/myapp --feeds-only
+```
+
+runs it on an interval in the current session. For an unattended cadence,
+register it as a scheduled agent instead (`/schedule`), pointing at the
+same command. Because the quiet path writes nothing, a daily check on a
+quiet project costs one history line a day and stays silent until the day
+a feed actually moves — which is the day you want to hear from it.
+
 ## License
 
 MIT. See `LICENSE`.
