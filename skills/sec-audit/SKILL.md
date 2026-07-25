@@ -2693,6 +2693,14 @@ of that:
 If you only ever run one of the two, run `all` — over-reporting is recoverable,
 a mass-closed alert set is not.
 
+**ACCEPTED findings never appear in either mode.** A risk someone explicitly
+accepted (§4.95) is dropped from `all` and `new` alike, mode-independently: an
+accepted finding re-raised as a code-scanning alert would make the acceptance
+meaningless, and it must not fail a PR check. This is the one suppression that
+applies to `all` — everything else `all` emits. The acceptance is still fully
+visible in the markdown report's "Accepted risks" section, so it is hidden from
+the alert feed, never from the reader.
+
 This section documents the report template so it remains readable in the
 skill source — but generation is **delegated** to the agent. Keeping the
 template here is for humans reading the skill; the agent is the single

@@ -190,6 +190,44 @@ assert d["entries"] == 1, d["entries"]
 print("  truncated / mis-cased fingerprints rejected; near-miss never matches OK")
 PY
 
+echo "=== (6b) a future-dated acceptance cannot buy a longer suppression ==="
+# The CRITICAL cap is measured from `accepted`, so a future decision date would
+# push the cap forward with it — one edit would hide a CRITICAL for decades.
+# This is THE bypass of the feature's central promise; both layers are tested.
+cat > "$scratch/reg.json" <<JSON
+{"schema": 1, "accepted": [
+ {"fingerprint": "$FP_CRIT", "reason": "hide it until 2100", "accepted": "2100-01-01",
+  "expires": "2100-01-30"}]}
+JSON
+out=$(run)
+python3 - "$FP_CRIT" <<PY
+import json, sys
+d = json.loads('''$out''')
+assert d["entries"] == 0, d["entries"]
+w = " ".join(d["warnings"])
+assert "future" in w and "30-day CRITICAL cap" in w, d["warnings"]
+f = {x["fingerprint"]: x for x in d["findings"]}[sys.argv[1]]
+assert f["status"] == "NEW", f["status"]     # never suppressed
+print("  layer 1: load() rejects a future-dated acceptance loudly OK")
+PY
+# Layer 2 (defence in depth): even if such an entry reached the clamp directly,
+# the anchor is min(accepted, today) so the cap cannot be pushed forward.
+python3 - <<'PY'
+import sys
+sys.path.insert(0, "scripts")
+from secaudit.accepted import effective_expiry
+from datetime import date
+today = date(2026, 7, 25)
+e = {"accepted": "2100-01-01", "expires": "2100-01-30"}
+exp, clamped = effective_expiry(e, "CRITICAL", today)
+assert clamped and exp == date(2026, 8, 24), (exp, clamped)   # today + 30d
+# a normal past-dated acceptance is unaffected by the anchor guard
+e2 = {"accepted": "2026-07-05", "expires": "2027-07-05"}
+exp2, c2 = effective_expiry(e2, "CRITICAL", today)
+assert c2 and exp2 == date(2026, 8, 4), (exp2, c2)
+print("  layer 2: clamp anchor is min(accepted, today) — cap cannot be pushed forward OK")
+PY
+
 echo "=== (7) type confusion never crashes the audit (regression, Tier-1 Criticals) ==="
 # A hand-edited register WILL eventually contain an unquoted fingerprint or a
 # list where a string belongs. Any of these raising would abort the whole audit

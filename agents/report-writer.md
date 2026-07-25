@@ -48,8 +48,8 @@ judgments. You render only what the inputs contain.
    orchestrator skill body (deterministic rubric stays in SKILL.md section 5,
    not here).
 6. Acceptances block (v1.34.0+, optional) — the `acceptances` object from
-   `deltas.py --accepted`: `{accepted, previously_accepted, refused[],
-   warnings[], expired[], clamped[]}`. Absent when the project has no
+   `deltas.py --accepted`: `{accepted, previously_accepted, clamped[],
+   lapsed[], expired[], refused[], warnings[]}`. Absent when the project has no
    `accepted.json`. Its per-finding fields (`suppressed_status`,
    `accepted_reason`, `accepted_expires`, `accepted_clamped_from`,
    `acceptance_not_applied`, `previously_accepted`) arrive on the findings
@@ -307,9 +307,20 @@ must not have:
   status, and the verbatim `acceptance_not_applied` text — a FIXED finding needs
   no acceptance, and a REGRESSED one means the vulnerability came back and the
   acceptance on file predates its return, so it must be re-accepted deliberately.
-- **Acceptances that lapsed** (`previously_accepted` on a finding): render it as
-  `previously accepted until <date> — now reported at full severity`, so a
-  reader who remembers accepting it learns why it is back.
+- **Acceptances that lapsed between runs** (`previously_accepted` on a finding):
+  render it as `previously accepted until <date> — now reported at full
+  severity`, so a reader who remembers accepting it learns why it is back. This
+  only fires when a *prior run* recorded the acceptance.
+- **Acceptances that never took effect this run** (`acceptances.lapsed`): the
+  register entry is live by its own `expires`, but the enforced expiry had
+  already passed — almost always a CRITICAL whose 30-day cap ran out while the
+  file still claims a far-off date. Render each as
+  `accepted until <enforced_expiry> (file says <expires>) — cap expired, now at
+  full severity`. **This is not optional and is not covered by
+  `previously_accepted`**: on a first run, or on any project with no prior state,
+  there is no earlier acceptance to lapse, so without this block the finding
+  returns at full severity with no explanation at all and the maintainer is left
+  believing their acceptance is still in force.
 - **Rejected or expired register entries** (`acceptances.warnings`,
   `acceptances.expired`): render each verbatim under a short "Register problems"
   list. A malformed entry means a suppression the maintainer *thought* was in

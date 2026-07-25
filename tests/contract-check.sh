@@ -2744,13 +2744,21 @@ echo "feed-incrementality: advisory cache wired, querybatch never cached, withdr
 # --- accepted-risk register rendering (v1.34.0, BL-004):
 # A suppression the reader cannot see is the failure mode this feature must not
 # have, so every rule that keeps an acceptance VISIBLE is contract-checked.
+acc_sec=$(sed -n '/^### Step 2.85/,/^### Step /p' agents/report-writer.md)
 check agents/report-writer.md 'Accepted risks' "report-writer missing the accepted-risks section"
 check agents/report-writer.md 'ACCEPTED' "report-writer missing the ACCEPTED status vocabulary"
 check agents/report-writer.md 'suppressed_status' "report-writer does not render the underlying status of an accepted finding"
 check agents/report-writer.md 'accepted_clamped_from' "report-writer does not surface a clamped CRITICAL expiry"
 check agents/report-writer.md 'acceptance_not_applied' "report-writer does not render refused acceptances"
-check agents/report-writer.md 'previously_accepted' "report-writer does not render lapsed acceptances"
-acc_sec=$(sed -n '/^### Step 2.85/,/^### Step /p' agents/report-writer.md)
+check agents/report-writer.md 'previously_accepted' "report-writer does not mention previously_accepted"
+# Scoped, and keyed on the field it actually guards: `previously_accepted` also
+# appears in the Inputs list, so a whole-file grep for it would still pass with
+# the rendering rule deleted. `acceptances.lapsed` is the DIFFERENT mechanism —
+# a cap that expired with no prior run to lapse from — and has no other mention.
+echo "$acc_sec" | grep -q 'acceptances.lapsed' \
+    || { echo "CONTRACT FAIL: report-writer does not render acceptances.lapsed (cap-expired acceptances would return unexplained)" >&2; fail=1; }
+echo "$acc_sec" | grep -q 'enforced_expiry' \
+    || { echo "CONTRACT FAIL: report-writer does not render the enforced expiry of a lapsed acceptance" >&2; fail=1; }
 [ -n "$acc_sec" ] || { echo "CONTRACT FAIL: report-writer Step 2.85 (accepted risks) not found" >&2; fail=1; }
 # The section must say acceptance is NOT resolution — the one confusion that
 # would let a live vulnerability read as dealt with.
@@ -2800,6 +2808,12 @@ if ! tr '\n' ' ' < skills/sec-audit/SKILL.md \
 fi
 # An accepted risk must never be re-raised as a code-scanning alert in ANY mode.
 check scripts/secaudit/sarif.py 'SUPPRESSED' "sarif.py lost the mode-independent suppression set"
+# The code is right, but §6.5's PROSE must say so too — it is the section a
+# future editor reads before changing SARIF behaviour, and without this a doc
+# change could contradict the code with nothing to catch it.
+sec65=$(sed -n '/### 6.5 Optional SARIF/,/^### /p' skills/sec-audit/SKILL.md)
+echo "$sec65" | grep -qi 'ACCEPTED findings never appear in either mode' \
+    || { echo "CONTRACT FAIL: SKILL.md §6.5 does not document that ACCEPTED is excluded from both SARIF modes" >&2; fail=1; }
 python3 - <<'PY' || { echo "CONTRACT FAIL: sarif.py suppression sets are malformed" >&2; fail=1; }
 import sys
 sys.path.insert(0, "scripts")

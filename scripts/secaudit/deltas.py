@@ -302,6 +302,10 @@ def apply_acceptances(findings, new_state, prev_state, register, run_id, today=N
             # inflate the counter and soften exactly what must not be softened.
             g["previously_accepted"] = was_accepted[fp]
             if rec is not None:
+                # Defensive only: _state_rec builds `triage` from TRIAGE_FIELDS,
+                # which never includes ACCEPT_FIELDS, so there is normally
+                # nothing to pop. Kept so a future change to how triage is
+                # assembled cannot resurrect a stale acceptance.
                 for k in ACCEPT_FIELDS:
                     rec["triage"].pop(k, None)
 

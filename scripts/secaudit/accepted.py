@@ -136,6 +136,16 @@ def load(path, now=None):
             out["warnings"].append(
                 f"{label}: expires ({d_exp}) precedes accepted ({d_acc}) — entry ignored")
             continue
+        if d_acc > today:
+            # The CRITICAL cap is measured from `accepted`, so a future decision
+            # date would push the cap forward by exactly as much — one edit would
+            # hide a CRITICAL for as long as the writer likes. A decision cannot
+            # have been made tomorrow; reject rather than silently honour it.
+            out["warnings"].append(
+                f"{label}: accepted ({d_acc}) is in the future — entry ignored; a "
+                f"risk cannot be accepted before the decision was made, and a "
+                f"future date would defeat the {CRITICAL_MAX_DAYS}-day CRITICAL cap")
+            continue
         by = entry.get("accepted_by")
         rec = {"fingerprint": fp, "reason": str(entry["reason"]).strip(),
                "accepted": d_acc.isoformat(), "expires": d_exp.isoformat(),
@@ -153,10 +163,16 @@ def load(path, now=None):
     return out
 
 
-def effective_expiry(entry, severity):
+def effective_expiry(entry, severity, today=None):
     """Expiry actually enforced. CRITICAL acceptances are capped at
     CRITICAL_MAX_DAYS from the date the call was made — a longer `expires` is
-    clamped, never honoured. Returns (date, clamped: bool)."""
+    clamped, never honoured. Returns (date, clamped: bool).
+
+    The cap anchor is `min(accepted, today)`: `load()` already rejects a
+    future-dated `accepted`, and this makes the cap independent of that check
+    surviving, so the anchor can never be pushed forward to buy a longer
+    suppression. Defence in depth on the feature's central promise.
+    """
     exp = _parse_date(entry["expires"])
     # `severity` arrives from the findings stream, not the register. A lane
     # emitting a non-string or unknown severity must not take acceptance
@@ -168,7 +184,10 @@ def effective_expiry(entry, severity):
     sev = severity.upper() if isinstance(severity, str) else ""
     if sev in UNCAPPED_SEVERITIES:
         return exp, False
-    cap = _parse_date(entry["accepted"]) + timedelta(days=CRITICAL_MAX_DAYS)
+    anchor = _parse_date(entry["accepted"])
+    if today is not None and anchor > today:
+        anchor = today
+    cap = anchor + timedelta(days=CRITICAL_MAX_DAYS)
     if exp > cap:
         return cap, True
     return exp, False
@@ -192,7 +211,7 @@ def apply(findings, register, now=None):
         if not entry:
             out.append(f)
             continue
-        exp, clamped = effective_expiry(entry, f.get("severity"))
+        exp, clamped = effective_expiry(entry, f.get("severity"), today)
         if exp < today:
             # The clamp expired it even though the file says otherwise. Report
             # it as a live finding and say why the acceptance did not apply.
