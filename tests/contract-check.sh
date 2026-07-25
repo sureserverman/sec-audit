@@ -2741,6 +2741,23 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
 
+# --- SARIF delta modes (v1.33.0, BL-007):
+# --sarif=new exists so a PR check fails on what the PR added, not on the
+# project's whole backlog. The flag must reach sarif.py as --mode, and bare
+# --sarif must keep meaning "everything" — a silent switch to `new` on the
+# default branch would mass-close a repo's carried code-scanning alerts.
+check commands/sec-audit.md 'sarif=new' "command does not parse --sarif=new"
+check commands/sec-audit.md 'sarif_mode' "command does not pass the sarif_mode skill input"
+check skills/sec-audit/SKILL.md 'sarif_mode' "SKILL.md does not declare the sarif_mode input"
+check skills/sec-audit/SKILL.md 'sarif.py" --mode=' "SKILL.md §6.5 does not invoke sarif.py with --mode"
+check scripts/secaudit/sarif.py 'INTRODUCED' "sarif.py lost the introduced-status filter"
+# The flags-not-lanes assertion must still cover --sarif after the rename.
+if ! grep -qE '`--sarif`.*(are|is) flags, not lane names|`--deep-deps`,[^.]*`--sarif`' commands/sec-audit.md; then
+    echo "CONTRACT FAIL: commands/sec-audit.md lost the '--sarif is a flag, not a lane' assertion" >&2
+    fail=1
+fi
+echo "sarif-modes: --sarif=new parsed, sarif_mode threaded to --mode, flags-not-lanes intact"
+
 # --- docs closeout (v1.32 Stage 6 Task 6.1):
 check skills/sec-audit/references/COVERAGE.md 'State home + incremental audits' \
     "COVERAGE.md missing the state-home / incremental section"

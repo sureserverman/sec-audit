@@ -44,6 +44,11 @@ code analysis; this skill orchestrates and enriches.
   incremental whenever prior state exists (§2.5).
 - `state_dir` (optional, v1.29.0+) — explicit state-home path from
   `--state-dir=`. Overrides portfolio resolution (§1.5).
+- `sarif` (optional) — `true` when the caller passed `--sarif` in any form.
+  Emits the SARIF 2.1.0 log in §6.5.
+- `sarif_mode` (optional, v1.33.0+) — `all` (default) or `new`. `all` emits every
+  open finding; `new` emits only findings this run introduced, for PR checks
+  (§6.5). Ignored when `sarif` is falsy.
 
 ## Output
 
@@ -2600,7 +2605,7 @@ with the run JSON on stdin (`run_id`, `started_at`, `finished_at`,
 `cost`). This is what makes the next run incremental — skipping it silently
 turns every future audit back into a full one.
 
-### 6.5 Optional SARIF output (`--sarif`)
+### 6.5 Optional SARIF output (`--sarif[=all|new]`)
 
 When the command passed `--sarif` (skill input `sarif: true`), also emit a
 machine-readable SARIF 2.1.0 log alongside the markdown report. This is a
@@ -2608,10 +2613,13 @@ deterministic script step, NOT part of report-writer (whose only file write is
 the markdown report):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/sarif.py" --mode="$sarif_mode" \
     < "$TMPDIR/secaudit-scored.json" \
     > "<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif"
 ```
+
+`sarif_mode` is `all` when the input is absent — bare `--sarif` keeps its
+pre-v1.33 behavior byte for byte.
 
 Use the **same** `YYYYMMDD-HHMM` UTC timestamp as the markdown report so the
 two files pair by name. `sarif.py` consumes the scored findings array from §5

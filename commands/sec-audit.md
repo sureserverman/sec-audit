@@ -23,11 +23,18 @@ Parse `$ARGUMENTS` into:
    `--only`/`--skip` lane name — it is a separate opt-in flag (the pass is
    network- and LLM-heavy, so it is off by default). Absent ⇒ the pass does
    not run.
-5. **`--sarif`** (optional, opt-in) — additionally emit a SARIF 2.1.0 log
-   (`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif`, same timestamp as the
-   markdown report) for GitHub code-scanning / IDE consumption (§6.5). This is
-   NOT a `--only`/`--skip` lane name — it is a separate opt-in flag. Absent ⇒
-   no `.sarif` file is written.
+5. **`--sarif[=all|new]`** (optional, opt-in) — additionally emit a SARIF 2.1.0
+   log (`<state_home>/reports/sec-audit-YYYYMMDD-HHMM.sarif`, same timestamp as
+   the markdown report) for GitHub code-scanning / IDE consumption (§6.5). Bare
+   `--sarif` (and `--sarif=all`) emits **every** open finding — the baseline
+   upload that maintains a repo's alert set. `--sarif=new` (v1.33.0+) emits only
+   what this run introduced (delta status NEW or REGRESSED), so a PR check fails
+   on what the PR added rather than on the project's whole backlog. Reject any
+   other value with a user-visible error before invoking the skill. **`new` is
+   for PR checks only — never upload it from the default branch**, where GitHub
+   auto-closes alerts absent from the newest upload and a `new`-mode log would
+   mass-close the project's carried alerts (§6.5). This is NOT a `--only`/`--skip`
+   lane name — it is a separate opt-in flag. Absent ⇒ no `.sarif` file is written.
 6. **`--diff[=ref]`** (optional, opt-in) — scope the review to changed files
    only (PR-time / pre-commit use). Bare `--diff` scopes to the working-tree
    changes + untracked files; `--diff=ref` also includes everything changed
@@ -114,7 +121,10 @@ Invoke the `sec-audit` skill (see `skills/sec-audit/SKILL.md`) with:
   (falsy) otherwise
 - `deep_deps_max` — the cap N from `--deep-deps=N`, or the default `10` when
   bare `--deep-deps` was passed; omit when `deep_deps` is falsy
-- `sarif` — `true` when `--sarif` was passed; omit (falsy) otherwise
+- `sarif` — `true` when `--sarif` / `--sarif=all` / `--sarif=new` was passed;
+  omit (falsy) otherwise
+- `sarif_mode` — `new` when `--sarif=new` was passed, else `all`; omit when
+  `sarif` is falsy
 - `diff` — `true` when `--diff` / `--diff=ref` was passed; omit (falsy) otherwise
 - `diff_ref` — the `ref` from `--diff=ref`, or omit for bare `--diff`
 - `full` — `true` when `--full` was passed; omit (falsy) otherwise
