@@ -47,6 +47,14 @@ judgments. You render only what the inputs contain.
 5. Scoring output — per-finding score (0–100) and bucket — supplied by the
    orchestrator skill body (deterministic rubric stays in SKILL.md section 5,
    not here).
+6. Acceptances block (v1.34.0+, optional) — the `acceptances` object from
+   `deltas.py --accepted`: `{accepted, previously_accepted, refused[],
+   warnings[], expired[], clamped[]}`. Absent when the project has no
+   `accepted.json`. Its per-finding fields (`suppressed_status`,
+   `accepted_reason`, `accepted_expires`, `accepted_clamped_from`,
+   `acceptance_not_applied`, `previously_accepted`) arrive on the findings
+   themselves; this block carries the register-level problems that belong to no
+   single finding. Render per Step 2.85 — never drop a warning it contains.
 
 ## Procedure
 
@@ -189,7 +197,14 @@ Baseline: `20260709-1738` (2026-07-09 17:38 UTC) — 12 of 812 files changed,
 | REVERIFIED |    18 | re-scanned this run, still present                   |
 | CARRIED    |    24 | not re-scanned this run (see per-lane reasons below) |
 | FIXED      |     5 | re-scanned cleanly and gone, or their file was deleted |
+| ACCEPTED   |     2 | open, but risk-accepted until a stated date          |
 ```
+
+Emit the `ACCEPTED` row **only** when `deltas.accepted` is present and non-zero —
+on a project with no register the row would imply a suppression mechanism is in
+play when none is. ACCEPTED findings are still open: they are counted in
+`deltas.total_open` and excluded only from the severity buckets, exactly like
+FIXED. Never present `total_open` as if acceptance reduced it.
 
 Then list the NEW and REGRESSED findings by title with links to their blocks —
 these are what the reader must act on.
@@ -251,6 +266,56 @@ section with what resolved them:
 that carried it no longer exists). Do not editorialize these into "fixed by the
 developer": the pipeline knows the finding is gone, not why.
 
+### Step 2.85 — Emit "Accepted risks" (v1.34.0+)
+
+Findings with `status: ACCEPTED` are **open findings the maintainer has
+explicitly accepted** via `<state_home>/accepted.json`. Like FIXED they are
+excluded from the severity buckets; unlike FIXED they are **not resolved**, and
+the report must never let that distinction blur. Emit this section whenever the
+run produced any ACCEPTED finding, any refused entry, or any register warning —
+skip it entirely otherwise.
+
+```markdown
+## Accepted risks
+
+These findings are open. They are excluded from the severity buckets below
+because someone accepted the risk, not because they were fixed.
+
+| Finding | File | Severity | Accepted | Expires | By | Reason |
+|---------|------|----------|----------|---------|----|--------|
+| SQL injection in user lookup | `src/db.py` | HIGH | 2026-07-20 | 2026-09-01 | alice | mitigated by the WAF rule |
+| Hardcoded token | `src/cfg.py` | CRITICAL | 2026-07-20 | 2026-08-19 ⚠ clamped from 2027-07-20 | bob | vendor fix pending |
+```
+
+Rendering rules, all mandatory:
+
+- **`Expires` renders the ENFORCED date**, from `accepted_expires` — not what the
+  file asked for. When `accepted_clamped_from` is present the finding was a
+  CRITICAL capped at 30 days: append `⚠ clamped from <accepted_clamped_from>`
+  so the reader sees the file's claim was overridden and the acceptance will
+  lapse sooner than written.
+- **`Reason` renders `accepted_reason` verbatim.** Do not summarise or improve
+  it; it is the accepting human's own justification and the reader is judging it.
+- **Never omit a row to keep the section short.** Every ACCEPTED finding appears.
+
+Then, when the run reports any of these, add the sub-blocks below. Each exists
+because a *silently* ignored suppression is the failure mode this whole feature
+must not have:
+
+- **Entries that did not apply** (`acceptances.refused`): a register entry
+  matched a finding the register may not suppress. Render the finding, its
+  status, and the verbatim `acceptance_not_applied` text — a FIXED finding needs
+  no acceptance, and a REGRESSED one means the vulnerability came back and the
+  acceptance on file predates its return, so it must be re-accepted deliberately.
+- **Acceptances that lapsed** (`previously_accepted` on a finding): render it as
+  `previously accepted until <date> — now reported at full severity`, so a
+  reader who remembers accepting it learns why it is back.
+- **Rejected or expired register entries** (`acceptances.warnings`,
+  `acceptances.expired`): render each verbatim under a short "Register problems"
+  list. A malformed entry means a suppression the maintainer *thought* was in
+  place is not — that is more urgent than the findings themselves, so never
+  swallow these.
+
 ### Step 3 — Emit severity buckets
 
 Order: CRITICAL, then HIGH, then MEDIUM, then LOW. Within each bucket, order
@@ -294,6 +359,16 @@ On an incremental run render exactly one of:
 | `REGRESSED`  | `REGRESSED — previously fixed in <previously_fixed_in>, found again`     |
 | `REVERIFIED` | `re-verified this run (first seen <first_seen>)`                         |
 | `CARRIED`    | `CARRIED — not re-verified this run: <carried_reason> (first seen <first_seen>, last verified <last_verified_at>)` |
+| `ACCEPTED`   | `ACCEPTED — risk accepted until <accepted_expires>; underlying status <suppressed_status>` |
+
+The `ACCEPTED` wording is mandatory and must name both the expiry and the
+`suppressed_status`. An accepted finding is still open, and the reader must be
+able to see what it would be called if nobody had accepted it — rendering it
+without its underlying status would make a suppression indistinguishable from a
+resolution. Append `(⚠ clamped from <accepted_clamped_from>)` when present.
+When a finding carries `acceptance_not_applied`, render that verbatim after its
+normal status line instead of any ACCEPTED wording — the acceptance did not take
+effect and the line must not suggest it did.
 
 The `CARRIED` wording is mandatory and must contain the literal phrase **"not
 re-verified this run"**. A carried finding is one this audit did not re-check;

@@ -2741,6 +2741,31 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
 
+# --- accepted-risk register rendering (v1.34.0, BL-004):
+# A suppression the reader cannot see is the failure mode this feature must not
+# have, so every rule that keeps an acceptance VISIBLE is contract-checked.
+check agents/report-writer.md 'Accepted risks' "report-writer missing the accepted-risks section"
+check agents/report-writer.md 'ACCEPTED' "report-writer missing the ACCEPTED status vocabulary"
+check agents/report-writer.md 'suppressed_status' "report-writer does not render the underlying status of an accepted finding"
+check agents/report-writer.md 'accepted_clamped_from' "report-writer does not surface a clamped CRITICAL expiry"
+check agents/report-writer.md 'acceptance_not_applied' "report-writer does not render refused acceptances"
+check agents/report-writer.md 'previously_accepted' "report-writer does not render lapsed acceptances"
+acc_sec=$(sed -n '/^### Step 2.85/,/^### Step /p' agents/report-writer.md)
+[ -n "$acc_sec" ] || { echo "CONTRACT FAIL: report-writer Step 2.85 (accepted risks) not found" >&2; fail=1; }
+# The section must say acceptance is NOT resolution — the one confusion that
+# would let a live vulnerability read as dealt with.
+echo "$acc_sec" | grep -qi 'not because they were fixed\|not resolved' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not distinguish acceptance from resolution" >&2; fail=1; }
+echo "$acc_sec" | grep -qi 'verbatim' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not require the reason be rendered verbatim" >&2; fail=1; }
+# Register problems must never be swallowed.
+echo "$acc_sec" | grep -qi 'never swallow\|never omit\|never drop' \
+    || { echo "CONTRACT FAIL: accepted-risks section does not forbid dropping register warnings" >&2; fail=1; }
+status_tbl=$(sed -n '/| `status`     | Status line/,/^$/p' agents/report-writer.md)
+echo "$status_tbl" | grep -q 'ACCEPTED' \
+    || { echo "CONTRACT FAIL: report-writer status-line table has no ACCEPTED row" >&2; fail=1; }
+echo "accepted-register: report renders accepted risks, clamps, refusals, lapses and register problems"
+
 # --- SARIF delta modes (v1.33.0, BL-007):
 # --sarif=new exists so a PR check fails on what the PR added, not on the
 # project's whole backlog. The flag must reach sarif.py as --mode, and bare
