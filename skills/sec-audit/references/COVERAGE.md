@@ -904,7 +904,7 @@ Dispatch discipline.
   `origin: "supply-chain"` findings (§3.27), deduped, capped at
   `deep_deps_max` (default 10). No flag / no candidates ⇒ does not run.
 - **Tool:** no external binary — the `dep-diff-analyst` sub-agent
-  (sonnet-pinned, tools Read + Bash + WebFetch) fetches version N and
+  (sonnet-pinned, tools Read + scoped Bash) fetches version N and
   N-1 artifacts registry-natively (PyPI JSON API + npm registry, no
   pip/npm install), runs a bounded `diff -ruN`, and classifies the
   diff benign / suspicious / malicious. Ports

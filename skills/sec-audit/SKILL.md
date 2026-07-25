@@ -2538,7 +2538,7 @@ do NOT dispatch — there is nothing to diff.
 
 **Dispatch.** When `deep_deps` is true AND candidates exist, dispatch the
 `dep-diff-analyst` agent (`agents/dep-diff-analyst.md`, pinned to **sonnet**,
-tools: Read + Bash + WebFetch) with `{"candidates": [...]}` on stdin. The agent
+tools: Read + scoped Bash) with `{"candidates": [...]}` on stdin. The agent
 fetches N and N-1 from the PyPI JSON API / npm registry (no `pip`/`npm
 install`), runs a bounded `diff -ruN`, classifies each benign / suspicious /
 malicious per `references/deep-deps-tools.md` (reusing the heuristic catalogue

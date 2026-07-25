@@ -2751,6 +2751,41 @@ if grep -nE 'cache\.(get|put)\(.*querybatch' scripts/secaudit/cve_enricher.py; t
 fi
 echo "feed-incrementality: advisory cache wired, querybatch never cached, withdrawn != fixed"
 
+# --- unused WebFetch grants (v1.36.0, BL-001, CWE-693 least-privilege):
+# cve-enricher, dep-diff-analyst and sec-expert each carried a WebFetch grant
+# none of them ever invoked — all three reach the network another way (the python
+# engine, scoped curl) or are forbidden from reaching it at all. A standing
+# unused egress capability in a security tool is exactly the finding sec-audit
+# reports about other people's agents.
+webfetch_allow='commands/sec-audit.md'
+wf_bad=0
+while IFS= read -r offender; do
+    [ -n "$offender" ] || continue
+    f="${offender%%:*}"
+    case "$f" in
+        $webfetch_allow) ;;
+        *) echo "CONTRACT FAIL: $offender grants WebFetch — remove it unless the body demonstrably fetches (BL-001)" >&2
+           wf_bad=$((wf_bad + 1)) ;;
+    esac
+done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
+         | grep -E '\bWebFetch\b' || true)
+[ "$wf_bad" -eq 0 ] || fail=1
+# The one allowlisted grant must stay JUSTIFIED, not just tolerated. The command
+# never invokes WebFetch and the skill it dispatches never instructs one (all
+# feed egress is delegated to sub-agents and the python engine), so this entry is
+# a known over-scope kept only because removing it changes the tool surface of a
+# live audit path that cannot be exercised by the hermetic suite. Tracked, not
+# blessed — see the Sub-plan 2 notes.
+grep -q 'WebFetch' commands/sec-audit.md \
+    || echo "  note: commands/sec-audit.md no longer grants WebFetch — drop it from webfetch_allow"
+if grep -n 'WebFetch' skills/sec-audit/SKILL.md | grep -qv 'prompt-injection'; then
+    if grep -qE '^\s*WebFetch|invoke WebFetch|call WebFetch' skills/sec-audit/SKILL.md; then
+        echo "CONTRACT FAIL: SKILL.md now instructs a WebFetch — the command's grant is no longer dead, update BL-001 notes" >&2
+        fail=1
+    fi
+fi
+echo "webfetch-scope: 0 unjustified WebFetch grants (1 tracked exception: the command entry point)"
+
 # --- feed-only re-audit (v1.35.0, BL-006):
 # The danger of a mode that runs no scanner is that it looks like an audit. Every
 # rule here keeps a feed-only run from being mistaken for one.
