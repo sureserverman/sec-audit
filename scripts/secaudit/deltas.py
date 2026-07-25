@@ -38,8 +38,24 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from secaudit.fingerprint import fingerprint  # noqa: E402
+from secaudit import accepted as accepted_mod  # noqa: E402
 
 TRIAGE_FIELDS = ("confidence", "fp_suspected", "triage_notes", "exposure", "auth_required")
+# Written onto a finding by the accepted-risk register (accepted.py). They ride
+# in the state record's `triage` block so the next run can tell that a finding
+# WAS accepted even after the acceptance lapses.
+ACCEPT_FIELDS = ("accepted_reason", "accepted_on", "accepted_expires",
+                 "accepted_by", "accepted_clamped_from")
+# Statuses the register may NOT suppress, whatever accepted.json says.
+#   FIXED     — there is nothing to accept; a resolved finding is not a risk.
+#               Suppressing it would also rewrite its state record back to
+#               `open`, so it could never resolve and a later reintroduction
+#               would read as REVERIFIED instead of REGRESSED.
+#   REGRESSED — the vulnerability came BACK. The acceptance on file predates the
+#               reintroduction and was never a decision about it. Re-accepting is
+#               a deliberate act (accepted.py's whole premise), so the finding is
+#               reported at full severity and the stale entry is surfaced.
+NON_SUPPRESSIBLE = frozenset({"FIXED", "REGRESSED"})
 
 
 class ConservationError(Exception):
@@ -204,13 +220,94 @@ def _state_rec(finding, lane, status, prev, run_id, ts, touch=True):
         "last_seen": run_id if touch else (prev or {}).get("last_seen"),
         "last_verified_at": ts if touch else (prev or {}).get("last_verified_at"),
         "finding": {k: v for k, v in finding.items()
-                    if k not in ("status", "stale", "carried_reason", "resolution")},
+                    if k not in ("status", "stale", "carried_reason", "resolution",
+                                 "suppressed_status", "previously_accepted")
+                    and k not in ACCEPT_FIELDS},
         "triage": {k: finding[k] for k in TRIAGE_FIELDS if k in finding},
     }
     if status == "fixed":
         rec["fixed_in_run"] = finding.get("fixed_in_run", run_id)
         rec["resolution"] = finding.get("resolution")
     return rec
+
+
+def apply_acceptances(findings, new_state, prev_state, register, run_id, today=None):
+    """Overlay the accepted-risk register onto classified findings (§5.5, BL-004).
+
+    Runs AFTER classify() on purpose: the conservation law is checked against the
+    real delta classes, so a suppression can never be the reason a baseline
+    finding goes unaccounted. Acceptance only ever rewrites presentation —
+    `status` becomes ACCEPTED and the real class moves to `suppressed_status`.
+
+    A finding whose acceptance has lapsed since the last run comes back at its
+    true status carrying `previously_accepted`, so the report can say "this was
+    accepted until <date>" instead of silently re-raising it as if new.
+    """
+    prev_findings = (prev_state or {}).get("findings") or {}
+    was_accepted = {
+        fp: (rec.get("triage") or {}).get("accepted_expires")
+        for fp, rec in prev_findings.items()
+        if (rec.get("triage") or {}).get("accepted_expires")
+    }
+
+    # Hold back everything the register is not allowed to touch BEFORE matching,
+    # so a suppression can never reach a resolved or reintroduced finding.
+    # Positions are tracked so the output order is exactly the input order.
+    idx_offered = [i for i, g in enumerate(findings)
+                   if (g.get("status") or "").upper() not in NON_SUPPRESSIBLE]
+    idx_protected = [i for i in range(len(findings)) if i not in set(idx_offered)]
+
+    offered, info = accepted_mod.apply([findings[i] for i in idx_offered],
+                                       register, today)
+    merged = list(findings)
+    for pos, g in zip(idx_offered, offered):
+        merged[pos] = g
+
+    entries = register.get("entries") or {}
+    refused = []
+    for i in idx_protected:
+        g = merged[i]
+        fp = g.get("fingerprint")
+        if fp and fp in entries:
+            # Say so out loud: an entry that looks like it covers this finding
+            # deliberately did not apply. Silence here would read as "accepted".
+            refused.append({"fingerprint": fp, "status": g.get("status"),
+                            "title": g.get("title") or g.get("id"),
+                            "reason": entries[fp]["reason"],
+                            "expires": entries[fp]["expires"]})
+            g["acceptance_not_applied"] = (
+                "FIXED — nothing to accept" if g.get("status") == "FIXED"
+                else "REGRESSED — the acceptance on file predates the "
+                     "reintroduction; re-accept explicitly if still acceptable")
+    info["refused"] = refused
+
+    findings = merged
+    for g in findings:
+        fp = g.get("fingerprint")
+        if not fp:
+            continue
+        rec = new_state.get(fp)
+        if g.get("status") == "ACCEPTED":
+            if rec is not None:
+                # ACCEPTED is a presentation state, never a state-store state:
+                # the record stays `open` so nothing downstream mistakes an
+                # accepted finding for a resolved one. Safe to force `open` here
+                # only because FIXED never reaches this branch (NON_SUPPRESSIBLE).
+                rec["status"] = "open"
+                rec["triage"].update({k: g[k] for k in ACCEPT_FIELDS if k in g})
+        elif fp in was_accepted and (g.get("status") or "").upper() not in NON_SUPPRESSIBLE:
+            # "previously_accepted" means an acceptance LAPSED and the finding
+            # resurfaced. A FIXED finding did not resurface, and a REGRESSED one
+            # is deliberately reported at full severity — tagging either would
+            # inflate the counter and soften exactly what must not be softened.
+            g["previously_accepted"] = was_accepted[fp]
+            if rec is not None:
+                for k in ACCEPT_FIELDS:
+                    rec["triage"].pop(k, None)
+
+    info["previously_accepted"] = sum(
+        1 for g in findings if g.get("previously_accepted"))
+    return findings, info
 
 
 def advisory_deltas(prev_deps, cve_output, run_id):
@@ -337,7 +434,7 @@ def main(argv):
     if "changeset" not in args or "run-id" not in args:
         sys.stderr.write("usage: deltas.py --state <f> --changeset <f> --run-id <id> "
                          "[--findings <f>] [--lane-status <f>] [--cve-output <f>] "
-                         "[--now ISO]\n")
+                         "[--accepted <f>] [--now ISO]\n")
         return 2
 
     state = json.load(open(args["state"], encoding="utf-8")) if args.get("state") and \
@@ -356,7 +453,28 @@ def main(argv):
     except ConservationError as e:
         sys.stderr.write(f"deltas: CONSERVATION FAILURE — {e}\n")
         return 5
+
     doc = {"findings": findings, "deltas": deltas, "state_findings": new_state}
+    if args.get("accepted"):
+        today = now.date() if now else None
+        register = accepted_mod.load(args["accepted"], today)
+        findings, acc = apply_acceptances(findings, new_state, state, register,
+                                          args["run-id"], today)
+        doc["findings"] = findings
+        doc["acceptances"] = acc
+        deltas["accepted"] = acc["accepted"]
+        deltas["previously_accepted"] = acc["previously_accepted"]
+        # ACCEPTED findings are still open findings — they are excluded from the
+        # severity buckets by the report, not from the audit. total_open is
+        # computed before this overlay and never adjusted by it, so a suppression
+        # can never shrink the reported open count.
+        #
+        # For consumers: `accepted` is an independent tally, NOT a subset marker
+        # on total_open. "open and not currently suppressed" is
+        # total_open - accepted. FIXED and REGRESSED findings are never counted
+        # in `accepted` (see NON_SUPPRESSIBLE), so the subtraction is safe.
+        for w in acc["warnings"]:
+            sys.stderr.write(f"deltas: accepted.json: {w}\n")
     if args.get("cve-output") and os.path.exists(args["cve-output"]):
         cve_out = json.load(open(args["cve-output"], encoding="utf-8"))
         doc["advisory_deltas"] = advisory_deltas(state.get("deps"), cve_out,
