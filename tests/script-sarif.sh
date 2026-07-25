@@ -154,6 +154,50 @@ assert len(run["results"]) == 2 and len(run["tool"]["driver"]["rules"]) == 1, \
 print("  same-id dedup: 2 results, 1 rule OK")
 PY
 
+echo "=== ACCEPTED is suppressed in BOTH modes (BL-004) ==="
+# An accepted risk must not come back as a code-scanning alert in either mode —
+# in `all` because someone explicitly accepted it, in `new` because it is not new.
+cat > "$scratch/acc-findings.json" <<'JSON'
+[{"id":"f-accepted","severity":"CRITICAL","title":"accepted risk","file":"a.py","line":1,
+  "status":"ACCEPTED","suppressed_status":"CARRIED"},
+ {"id":"f-live","severity":"HIGH","title":"live","file":"b.py","line":2,"status":"NEW"},
+ {"id":"f-carried","severity":"HIGH","title":"carried","file":"c.py","line":3,"status":"CARRIED"}]
+JSON
+for m in all new; do
+  python3 scripts/secaudit/sarif.py --mode=$m < "$scratch/acc-findings.json" > "$scratch/acc-$m.sarif"
+  python3 - "$scratch/acc-$m.sarif" "$m" <<'PY'
+import json, sys
+run = json.load(open(sys.argv[1]))["runs"][0]
+ids = sorted(r["ruleId"] for r in run["results"])
+assert "f-accepted" not in ids, (sys.argv[2], ids)
+assert "f-accepted" not in [r["id"] for r in run["tool"]["driver"]["rules"]], ids
+expect = ["f-carried", "f-live"] if sys.argv[2] == "all" else ["f-live"]
+assert ids == expect, (sys.argv[2], ids, expect)
+print(f"  --mode={sys.argv[2]}: ACCEPTED absent from results AND rules OK")
+PY
+done
+
+# Tripwire: every status deltas.py can emit must be accounted for in exactly one
+# of SUPPRESSED / NOT_INTRODUCED / (introduced). A status added to deltas.py
+# without updating sarif.py fails HERE rather than silently leaking or hiding.
+python3 - <<'PY'
+import re, sys
+sys.path.insert(0, "scripts")
+from secaudit.sarif import SUPPRESSED, NOT_INTRODUCED
+src = open("scripts/secaudit/deltas.py").read()
+emitted = set(re.findall(r'"status":\s*"([A-Z]+)"', src))
+emitted |= set(re.findall(r'g\["status"\]\s*=\s*"([A-Z]+)"', src))
+emitted |= {"NEW", "REVERIFIED", "CARRIED", "FIXED", "REGRESSED", "ACCEPTED"}
+known = SUPPRESSED | NOT_INTRODUCED | {"NEW", "REGRESSED"}
+unaccounted = emitted - known
+assert not unaccounted, (
+    f"deltas.py can emit status {sorted(unaccounted)} that sarif.py does not "
+    f"classify — it would be treated as introduced by default. Add it to "
+    f"SUPPRESSED or NOT_INTRODUCED deliberately.")
+assert not (SUPPRESSED & NOT_INTRODUCED), "a status cannot be in both sets"
+print(f"  tripwire: all {len(emitted)} deltas statuses accounted for OK")
+PY
+
 echo "=== --mode=new: emit only what this run introduced (BL-007) ==="
 # deltas.py stamps `status` upstream of score.py, which preserves every key, so
 # sarif.py sees the delta class on its stdin. Fixture covers each status plus an

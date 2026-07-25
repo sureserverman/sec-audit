@@ -2766,6 +2766,50 @@ echo "$status_tbl" | grep -q 'ACCEPTED' \
     || { echo "CONTRACT FAIL: report-writer status-line table has no ACCEPTED row" >&2; fail=1; }
 echo "accepted-register: report renders accepted risks, clamps, refusals, lapses and register problems"
 
+# Skill-level wiring: the register must be READ every run, excluded from scoring
+# like FIXED, never written by the tool, and never re-raised as a SARIF alert.
+check skills/sec-audit/SKILL.md 'accepted.json' "SKILL.md state layout does not list accepted.json"
+# Scope to the ACTUAL deltas.py invocation: '--accepted' also appears in §4.95
+# prose, so a whole-file grep would pass even with the flag dropped from the call.
+deltas_call=$(sed -n '/scripts\/secaudit\/deltas.py" \\/,/^```/p' skills/sec-audit/SKILL.md)
+echo "$deltas_call" | grep -q -- '--accepted' \
+    || { echo "CONTRACT FAIL: SKILL.md §4.9 deltas.py invocation does not pass --accepted" >&2; fail=1; }
+echo "$deltas_call" | grep -q -- '--lane-status' \
+    || { echo "CONTRACT FAIL: SKILL.md §4.9 deltas.py invocation lost --lane-status" >&2; fail=1; }
+check skills/sec-audit/SKILL.md '4.95' "SKILL.md is missing the §4.95 accepted-risk register section"
+acc_skill=$(sed -n '/^### 4.95 Accepted-risk register/,/^### /p' skills/sec-audit/SKILL.md)
+[ -n "$acc_skill" ] || { echo "CONTRACT FAIL: SKILL.md §4.95 section not found" >&2; fail=1; }
+for rule in 'Expiry is mandatory' '30 days' 'FIXED or REGRESSED' 'never fails the audit'; do
+    echo "$acc_skill" | grep -qi -- "$rule" \
+        || { echo "CONTRACT FAIL: SKILL.md §4.95 lost the '$rule' rule" >&2; fail=1; }
+done
+# The tool must never rewrite the user's suppression list.
+grep -qi 'never creates, rewrites or prunes it' skills/sec-audit/SKILL.md \
+    || { echo "CONTRACT FAIL: SKILL.md does not forbid sec-audit writing accepted.json" >&2; fail=1; }
+# ACCEPTED excluded from scoring, exactly like FIXED, and still counted open.
+# Newline-insensitive: the sentence wraps in the source.
+if ! tr '\n' ' ' < skills/sec-audit/SKILL.md \
+     | grep -qE 'FIXED and +ACCEPTED findings are excluded from scoring'; then
+    echo "CONTRACT FAIL: SKILL.md does not exclude ACCEPTED from scoring alongside FIXED" >&2
+    fail=1
+fi
+if ! tr '\n' ' ' < skills/sec-audit/SKILL.md \
+     | grep -qE 'still counts in +.deltas.total_open'; then
+    echo "CONTRACT FAIL: SKILL.md does not state ACCEPTED still counts in total_open" >&2
+    fail=1
+fi
+# An accepted risk must never be re-raised as a code-scanning alert in ANY mode.
+check scripts/secaudit/sarif.py 'SUPPRESSED' "sarif.py lost the mode-independent suppression set"
+python3 - <<'PY' || { echo "CONTRACT FAIL: sarif.py suppression sets are malformed" >&2; fail=1; }
+import sys
+sys.path.insert(0, "scripts")
+from secaudit.sarif import SUPPRESSED, NOT_INTRODUCED
+assert "ACCEPTED" in SUPPRESSED, SUPPRESSED
+assert "ACCEPTED" not in NOT_INTRODUCED, NOT_INTRODUCED
+assert not (SUPPRESSED & NOT_INTRODUCED), (SUPPRESSED, NOT_INTRODUCED)
+PY
+echo "accepted-wiring: --accepted passed every run, excluded from scoring + SARIF, register never written"
+
 # --- SARIF delta modes (v1.33.0, BL-007):
 # --sarif=new exists so a PR check fails on what the PR added, not on the
 # project's whole backlog. The flag must reach sarif.py as --mode, and bare

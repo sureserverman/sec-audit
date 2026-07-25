@@ -27,8 +27,17 @@ SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 LEVEL = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning",
          "LOW": "note", "INFO": "note"}
 MODES = ("all", "new")
-# Delta statuses (deltas.py) that mean "this run introduced it".
-INTRODUCED = {"NEW", "REGRESSED"}
+# Two ORTHOGONAL questions, deliberately not merged into one predicate:
+#
+#   SUPPRESSED     — "should this leave the SARIF entirely, in every mode?"
+#                    An ACCEPTED finding is a risk a human explicitly accepted;
+#                    re-raising it as a code-scanning alert in `all` mode would
+#                    make the acceptance meaningless.
+#   NOT_INTRODUCED — "did THIS run introduce it?", the --mode=new filter only.
+#                    A closed denylist, so an unrecognised or future status
+#                    fails OPEN (shown in the PR check) rather than vanishing.
+SUPPRESSED = {"ACCEPTED"}
+NOT_INTRODUCED = {"CARRIED", "REVERIFIED", "FIXED"}
 
 
 def _level(f):
@@ -70,15 +79,22 @@ def _is_sentinel(f):
     return any(isinstance(k, str) and k.startswith("__") for k in f)
 
 
+def _suppressed(f):
+    """True when the finding must not appear in ANY mode. Mode-independent."""
+    status = f.get("status")
+    return status is not None and str(status).upper() in SUPPRESSED
+
+
 def _introduced(f):
     """True when this run introduced the finding. A finding with no `status`
     key predates delta classification (or the run had no baseline) — treat it as
     introduced so `--mode=new` fails open into the PR check. Silently dropping an
-    unclassified finding would turn a missing field into a false clean."""
+    unclassified finding would turn a missing field into a false clean. The test
+    is a denylist so an unrecognised status also fails open."""
     status = f.get("status")
     if status is None:
         return True
-    return str(status).upper() in INTRODUCED
+    return str(status).upper() not in NOT_INTRODUCED
 
 
 def to_sarif(findings, mode="all"):
@@ -86,6 +102,8 @@ def to_sarif(findings, mode="all"):
     results = []
     for f in findings:
         if _is_sentinel(f):
+            continue
+        if _suppressed(f):
             continue
         if mode == "new" and not _introduced(f):
             continue

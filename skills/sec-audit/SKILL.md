@@ -103,11 +103,18 @@ and the incremental state that makes §2.5 possible — into the audited project
 <state_home>/                      # <portfolio_root>/<area>/<name>/security
   audit-state.json                 # incremental baseline (manifest, findings, deps, feeds)
   advisory-cache.json              # cached advisory projections
+  accepted.json                    # accepted-risk register — HAND-EDITED, never written
   history.jsonl                    # one line per run
   latest.md                        # pointer to the newest report
   reports/sec-audit-<ts>.md        # the user-facing deliverable
   reports/sec-audit-<ts>.sarif     # only when --sarif
 ```
+
+`accepted.json` is the **only** file here the user owns. sec-audit reads it and
+never creates, rewrites or prunes it — not even to drop an expired entry. An
+audit tool that edits its own suppression list could quietly widen its own blind
+spots, so expiry is enforced at read time and the file is left exactly as the
+maintainer wrote it.
 
 Resolve it deterministically — do not guess the path:
 
@@ -2501,6 +2508,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/deltas.py" \
     --changeset   "$TMPDIR/secaudit-changeset.json" \
     --findings    "$TMPDIR/secaudit-fp.jsonl" \
     --lane-status "$TMPDIR/secaudit-lane-status.json" \
+    --accepted    "<state_home>/accepted.json" \
     --run-id      "<YYYYMMDD-HHMM>" > "$TMPDIR/secaudit-merged.json"
 ```
 
@@ -2509,18 +2517,27 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/deltas.py" \
 stops a lane whose tool was missing from silently "fixing" every finding it can
 no longer see.
 
+`--accepted` points at the accepted-risk register (v1.34.0+, §4.95). Pass it
+**always** — an absent file is the normal case and is handled silently. Do not
+skip the flag just because no register exists, or a project that later gains one
+would need a skill change to honour it.
+
 Output: `findings` (every finding with a `status` of NEW / REVERIFIED / CARRIED /
-FIXED / REGRESSED), `deltas` (the counts), and `state_findings` (the map to
-persist in §6).
+FIXED / REGRESSED / ACCEPTED), `deltas` (the counts), `state_findings` (the map to
+persist in §6), and `acceptances` (register-level problems) when `--accepted` was
+given.
 
 Skill-level invariants:
 
 - **Exit code 5 is a conservation failure** — the merge could not account for
   every baseline finding. Stop the run and report it. Never publish a report
   built on a finding set that lost entries.
-- **Feed the whole merged set to §5**, not just the fresh part. FIXED findings
-  are excluded from scoring (they are rendered in their own report section);
-  everything else scores normally.
+- **Feed the whole merged set to §5**, not just the fresh part. FIXED and
+  ACCEPTED findings are excluded from scoring (each is rendered in its own report
+  section); everything else scores normally. ACCEPTED is excluded because someone
+  accepted the risk, **not** because it is resolved — it still counts in
+  `deltas.total_open`, and a report must never present acceptance as a reduction
+  in open findings.
 - **Persist `state_findings` in §6** via statestore, together with the new file
   manifest and the per-lane `lane_state` (`last_run`, `last_run_at`, `status`,
   `digest`, `tool_versions`, `findings` count). Skipping the persist step makes
@@ -2604,6 +2621,32 @@ with the run JSON on stdin (`run_id`, `started_at`, `finished_at`,
 `plugin_version`, `mode`, `lanes_ran`, `lanes_carried`, `counts`, `deltas`,
 `cost`). This is what makes the next run incremental — skipping it silently
 turns every future audit back into a full one.
+
+### 4.95 Accepted-risk register (v1.34.0+)
+
+`<state_home>/accepted.json` lets a maintainer record "I accept this finding" so
+it renders as ACCEPTED instead of returning at full severity every run. It is
+keyed by the v1.30 fingerprint (stable across line moves), hand-edited, and read
+by `deltas.py --accepted` in §4.9. Format and validation rules live in
+`scripts/secaudit/accepted.py`; the rules that matter at skill level:
+
+- **Expiry is mandatory.** An entry without `expires` is rejected and its finding
+  keeps full severity. There is no permanent suppression.
+- **A CRITICAL is capped at 30 days per acceptance.** A longer `expires` is
+  clamped and the report says so. Renewing is a deliberate act, so "accept a
+  CRITICAL and forget" cannot happen.
+- **The register cannot suppress FIXED or REGRESSED.** Nothing is gained by
+  accepting a resolved finding, and a reintroduced one was never covered by the
+  decision on file — it must be re-accepted explicitly.
+- **Nothing is ever removed.** Acceptance rewrites presentation only; the finding
+  stays in the pipeline, in the state store, and in `total_open`.
+- **A broken register never fails the audit** — it degrades to zero acceptances
+  plus a loud warning that the report must render. Refusing to audit because a
+  suppression file is corrupt would be worse; hiding the corruption worse still.
+
+If `deltas.py` reports register warnings on stderr, carry them into the
+report-writer inputs — a maintainer who believes a suppression is in place when
+it is not needs to hear that more urgently than the findings themselves.
 
 ### 6.5 Optional SARIF output (`--sarif[=all|new]`)
 
