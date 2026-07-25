@@ -2,7 +2,7 @@
 name: ai-tools-runner
 description: "AI-tools static-analysis adapter for sec-audit. Runs jq (JSON structural validator) and mcp-scan (tool-poisoning + malicious-description scanner) against AI-tool-config files under target_path; emits JSONL findings tagged origin: \"ai-tools\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.25."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(command -v:*), Bash(jq:*), Bash(mcp-scan:*), Bash(snyk-agent-scan:*), Bash(find:*), Bash(sed:*), Bash(awk:*), Bash(printf:*), Bash(basename:*)
 ---
 
 # ai-tools-runner

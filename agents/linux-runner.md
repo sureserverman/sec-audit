@@ -2,7 +2,7 @@
 name: linux-runner
 description: "Desktop Linux static-analysis adapter for sec-audit. Runs systemd-analyze security, lintian, and checksec against target_path; emits JSONL findings tagged origin: \"linux\". Sentinel-exits when tools are unavailable or inapplicable. Dispatched by sec-audit §3.12."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(command -v:*), Bash(systemd-analyze:*), Bash(lintian:*), Bash(checksec:*), Bash(systemctl:*), Bash(find:*), Bash(xargs:*), Bash(file:*), Bash(grep:*), Bash(cd:*), Bash(basename:*), Bash(uname:*), Bash(echo:*), Bash(true:*)
 ---
 
 # linux-runner
@@ -108,8 +108,8 @@ command -v checksec 2>/dev/null
 find "$target_path" -type f -name '*.service' -not -path '*/.git/*' \
     > "$TMPDIR/linux-runner-units.txt"
 [ -f "$target_path/debian/control" ] && echo yes > "$TMPDIR/linux-runner-has-debian"
-find "$target_path" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' \
-    -exec file {} + 2>/dev/null | grep -l 'ELF' \
+find "$target_path" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -print0 \
+    | xargs -0 file 2>/dev/null | grep -l 'ELF' \
     > "$TMPDIR/linux-runner-elf.txt" || true
 ```
 

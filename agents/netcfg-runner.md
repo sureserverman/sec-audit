@@ -2,7 +2,7 @@
 name: netcfg-runner
 description: "Networking-config static-analysis adapter for sec-audit. Runs sing-box check and xray test against netcfg-shaped files under target_path; emits JSONL findings tagged origin: \"netcfg\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.23."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(command -v:*), Bash(find:*), Bash(xargs:*), Bash(grep:*), Bash(sing-box check:*), Bash(xray test:*), Bash(awk:*), Bash(printf:*), Bash(sort:*), Bash(dirname:*)
 ---
 
 # netcfg-runner
@@ -86,9 +86,9 @@ Build `tools_available`. Then check applicability:
   `inbounds` + `outbounds` arrays with sing-box vocabulary):
 
   ```bash
-  singbox_files=$( find "$target_path" -type f -name '*.json' \
-                       -exec grep -l '"inbounds"' {} + 2>/dev/null \
-                   | xargs -I{} sh -c 'grep -lE "\"type\"\s*:\s*\"(socks|http|mixed|vless|trojan|hysteria|hysteria2|tuic|naive|shadowsocks)\"" "{}" 2>/dev/null' )
+  singbox_files=$( find "$target_path" -type f -name '*.json' -print0 \
+                   | xargs -0 grep -lZ '"inbounds"' 2>/dev/null \
+                   | xargs -0 grep -lE '"type"\s*:\s*"(socks|http|mixed|vless|trojan|hysteria|hysteria2|tuic|naive|shadowsocks)"' 2>/dev/null )
   ```
 
   If sing-box on PATH but no sing-box-shaped JSON, record
@@ -100,9 +100,9 @@ Build `tools_available`. Then check applicability:
   `outbounds` arrays with Xray vocabulary):
 
   ```bash
-  xray_files=$( find "$target_path" -type f -name '*.json' \
-                    -exec grep -l '"inbounds"' {} + 2>/dev/null \
-                | xargs -I{} sh -c 'grep -lE "\"protocol\"\s*:\s*\"(vless|vmess|trojan|shadowsocks|dokodemo-door|freedom|blackhole)\"" "{}" 2>/dev/null' )
+  xray_files=$( find "$target_path" -type f -name '*.json' -print0 \
+                | xargs -0 grep -lZ '"inbounds"' 2>/dev/null \
+                | xargs -0 grep -lE '"protocol"\s*:\s*"(vless|vmess|trojan|shadowsocks|dokodemo-door|freedom|blackhole)"' 2>/dev/null )
   ```
 
   If xray on PATH but no Xray-shaped JSON, record skipped

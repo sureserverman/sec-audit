@@ -2,7 +2,7 @@
 name: ios-runner
 description: "iOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, and notarytool on macOS hosts with bundle artifacts under target_path; emits JSONL findings tagged origin: \"ios\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.11."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(command -v:*), Bash(find:*), Bash(head:*), Bash(mobsfscan:*), Bash(codesign:*), Bash(spctl:*), Bash(xcrun:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)
 ---
 
 # ios-runner
