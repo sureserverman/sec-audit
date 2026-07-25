@@ -2788,7 +2788,20 @@ echo "$readme_fo" | grep -qE '/loop|/schedule' \
     || { echo "CONTRACT FAIL: README feed-only section gives no scheduling recipe" >&2; fail=1; }
 check skills/sec-audit/references/COVERAGE.md 'feeds-only' \
     "COVERAGE.md flag inventory does not record --feeds-only"
+# history.jsonl is read across repo boundaries (the portfolio security roll-up),
+# so its shape is a published contract, not an internal detail.
+check skills/sec-audit/SKILL.md '1.5.1 Consumer contract' \
+    "SKILL.md missing the history.jsonl consumer contract"
+hist_sec=$(sed -n '/^### 1.5.1 Consumer contract/,/^## /p' skills/sec-audit/SKILL.md)
+[ -n "$hist_sec" ] || { echo "CONTRACT FAIL: SKILL.md §1.5.1 not found" >&2; fail=1; }
+echo "$hist_sec" | grep -qi 'tolerate' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not require consumers to tolerate unknown keys/values" >&2; fail=1; }
+echo "$hist_sec" | grep -qi 'never .0.\|never \`0\`' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not state optional fields normalise to null, never 0" >&2; fail=1; }
+echo "$hist_sec" | grep -q 'total_open - accepted' \
+    || { echo "CONTRACT FAIL: §1.5.1 does not define open-and-not-suppressed as total_open - accepted" >&2; fail=1; }
 echo "feed-only: --feeds-only parsed, no-FIXED + no-baseline refusal, mode:feeds, quiet mode keeps the audit trail"
+echo "history-contract: §1.5.1 publishes the run-record shape consumers may rely on"
 
 # --- accepted-risk register rendering (v1.34.0, BL-004):
 # A suppression the reader cannot see is the failure mode this feature must not

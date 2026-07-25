@@ -119,6 +119,32 @@ audit tool that edits its own suppression list could quietly widen its own blind
 spots, so expiry is enforced at read time and the file is left exactly as the
 maintainer wrote it.
 
+### 1.5.1 Consumer contract for `history.jsonl` (v1.35.0)
+
+`history.jsonl` is read by tools outside this plugin (the portfolio-level
+security roll-up). Its shape as of v1.35 — **anything reading it must tolerate
+unknown keys and unknown enum values**, because this list grows:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `run_id` | yes | `YYYYMMDD-HHMM`, UTC; sorts chronologically |
+| `mode` | yes | `full` \| `incremental` \| `feeds` (v1.35). **`feeds` means no code lane ran** — its unchanged counts are NOT evidence the code was re-verified |
+| `started_at` / `finished_at` | no | ISO-8601 |
+| `plugin_version` | no | |
+| `counts` | no | open-finding counts by severity |
+| `deltas` | no | `new`, `regressed`, `reverified`, `carried`, `fixed`, `baseline_open`, `total_open`; plus `accepted` and `previously_accepted` (v1.34) when a register was read |
+| `lanes_ran` / `lanes_carried` | no | |
+| `cost` | no | |
+
+Two rules for any consumer:
+
+- **Optional fields normalise to `null`, never `0`.** "We did not record this"
+  and "this was zero" are different facts, and a roll-up that renders a missing
+  count as `0` reports a clean project that was never measured.
+- **`total_open` already includes ACCEPTED findings.** "Open and not currently
+  suppressed" is `total_open - accepted`. Never treat `accepted` as if it had
+  already been subtracted, and never present acceptance as a drop in open count.
+
 Resolve it deterministically — do not guess the path:
 
 ```bash
