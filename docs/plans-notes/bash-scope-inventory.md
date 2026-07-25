@@ -62,3 +62,75 @@ in the Stage 3 handoff + mac-handoff-style runbook note). Resolved scopes:
 ## Coverage check
 All 30 Bash-granting files accounted for: 19 (Class A) + 5 (Class B) + 4 (Class C) +
 2 (Class D) = 30. ✓
+
+---
+
+## Matcher behavior (LIVE-VERIFIED 2026-07-25)
+
+The three questions that forced the 2026-07-09 revert (commit `7718c0a`) are
+answered here by observation, not inference. Harness:
+`docs/plans-notes/matcher-probe.sh`; raw transcripts:
+`docs/plans-notes/matcher-probe-transcripts.txt`.
+
+**Environment:** Claude Code **2.1.220**, Linux 7.0.0-28-generic, headless
+`claude -p` with `--permission-mode default` and a harness-owned settings file
+pinning `permissions.defaultMode: "default"`, `allow: []`, `deny: []`.
+
+**Every run is bracketed by two controls** — a command inside the allowlist
+(must be ALLOWED) and one outside it (must be DENIED). Verdicts are read from a
+marker file on disk, never from the model's prose. The run below is the first in
+which both controls behaved; two earlier runs were discarded, and *why* they were
+discarded matters as much as the results:
+
+| Discarded run | What it reported | Actual cause |
+|---|---|---|
+| #1 | everything ALLOWED | `~/.claude/settings.json` sets `permissions.defaultMode: "auto"` — a safety classifier, not the allowlist, decided each command. A `touch` ran under an allowlist of only `Bash(echo:*)`. |
+| #2 | everything DENIED | (a) the sandbox restricts writes to the project dir, so `/tmp` markers were blocked by the **sandbox**, indistinguishable from a matcher denial; (b) the prompt demanded an unexplained `touch` of a file named `*_deny`, which the model correctly refused as an unverifiable sentinel — a **refusal**, not a denial. |
+
+Both would have been recorded as enforcement facts. That is exactly the failure
+mode BL-002's "needs-live-verification" tag exists to prevent.
+
+### Results
+
+| Q | Construct | Allowlist | Verdict |
+|---|---|---|---|
+| 1 | `[ -f X ] && touch M` | `Bash(touch:*)` | **ALLOWED** |
+| 2 | `diff <(cat X) X && touch M` | `Bash(diff:*),Bash(touch:*)` | **DENIED** |
+| 2b | same, with `cat` granted | `+ Bash(cat:*)` | **DENIED** |
+| 3 | `cmd=touch; "$cmd" M` | `Bash(touch:*)` | **ALLOWED** |
+| 3b | same, resolved cmd NOT granted | `Bash(echo:*)` | **DENIED** |
+| 3c | literal `touch M` (control) | `Bash(touch:*)` | **ALLOWED** |
+
+### What this means for the six runners
+
+1. **`[ … ] && …` precondition gates need no grant.** `[` is not separately
+   matched — Q1 passed with only `Bash(touch:*)` allowed. **No `Bash([:*)` is
+   required anywhere.** (Original assumption: possibly needed. Disproven.)
+
+2. **Process substitution is rejected outright, and no grant fixes it.** The Bash
+   tool refuses the call before execution with a literal
+   `Error: Contains process_substitution` — *even when the inner command is
+   explicitly allowed* (Q2b). This is stronger than the question assumed: the
+   macOS runner's `< <(cat …)` is not a scoping problem needing `Bash(cat:*)`, it
+   **cannot run under the Bash tool at all**. It must be rewritten to a pipe or a
+   temp file. Note this is independent of scoping — the construct is already
+   broken today under the *unscoped* `Bash` grant.
+
+3. **Variable command names resolve and match correctly — they do not bypass.**
+   `cmd=touch; "$cmd" …` was ALLOWED under `Bash(touch:*)` and DENIED under
+   `Bash(echo:*)`, same command, same target directory: the only variable was the
+   allowlist. The matcher resolves the indirection (one transcript states it
+   matched "variable-indirected command name" explicitly). So ai-tools-runner's
+   `"$mcp_scan_bin"` **can** be scoped; the blocker recorded in BL-002 — "no
+   `Bash(...)` rule matches a variable command name" — is **disproven**.
+
+### Residual uncertainty (do not overstate these results)
+
+- Probes drove `claude -p --allowedTools`. The runners are dispatched as
+  **sub-agents whose grants come from `tools:` frontmatter**. Both are believed to
+  feed the same permission engine, but that equivalence was **not** separately
+  proven here.
+- Verified on Linux only. The macOS-specific runners (`ios`, `macos`) were not
+  dispatched against real signing tools; finding 2 above applies to them by
+  construction (it is a Bash-tool rule, not a platform one), but their remaining
+  command surface is still verified-by-inspection.
