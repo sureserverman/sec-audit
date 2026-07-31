@@ -177,8 +177,17 @@ def _flatten(arr, flatten):
                 # which yields KEYS (strings) and silently produced no usable
                 # findings.
                 for rule, hits in val.items():
+                    if hits is None or hits is False:
+                        continue          # rule ran, did not match
                     if isinstance(hits, dict):
                         hits = [hits]
+                    elif isinstance(hits, (str, int, float, bool)):
+                        # A rule may store its message directly instead of a list
+                        # of hits — guarddog's metadata detectors do exactly this
+                        # (`results[rule] = message`), while its source-code rules
+                        # append dicts. Iterating a string would walk characters
+                        # and silently yield nothing, so lift it into one finding.
+                        hits = [{"message": str(hits)}]
                     for child in (hits or []):
                         if isinstance(child, dict):
                             nxt.append(({**child, "_key": rule}, parent))

@@ -1,4 +1,10 @@
 # Intentionally suspicious requirements for sec-audit supply-chain lane tests.
-# NOT a real project. 'python-sqlite' is a known typosquat shape.
+# NOT a real project.
+#
+# NOTE: guarddog can only analyse packages it can DOWNLOAD from PyPI. A made-up
+# name (this file used to list `python-sqlite`) makes guarddog error with
+# "Package/Version not on PyPI" and analyse nothing, so it cannot exercise the
+# typosquatting rule — the fixture looked like it tested detection and did not.
+# The reputation-rule mapping is pinned by tests/supply-chain-guarddog-map.sh
+# against a hand-written payload instead, which needs no network at all.
 requests==2.32.3
-python-sqlite==0.1.0

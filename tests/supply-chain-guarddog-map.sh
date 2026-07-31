@@ -33,14 +33,24 @@ lane = json.load(open(os.path.join(
     plugin_root, "scripts/secaudit/lanes/supply-chain.json")))
 
 # Verbatim shape from `guarddog <eco> verify --output-format json`.
+#
+# NOTE the two different value shapes inside `result.results` — this is the
+# thing that broke, and the reason this fixture is written by hand:
+#   * METADATA / reputation rules store the message STRING directly
+#     (`analyzer.py`: `results[rule] = message`), or None when they did not match;
+#   * SOURCE-CODE rules (threat-* / capability-*) store a LIST OF DICTS.
+# Iterating a string walks its characters and yields nothing, so a mapping that
+# only understood lists reported zero reputation findings while guarddog was
+# reporting them — silently, which is the worst way for this lane to fail.
 payload = [
   {"dependency": "python-sqlite", "version": "0.1.0", "result": {
       "issues": 2, "errors": {}, "results": {
-        "typosquatting": [{"message": "Package name resembles 'pysqlite3'"}],
+        "typosquatting": "Package name resembles 'pysqlite3'",          # string
+        "metadata_mismatch": "repo URL does not match",                 # string
         "capability-network-outbound": [{"message": "makes outbound calls"}],
-        "threat-network-reverse-shell": [{"message": "looks like a reverse shell"}],
-        "metadata_mismatch": [{"message": "repo URL does not match"}],
-        "deceptive_author": None}}},
+        "threat-network-reverse-shell": [{"message": "reverse shell"}],
+        "deceptive_author": None,                                       # ran, no match
+        "bundled_binary": False}}},                                     # ran, no match
   {"dependency": "requests", "version": "2.32.3", "result": {
       "issues": 3, "errors": {}, "results": {
         "typosquatting": None,
@@ -78,7 +88,7 @@ for name in names:
         f"{name}: package@version lost: {byid['typosquatting']['file']}"
     print("  %-14s 2 reputation findings, 0 noise, package@version intact" % name)
 
-print("  a rule whose value is null (deceptive_author) yields no finding")
+print("  string-valued rules mapped; null/False rules yield nothing")
 PY
 
 echo "supply-chain-guarddog-map: OK"
