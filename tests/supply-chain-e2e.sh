@@ -13,7 +13,10 @@ while IFS= read -r line; do
     echo "$line" | jq -e . >/dev/null 2>&1 || { echo "supply-chain-e2e: FAIL — bad JSON" >&2; exit 1; }
 done < "$jsonl"
 
-gd=$(jq -rs 'map(select(.origin=="supply-chain" and .tool=="guarddog")) | length' "$jsonl")
+# `guarddog` is wired per ecosystem (guarddog-npm / -pypi / -go since v1.36.2),
+# so match the family rather than the bare name — a recorded fixture may carry
+# either, depending on when it was captured.
+gd=$(jq -rs 'map(select(.origin=="supply-chain" and (.tool=="guarddog" or (.tool|startswith("guarddog-"))))) | length' "$jsonl")
 [ "$gd" -ge 1 ] || { echo "supply-chain-e2e: FAIL (a) guarddog findings: $gd" >&2; exit 1; }
 echo "  (a) guarddog findings: $gd"
 

@@ -881,7 +881,8 @@ Dispatch discipline.
 - **Host-OS gate:** none.
 - **Skip reasons:** `tool-missing`, `no-supply-chain-source`
   (a tool is on PATH but the target has no PyPI/npm manifest).
-- **Origin tag:** `"supply-chain"`. Tool whitelist: `guarddog`,
+- **Origin tag:** `"supply-chain"`. Tool whitelist: `guarddog-npm`,
+  `guarddog-pypi`, `guarddog-go`,
   `osv-scanner`. Status values: `ok` / `partial` /
   `unavailable`.
 - **Dep-inventory:** NOT newly affected — the PyPI/npm
@@ -1089,7 +1090,7 @@ semantic category:
 | `no-webapp-source`| webapp               | bearer on PATH but target has no recognised web-framework manifest (no Python / Node / Ruby / Java / PHP / Go signal). |
 | `no-node-source`  | webapp               | njsscan on PATH but no `*.js` / `*.ts` / `*.jsx` / `*.tsx` files under target.                                         |
 | `no-rails-source` | webapp               | brakeman on PATH but target is not a Rails app (no Gemfile mentioning rails AND no `config/application.rb`).           |
-| `no-supply-chain-source` | supply-chain  | guarddog / osv-scanner on PATH but target has no PyPI / npm dependency manifest.                                       |
+| `no-supply-chain-source` | supply-chain  | guarddog / osv-scanner on PATH but target has no dependency manifest that tool can read (guarddog: npm/PyPI/Go; osv-scanner: any of its 28 lockfiles). |
 | `no-prior-version` | deep-deps           | A flagged dependency's installed release is the first published version — no N-1 to diff against.                      |
 | `no-git-history`  | secrets              | trufflehog on PATH but the target is not a git repository (no `.git`) — no history to scan. gitleaks' working-tree scan still runs. NEW in v1.21. |
 

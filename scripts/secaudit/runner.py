@@ -162,8 +162,28 @@ def _flatten(arr, flatten):
     for k in keys:
         nxt = []
         for parent, _gp in level:
-            if isinstance(parent, dict):
-                for child in (parent.get(k) or []):
+            if not isinstance(parent, dict):
+                continue
+            # Dotted keys descend several levels in one step, so the leaf's
+            # `_parent` stays the element that carries the identifying fields
+            # rather than an intermediate wrapper (e.g. guarddog's
+            # "result.results" keeps `dependency`/`version` reachable).
+            val = _get(parent, k)
+            if isinstance(val, dict):
+                # A rule-keyed object rather than an array — the same shape
+                # `iterate: "values"` handles at the base level. Iterate the
+                # values and expose the key as `_key`, so the rule name is
+                # mappable. Previously this fell through to iterating the dict,
+                # which yields KEYS (strings) and silently produced no usable
+                # findings.
+                for rule, hits in val.items():
+                    if isinstance(hits, dict):
+                        hits = [hits]
+                    for child in (hits or []):
+                        if isinstance(child, dict):
+                            nxt.append(({**child, "_key": rule}, parent))
+            else:
+                for child in (val or []):
                     nxt.append((child, parent))
         level = nxt
     return level
