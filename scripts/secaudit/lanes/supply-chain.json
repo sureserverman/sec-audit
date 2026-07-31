@@ -16,7 +16,7 @@
       }
     },
     {
-      "name": "osv-scanner", "probe": "osv-scanner", "applicable_glob": "package.json", "inapplicable_reason": "no-supply-chain-source",
+      "name": "osv-scanner", "probe": "osv-scanner", "applicable_glob": ["Cargo.lock", "go.mod", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "requirements.txt", "poetry.lock", "Pipfile.lock", "pdm.lock", "uv.lock", "pylock.toml", "Gemfile.lock", "gems.locked", "pom.xml", "gradle.lockfile", "buildscript-gradle.lockfile", "verification-metadata.xml", "packages.lock.json", "packages.config", "deps.json", "composer.lock", "conan.lock", "pubspec.lock", "mix.lock", "cabal.project.freeze", "stack.yaml.lock", "renv.lock"], "inapplicable_reason": "no-supply-chain-source",
       "invoke": ["osv-scanner", "--format", "json", "-r", "{target}"], "output": "stdout",
       "findings_path": "results", "flatten": ["packages", "vulnerabilities"],
       "filter": {"field": "id", "startswith": "MAL-"},
