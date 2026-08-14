@@ -33,6 +33,10 @@ Desktop.ini
 
 # ===== Environment & Secrets =====
 .env
+# ...but tests/fixtures/vulnerable-secrets/.env is a fixture of FAKE canary
+# credentials the secrets lane exists to detect. Ignoring it meant every clone
+# scanned a tree with less in it than the author's, and said nothing.
+!tests/fixtures/**/.env
 .env.*
 !.env.example
 *.pem
@@ -75,6 +79,10 @@ yarn-error.log*
 # ===== Rust =====
 target/
 Cargo.lock
+# ...but a Cargo.lock under tests/fixtures/ is test INPUT, not build output.
+# The blanket rule above silently excluded tests/fixtures/depinv/cargo/Cargo.lock,
+# so script-depinv passed locally and failed in every clone and on CI.
+!tests/fixtures/**/Cargo.lock
 # Keep Cargo.lock for binaries, remove this line if building a binary
 
 # ===== C / C++ / CUDA =====

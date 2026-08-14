@@ -21,11 +21,17 @@ run() {  # label, command...
   else
     fail=$((fail+1)); failed="$failed $label"
     printf '  FAIL  %s (see /tmp/ci-local-%s.log)\n' "$label" "$label"
+    # Print the tail inline. On CI that /tmp log is never uploaded, so a
+    # failure used to arrive as a bare test name with the reason discarded —
+    # script-depinv was red for days behind exactly that.
+    printf '  ---- last 25 lines of %s ----\n' "$label"
+    tail -n 25 "/tmp/ci-local-$label.log" 2>/dev/null | sed 's/^/  | /'
+    printf '  ---- end %s ----\n' "$label"
   fi
 }
 
 echo "=== deterministic script suites ==="
-for t in contract-check script-runner script-score script-inventory script-cve-enricher \
+for t in fixtures-tracked contract-check script-runner script-score script-inventory script-cve-enricher \
          script-sarif script-diffscope script-statehome script-statestore \
          script-fingerprint script-changeset script-deltas script-depinv script-versions \
          script-agentscan \
