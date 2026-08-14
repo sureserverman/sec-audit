@@ -1,0 +1,41 @@
+[
+ {
+  "dependency": "electron-native-notify",
+  "version": "1.1.6",
+  "result": {
+   "issues": 2,
+   "errors": {},
+   "results": {
+    "typosquatting": null,
+    "bundled_binary": "package ships a prebuilt binary not present in the source repository",
+    "repository_integrity_mismatch": "published tarball does not match the linked GitHub repository",
+    "capability-network-outbound": [
+     {
+      "message": "makes outbound network calls"
+     }
+    ],
+    "threat-network-reverse-shell": [
+     {
+      "message": "reverse shell pattern"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "dependency": "lodash",
+  "version": "4.17.21",
+  "result": {
+   "issues": 0,
+   "errors": {},
+   "results": {
+    "typosquatting": null,
+    "threat-runtime-system-info": [
+     {
+      "message": "reads system info"
+     }
+    ]
+   }
+  }
+ }
+]

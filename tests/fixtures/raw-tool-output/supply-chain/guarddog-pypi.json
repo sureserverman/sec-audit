@@ -1,0 +1,35 @@
+[
+ {
+  "dependency": "reqeusts",
+  "version": "2.0.0",
+  "result": {
+   "issues": 1,
+   "errors": {},
+   "results": {
+    "typosquatting": "Package name resembles 'requests'",
+    "deceptive_author": null,
+    "capability-filesystem-delete": [
+     {
+      "message": "deletes files"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "dependency": "requests",
+  "version": "2.32.3",
+  "result": {
+   "issues": 0,
+   "errors": {},
+   "results": {
+    "typosquatting": null,
+    "threat-runtime-system-info": [
+     {
+      "message": "reads system info"
+     }
+    ]
+   }
+  }
+ }
+]
