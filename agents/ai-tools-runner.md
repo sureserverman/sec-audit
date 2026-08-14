@@ -35,8 +35,22 @@ server under any circumstance.
 6. **Respect scope.** jq validates ONLY the AI-tool-config
    JSON shapes listed below; not arbitrary `*.json` files
    under target. mcp-scan only sees `.mcp.json`,
-   `claude_desktop_config.json`, and skill / agent markdown
-   trees.
+   `claude_desktop_config.json`, and skill markdown trees —
+   **not** agent markdown, which it does not recognise.
+6a. **Discover skills directories by shape, never by a fixed
+   path.** mcp-scan only finds skills sitting directly beneath
+   the path it is given; aimed at a repository root it reports
+   "no mcp servers or skills found" and exits 0. Locate every
+   directory containing `*/SKILL.md` and invoke mcp-scan once
+   per directory. A marketplace keeps them under
+   `plugins/<plugin>/skills/`, which the old fixed
+   `<target>/skills` invocation missed entirely.
+6b. **Always run `agentscan`** (bundled, see the reference).
+   It covers agent markdown and every skill layout, so it is
+   the lane's floor: mcp-scan being absent degrades the lane to
+   `partial`, never to `unavailable`, as long as agentscan ran.
+   Fold its stderr coverage line (`scanned N skill + M agent
+   file(s)`) into the status record.
 7. **Output goes to `$TMPDIR`.** Never write into the
    caller's tree.
 8. **No host-OS gate** — both tools are cross-platform.

@@ -60,13 +60,31 @@ JSON files in scope (the only ones the runner passes to jq):
 - `.claude/settings.local.json`
 - `opencode.json`
 
+Files in scope for `agentscan` (the third tool, added v1.36.4): every
+`**/SKILL.md` and every `**/agents/*.md` under target, found by shape at any
+depth and in any layout.
+
 Files in scope for mcp-scan:
 
 - All `.mcp.json` discovered above.
 - `claude_desktop_config.json` if present anywhere under target.
-- Skill / agent markdown trees: `skills/**/SKILL.md`,
-  `agents/*.md`, `.claude/agents/*.md`, `.claude/skills/**/SKILL.md`
-  (mcp-scan reads these via its `--skills` flag).
+- Skill markdown trees, via its `--skills` flag — but read the two limits
+  below before trusting a clean result from it.
+
+**mcp-scan does not cover agent markdown.** Until v1.36.4 this file listed
+`agents/*.md` and `.claude/agents/*.md` as in-scope for `--skills`. They are
+not: pointed at a directory of agent files, `snyk-agent-scan inspect --skills`
+reports zero entries and exits 0, because it only recognises skill-shaped
+folders. Agent files are covered by `agentscan` (below) instead.
+
+**mcp-scan finds skills only where they sit directly beneath the path you
+give it.** Aimed at a repository root it prints "no mcp servers or skills
+found" and exits 0 — a clean result for a tree it never opened. A Claude Code
+plugin marketplace keeps skills at `plugins/<plugin>/skills/`, so the old
+`--skills "$target_path/skills"` invocation silently scanned nothing on every
+marketplace-shaped repo. The runner now discovers skills directories by shape
+(any directory containing `*/SKILL.md`) and invokes mcp-scan once per
+directory found.
 
 Not every JSON file in the target tree — only the six AI-tool-
 config shapes above. YAML-fronted Markdown files (`.mdc`,
@@ -109,6 +127,46 @@ validation beyond parse correctness; OAuth token introspection.
 - Primary source: https://jqlang.org/
 
 Source: https://jqlang.org/
+
+### agentscan (bundled, v1.36.4+)
+
+- Install: none — ships with the plugin at
+  `${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/agentscan.py`. Pure stdlib Python,
+  no network, no execution, reads files only.
+- Invocation:
+  ```bash
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/agentscan.py" "$target_path" \
+      > "$TMPDIR/ai-tools-runner-agentscan.jsonl" \
+      2> "$TMPDIR/ai-tools-runner-agentscan.stderr"
+  ```
+- Why it exists: it covers the shape mcp-scan cannot reach (agent markdown)
+  and the layouts mcp-scan silently skips (skills anywhere other than
+  `<target>/skills`). It is not a replacement for mcp-scan — mcp-scan reads
+  MCP server descriptions, which agentscan does not.
+- Output: sec-audit finding JSONL on stdout, already in schema — one object
+  per line, `origin: "ai-tools"`, `tool: "agentscan"`. No mapping table is
+  needed; pass the lines through. stderr carries a one-line coverage summary
+  (`scanned N skill + M agent file(s), K finding(s)`) which the runner should
+  fold into its status record so coverage is visible.
+- Checks, all mechanical:
+
+  | id | severity | what |
+  |---|---|---|
+  | `agentscan:unscoped-tool-grant` | HIGH | `allowed-tools:`/`tools:` naming bare `Bash` or `Bash(*)` |
+  | `agentscan:interpreter-grant` | HIGH | a grant scoped to an interpreter (`bash`, `sh`, `python3`, `sqlite3`, `node`, `env`, `xargs`, …), which an argument filter cannot constrain |
+  | `agentscan:missing-tool-grant` | MEDIUM | no tool key at all — inherits the caller's whole tool set, Write and Edit included |
+  | `agentscan:hidden-unicode` | HIGH | zero-width or bidi-control characters |
+  | `agentscan:hidden-instruction` | MEDIUM | an imperative inside an HTML comment |
+  | `agentscan:instruction-override` | HIGH | prose steering the agent to disregard or conceal from its operator |
+  | `agentscan:exfiltration-shape` | HIGH | a documented `curl \| sh`, or a command sending local data outward |
+
+- False-positive control: a well-written skill documents its own hazards, so
+  the override and exfiltration checks are suppressed under a heading matching
+  pitfall/never/anti-pattern/caveat, and on lines framed negatively
+  (`Never …`, `Do not …`, `Avoid …`). The unicode checks are deliberately NOT
+  suppressed — an invisible character is never documentation.
+
+Source: bundled with this plugin; see `tests/script-agentscan.sh`.
 
 ### mcp-scan (or snyk-agent-scan)
 

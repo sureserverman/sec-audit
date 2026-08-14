@@ -745,18 +745,24 @@ Dispatch discipline.
   (`opencode.json` or `.opencode/`). Inventory values:
   `["claude-code"]`, `["cursor"]`, `["codex"]`, `["opencode"]`, or
   combinations. `AGENTS.md` fires both `codex` and `opencode`.
-- **Tools:** `jq` (universal C-implemented JSON validator;
-  `--exit-status .` mode for structural well-formedness check)
-  AND `mcp-scan inspect --json` (Invariant Labs; rebranded
+- **Tools:** `jq` (universal C-implemented JSON validator, in
+  `--exit-status .` mode for structural well-formedness check),
+  `mcp-scan inspect --json` (Invariant Labs; rebranded
   `snyk-agent-scan` after the Snyk acquisition; Apache-2.0)
   for tool-poisoning + malicious-description detection on
   `.mcp.json` / `claude_desktop_config.json` / skill markdown
-  trees. Static-only: the runner uses `inspect` mode and
-  forbids the `scan` subcommand and
-  `--dangerously-run-mcp-servers`, both of which would launch
-  stdio MCP servers locally. Two-tool lane like SAST
-  (semgrep + bandit) and webext (addons-linter + web-ext +
-  retire). Cross-platform.
+  trees, AND `agentscan` (bundled with this plugin, v1.36.4+)
+  for agent + skill markdown in any layout. Static-only: the
+  runner uses `inspect` mode and forbids the `scan` subcommand
+  and `--dangerously-run-mcp-servers`, both of which would
+  launch stdio MCP servers locally; `agentscan` reads files and
+  executes nothing. Three-tool lane. Cross-platform.
+  **Division of labour:** mcp-scan is the only tool that reads
+  MCP *server* descriptions; `agentscan` is the only tool that
+  reads `agents/*.md` at all, and the only one that finds
+  skills outside `<target>/skills` — mcp-scan aimed at a
+  repository root reports "no skills found" and exits 0, so on
+  a marketplace-shaped repo it scanned nothing before v1.36.4.
 - **Reference packs:** `references/ai-tools/claude-code-plugin.md`,
   `references/ai-tools/claude-code-mcp.md`,
   `references/ai-tools/prompt-injection.md`,
