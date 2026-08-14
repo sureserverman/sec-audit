@@ -890,7 +890,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} image tool must be trivy|grype, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: image findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "jq", "mcp-scan", "guarddog", "osv-scanner", "dep-diff"}:
+            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "jq", "mcp-scan", "agentscan", "guarddog", "osv-scanner", "dep-diff"}:
                 print(f"CONTRACT FAIL: {path}:{i} image finding carries non-image tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         # Origin-aware validation: ai-tools findings must carry `tool` and `origin`.
@@ -898,8 +898,8 @@ with open(path) as fh:
             if "tool" not in obj:
                 print(f"CONTRACT FAIL: {path}:{i} ai-tools finding missing 'tool' field", file=sys.stderr)
                 errs += 1
-            elif obj["tool"] not in {"jq", "mcp-scan"}:
-                print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq|mcp-scan, got {obj['tool']!r}", file=sys.stderr)
+            elif obj["tool"] not in {"jq", "mcp-scan", "agentscan"}:
+                print(f"CONTRACT FAIL: {path}:{i} ai-tools tool must be jq|mcp-scan|agentscan, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: ai-tools findings must NOT carry any other lane's tool name.
             if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner", "dep-diff"}:
@@ -914,7 +914,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} webapp tool must be bearer|njsscan|brakeman, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: webapp findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "guarddog", "osv-scanner", "dep-diff"}:
+            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "agentscan", "guarddog", "osv-scanner", "dep-diff"}:
                 print(f"CONTRACT FAIL: {path}:{i} webapp finding carries non-webapp tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         if obj.get("origin") == "supply-chain":
@@ -925,7 +925,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} supply-chain tool must be guarddog|osv-scanner, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: supply-chain findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "bearer", "njsscan", "brakeman", "dep-diff"}:
+            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "agentscan", "bearer", "njsscan", "brakeman", "dep-diff"}:
                 print(f"CONTRACT FAIL: {path}:{i} supply-chain finding carries non-supply-chain tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         if obj.get("origin") == "deep-deps":
@@ -939,7 +939,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} deep-deps finding verdict must be malicious|suspicious, got {obj.get('verdict')!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: deep-deps findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner"}:
+            if obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "agentscan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner"}:
                 print(f"CONTRACT FAIL: {path}:{i} deep-deps finding carries non-deep-deps tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
         if obj.get("origin") == "secrets":
@@ -950,7 +950,7 @@ with open(path) as fh:
                 print(f"CONTRACT FAIL: {path}:{i} secrets tool must be gitleaks|trufflehog, got {obj['tool']!r}", file=sys.stderr)
                 errs += 1
             # Origin-tag isolation: secrets findings must NOT carry any other lane's tool name.
-            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner", "dep-diff"}:
+            if obj.get("tool") in {"semgrep", "bandit", "zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "gosec", "staticcheck", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "agentscan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner", "dep-diff"}:
                 print(f"CONTRACT FAIL: {path}:{i} secrets finding carries non-secrets tool {obj.get('tool')!r}", file=sys.stderr)
                 errs += 1
 sys.exit(1 if errs else 0)
@@ -2584,7 +2584,7 @@ for line in sys.stdin:
     line = line.strip()
     if not line: continue
     obj = json.loads(line)
-    if obj.get("origin") == "go" and obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner", "dep-diff"}:
+    if obj.get("origin") == "go" and obj.get("tool") in {"semgrep", "bandit", "gitleaks", "trufflehog","zap-baseline", "addons-linter", "web-ext", "retire", "cargo-audit", "cargo-deny", "cargo-geiger", "cargo-vet", "mobsfscan", "apkleaks", "android-lint", "codesign", "spctl", "notarytool", "pkgutil", "stapler", "systemd-analyze", "lintian", "checksec", "binskim", "osslsigncode", "sigcheck", "kube-score", "kubesec", "tfsec", "checkov", "actionlint", "zizmor", "hadolint", "virt-xml-validate", "kics", "phpcs", "cppcheck", "flawfinder", "shellcheck", "pip-audit", "ruff", "ansible-lint", "sing-box", "xray", "trivy", "grype", "jq", "mcp-scan", "agentscan", "bearer", "njsscan", "brakeman", "guarddog", "osv-scanner", "dep-diff"}:
         errs += 1
 sys.exit(1 if errs else 0)
 ' >/dev/null 2>&1; then

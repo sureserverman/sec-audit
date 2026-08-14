@@ -77,9 +77,23 @@ last="$(PATH="$stub" python3 "$runner" "$lane" "$empty" 2>/dev/null | tail -n1)"
 python3 - "$lane" "$last" <<'PY'
 import json, sys
 o = json.loads(sys.argv[2])
-key = "__" + sys.argv[1].replace("-", "_") + "_status__"
-assert o.get(key) == "unavailable" and o.get("tools") == [], o
-print("  no-tools -> unavailable sentinel: OK")
+lane = sys.argv[1]
+key = "__" + lane.replace("-", "_") + "_status__"
+cfg = json.load(open(f"scripts/secaudit/lanes/{lane}.json"))
+bundled = sorted(t["name"] for t in cfg["tools"] if t.get("bundled"))
+if bundled:
+    # A bundled tool ships with the plugin and cannot be missing, so this lane
+    # has no `unavailable` state — scrubbing PATH can only reach `partial`,
+    # with the bundled tool still reporting and every external tool skipped.
+    external = {t["name"] for t in cfg["tools"] if not t.get("bundled")}
+    skipped = {e.get("tool") for e in (o.get("skipped") or [])}
+    assert o.get(key) == "partial", o
+    assert o.get("tools") == bundled, o
+    assert external <= skipped, (external, skipped)
+    print(f"  no-tools -> partial, bundled {bundled} still ran: OK")
+else:
+    assert o.get(key) == "unavailable" and o.get("tools") == [], o
+    print("  no-tools -> unavailable sentinel: OK")
 PY
 
 # --files scoping (--diff mode): the {files:GLOB} expansion must intersect with

@@ -33,6 +33,35 @@ if [ ! -d "$target" ]; then
     exit 1
 fi
 
+# ---- Step 0: agentscan covers the shape mcp-scan cannot see ----
+# mcp-scan reports zero entries for a directory of agent markdown, so before
+# v1.36.4 nothing examined agents/*.md at all. agentscan is bundled, so this
+# check runs on every host regardless of what is installed.
+echo "ai-tools-e2e: agentscan agent-markdown coverage..."
+as_out="$(python3 "$plugin_root/scripts/secaudit/agentscan.py" "$target" 2>/dev/null)"
+for want in "agents/poisoned-agent.md" "agentscan:unscoped-tool-grant" \
+            "agentscan:hidden-unicode" "agentscan:instruction-override" \
+            "agentscan:hidden-instruction"; do
+    printf '%s' "$as_out" | grep -q -- "$want" || {
+        echo "ai-tools-e2e: FAIL — agentscan missed $want" >&2; exit 1; }
+done
+printf '%s' "$as_out" | grep -q 'skills/poisoned-skill/SKILL.md' || {
+    echo "ai-tools-e2e: FAIL — agentscan missed the poisoned skill" >&2; exit 1; }
+echo "  agentscan: agent + skill markdown both covered, 4 detectors fired"
+
+# The lane must still be usable when mcp-scan is absent, because agentscan
+# ships with the plugin — `unavailable` would be a lie for this lane.
+# python3 must stay reachable (it runs the engine), so scrub PATH to a
+# python3-only stub — the same technique script-runner.sh uses.
+stub="$(mktemp -d)"; ln -sf "$(command -v python3)" "$stub/python3"
+last_line="$(PATH="$stub" python3 "$plugin_root/scripts/secaudit/runner.py" \
+    ai-tools "$target" 2>/dev/null | tail -n1)"
+rm -rf "$stub"
+printf '%s' "$last_line" | grep -q '"__ai_tools_status__": *"partial"' || {
+    echo "ai-tools-e2e: FAIL — scrubbed PATH should degrade to partial, got: $last_line" >&2
+    exit 1; }
+echo "  bundled floor: scrubbed PATH degrades to partial, not unavailable"
+
 # ---- Step 1: fixture-content sanity ----
 echo "ai-tools-e2e: validating fixture content..."
 

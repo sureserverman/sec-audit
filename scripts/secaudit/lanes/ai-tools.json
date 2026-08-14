@@ -1,0 +1,63 @@
+{
+  "lane": "ai-tools",
+  "status_key": "__ai_tools_status__",
+  "origin": "ai-tools",
+  "reference": "ai-tools-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "mcp-scan is NOT defined here and stays agent-driven: it must be invoked once per directory that directly contains skill folders, and that discovery is not expressible in this schema (there is no {dirs:} placeholder). Aimed at a target root it exits 0 reporting nothing, so a naive lane entry would manufacture a clean result. jq and agentscan are fully mechanical and belong here.",
+  "tools": [
+    {
+      "name": "jq",
+      "probe": "jq",
+      "mode": "validator",
+      "file_select": {
+        "glob": "plugin.json|marketplace.json|.mcp.json|settings.json|settings.local.json|opencode.json|claude_desktop_config.json"
+      },
+      "invoke": [
+        "jq",
+        "--exit-status",
+        ".",
+        "{file}"
+      ],
+      "inapplicable_reason": "no-ai-tool-config",
+      "dedupe_by": "file",
+      "synth": {
+        "id": "jq:invalid-json",
+        "severity": "MEDIUM",
+        "cwe": "CWE-1284",
+        "title": "AI-tool config file is not well-formed JSON",
+        "evidence": "{msg}",
+        "reference_url": "https://jqlang.org/",
+        "fix_recipe": null,
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "agentscan",
+      "probe": "python3",
+      "invoke": [
+        "python3",
+        "{scripts}/agentscan.py",
+        "{target}"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "bundled": true,
+      "_note": "ships with the plugin, so it cannot be missing. A lane with a bundled tool has no `unavailable` state: the worst case is `partial` with every external tool skipped."
+    }
+  ]
+}

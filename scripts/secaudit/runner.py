@@ -344,7 +344,9 @@ def _build_argv(invoke, target, tmp, scope=None):
                         if _in_scope(target, p, scope):
                             argv.append(p)
         else:
-            argv.append(a.replace("{target}", target).replace("{tmp}", tmp))
+            argv.append(a.replace("{target}", target)
+                         .replace("{tmp}", tmp)
+                         .replace("{scripts}", os.path.dirname(os.path.abspath(__file__))))
     return argv
 
 
@@ -375,12 +377,12 @@ def _select_files(target, fsel, scope=None):
     `find ... -exec grep -l` precondition."""
     import fnmatch
     import re
-    glob = fsel.get("glob", "*")
+    globs = fsel.get("glob", "*").split("|")   # any-of, as in {files:a|b}
     rx = re.compile(fsel["grep"]) if fsel.get("grep") else None
     sel = []
     for root, _d, files in _walk(target):
         for fn in sorted(files):
-            if not fnmatch.fnmatch(fn, glob):
+            if not any(fnmatch.fnmatch(fn, g) for g in globs):
                 continue
             p = os.path.join(root, fn)
             if not _in_scope(target, p, scope):
@@ -412,7 +414,10 @@ def run_live(lane, target, scope=None):
                 continue
             rows = []
             for fp in files:
-                argv = [a.replace("{file}", fp) for a in tc["invoke"]]
+                argv = [a.replace("{file}", fp)
+                         .replace("{target}", target)
+                         .replace("{scripts}", os.path.dirname(os.path.abspath(__file__)))
+                        for a in tc["invoke"]]
                 try:
                     proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
                 except Exception as e:
