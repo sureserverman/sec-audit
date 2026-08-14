@@ -30,6 +30,28 @@ printf -- '---\nname: a\ntools: Read, Bash\n---\nbody\n' > "$t/agents/a.md"
 echo "  agents/*.md scanned and graded: OK"
 
 # ---------------------------------------------------------------------------
+echo "=== commands are scanned too (a grant must not vanish by moving) ==="
+# Moving a shell call from a skill into its command genuinely reduces
+# reachability — a command runs only when the user types it — but the grant
+# still exists. Scanning only skills would report that move as elimination.
+t="$scratch/cmd"; mkdir -p "$t/commands"
+printf -- '---\ndescription: does a thing\nallowed-tools: Bash(bash:*), Read\n---\nbody\n' \
+    > "$t/commands/doit.md"
+[ "$(ids "$t")" = "agentscan:interpreter-grant" ] \
+    || { echo "FAIL: command not scanned: $(ids "$t")"; exit 1; }
+python3 "$as" "$t" 2>&1 >/dev/null | grep -q '1 command file' \
+    || { echo "FAIL: command count missing from the coverage line"; exit 1; }
+echo "  commands/*.md scanned and counted: OK"
+
+echo "=== a command with no allowed-tools key is NOT flagged ==="
+# Unlike a skill, a command commonly omits the key; treating that as the same
+# hazard would bury the real ones.
+t="$scratch/cmdnokey"; mkdir -p "$t/commands"
+printf -- '---\ndescription: plain command\n---\nbody\n' > "$t/commands/plain.md"
+[ "$(count "$t")" = "0" ] || { echo "FAIL: bare command flagged: $(ids "$t")"; exit 1; }
+echo "  command without a tool key: clean, OK"
+
+# ---------------------------------------------------------------------------
 echo "=== detector: bare Bash -> unscoped-tool-grant ==="
 t="$scratch/bare"; mkdir -p "$t/skills/s"
 printf -- '---\nname: s\nallowed-tools: Read, Glob, Bash\n---\nbody\n' > "$t/skills/s/SKILL.md"

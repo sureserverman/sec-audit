@@ -143,6 +143,12 @@ def is_agent_or_skill(path: str) -> str | None:
         return "skill"
     if base.endswith(".md") and "agents" in parts[:-1]:
         return "agent"
+    # Commands declare `allowed-tools:` from the same vocabulary and can hold the
+    # same grants. Omitting them let a grant "disappear" simply by moving from a
+    # skill into its command — a real reduction in reachability, but not the
+    # elimination the finding count implied.
+    if base.endswith(".md") and "commands" in parts[:-1]:
+        return "command"
     return None
 
 
@@ -202,6 +208,8 @@ def finding(fid, severity, cwe, title, path, line, evidence, target, confidence=
 def check_tool_grant(path, kind, fields, target):
     out = []
     key = next((k for k in FRONTMATTER_TOOL_KEYS if k in fields), None)
+    if key is None and kind == "command":
+        return out          # commands commonly omit the key; not the skill hazard
     if key is None:
         out.append(finding(
             "missing-tool-grant", "MEDIUM", "CWE-693",
@@ -287,7 +295,7 @@ def check_text(path, kind, text, target):
 
 
 def scan(target: str):
-    findings, counts = [], {"skill": 0, "agent": 0}
+    findings, counts = [], {"skill": 0, "agent": 0, "command": 0}
     for path, kind in walk(target):
         counts[kind] += 1
         try:
@@ -314,8 +322,8 @@ def main(argv):
     for f in findings:
         sys.stdout.write(json.dumps(f, sort_keys=True) + "\n")
     sys.stderr.write(
-        f"agentscan: scanned {counts['skill']} skill + {counts['agent']} agent "
-        f"file(s), {len(findings)} finding(s)\n")
+        f"agentscan: scanned {counts['skill']} skill + {counts['agent']} agent + "
+        f"{counts['command']} command file(s), {len(findings)} finding(s)\n")
     return 0
 
 
