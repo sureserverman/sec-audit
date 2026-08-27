@@ -2,7 +2,7 @@
 name: netcfg-runner
 description: "Networking-config static-analysis adapter for sec-audit. Runs sing-box check and xray test against netcfg-shaped files under target_path; emits JSONL findings tagged origin: \"netcfg\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.23."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # netcfg-runner
@@ -28,12 +28,18 @@ sec-expert reading the reference packs.
 4. **JSONL on stdout; one trailing `__netcfg_status__`
    record.**
 5. **Respect scope.** Scan only files under `target_path`.
-   ALWAYS use the validation subcommands (`sing-box check`,
-   `xray test -confdir`) which parse without starting
-   listeners or network activity. NEVER use `sing-box run`
-   or `xray run`.
-6. **Output goes to `$TMPDIR`.** Never write into the
-   caller's tree.
+   ALWAYS use the validation form, which parses without
+   starting listeners or network activity: `sing-box check`,
+   and `xray run -test`. **`-test` is mandatory whenever
+   `xray run` appears** — it checks the config and exits
+   instead of launching the server. There is no `xray test`
+   subcommand: it exits `unknown command`, and a runner that
+   invokes it reports the tool's own usage error as if the
+   caller's config were malformed. NEVER use `sing-box run`,
+   and never `xray run` without `-test`.
+6. **Never write into the caller's tree.** The engine owns
+   every intermediate file and keeps them in its own temp
+   directory; you invoke it and read stdout.
 7. **No host-OS gate** — both tools cross-platform.
 
 ## Finding schema
@@ -67,126 +73,52 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `references/netcfg-tools.md`; extract invocations,
-field mappings, and the skip vocabulary.
-
-### Step 2 — Resolve target + probe tools + check applicability
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-command -v sing-box 2>/dev/null
-command -v xray 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" netcfg <target_path>
 ```
 
-Build `tools_available`. Then check applicability:
+The engine probes both tools (`command -v sing-box`, `command -v xray`), checks
+applicability, runs each as a per-file **validator**, and maps results to the
+Finding schema above per `netcfg-tools.md`:
 
-- **sing-box applicable** iff `tools_available` contains
-  `sing-box` AND find sing-box-shaped JSON files (top-level
-  `inbounds` + `outbounds` arrays with sing-box vocabulary):
+- **sing-box** (`sing-box check -c <file>`): a non-zero exit synthesizes one
+  `sing-box:invalid-config` finding (`CWE-1284`, MEDIUM) from the diagnostic —
+  one per failing file.
+- **xray** (`xray run -test -c <file>`): same shape, `xray:invalid-config`.
+  `-test` loads and checks the config and exits **without launching the
+  server** — `Configuration OK.` and exit 0 when valid, exit 23 with a
+  `Failed to start:` diagnostic when not. There is no `xray test` subcommand;
+  see **Hard rules** 5.
 
-  ```bash
-  singbox_files=$( find "$target_path" -type f -name '*.json' \
-                       -exec grep -l '"inbounds"' {} + 2>/dev/null \
-                   | xargs -I{} sh -c 'grep -lE "\"type\"\s*:\s*\"(socks|http|mixed|vless|trojan|hysteria|hysteria2|tuic|naive|shadowsocks)\"" "{}" 2>/dev/null' )
-  ```
+**Applicability is by content, not filename** — both tools eat `*.json`, so a
+file qualifies for a tool only if it holds an `inbounds` array AND that
+dialect's protocol vocabulary (sing-box: `type` ∈ socks/http/mixed/vless/
+trojan/hysteria/hysteria2/tuic/naive/shadowsocks; xray: `protocol` ∈ vless/
+vmess/trojan/shadowsocks/dokodemo-door/freedom/blackhole). A sing-box config is
+therefore never handed to xray or the reverse. A tool absent from PATH is a
+`tool-missing` skip; a tool on PATH with no config of its dialect is a
+`no-singbox-config` / `no-xray-config` skip, not a failure.
 
-  If sing-box on PATH but no sing-box-shaped JSON, record
-  skipped entry `{"tool": "sing-box", "reason":
-  "no-singbox-config"}`.
+Output is faithful JSONL — every line `origin: "netcfg"`, `tool: "sing-box" |
+"xray"` — then one `__netcfg_status__` record. When no tool ran, the only line is
+the unavailable sentinel:
 
-- **xray applicable** iff `tools_available` contains `xray`
-  AND find Xray-shaped JSON files (top-level `inbounds` +
-  `outbounds` arrays with Xray vocabulary):
-
-  ```bash
-  xray_files=$( find "$target_path" -type f -name '*.json' \
-                    -exec grep -l '"inbounds"' {} + 2>/dev/null \
-                | xargs -I{} sh -c 'grep -lE "\"protocol\"\s*:\s*\"(vless|vmess|trojan|shadowsocks|dokodemo-door|freedom|blackhole)\"" "{}" 2>/dev/null' )
-  ```
-
-  If xray on PATH but no Xray-shaped JSON, record skipped
-  entry `{"tool": "xray", "reason": "no-xray-config"}`.
-
-If `tools_available` is empty AND no applicability matched,
-emit unavailable sentinel with `tool-missing` skipped
-entries for absent tools, exit 0.
-
-### Step 3 — Run each available + applicable tool
-
-**sing-box check** (per file):
-
-```bash
-: > "$TMPDIR/netcfg-runner-singbox.tsv"
-for f in $singbox_files; do
-    out=$( sing-box check -c "$f" 2>&1 )
-    rc=$?
-    rel="${f#$target_path/}"
-    printf '%s\t%d\t%s\n' "$rel" "$rc" "$out" \
-        >> "$TMPDIR/netcfg-runner-singbox.tsv"
-done
-rc_sb=0
+```json
+{"__netcfg_status__": "unavailable", "tools": []}
 ```
 
-**xray test** (per directory containing Xray configs):
+### Step 2 — Polish (presentation only)
 
-```bash
-: > "$TMPDIR/netcfg-runner-xray.tsv"
-xray_dirs=$( for f in $xray_files; do dirname "$f"; done | sort -u )
-for d in $xray_dirs; do
-    out=$( xray test -confdir "$d" 2>&1 )
-    rc=$?
-    rel="${d#$target_path/}"
-    [ -z "$rel" ] && rel="."
-    printf '%s\t%d\t%s\n' "$rel" "$rc" "$out" \
-        >> "$TMPDIR/netcfg-runner-xray.tsv"
-done
-rc_xr=0
-```
-
-### Step 4 — Parse outputs
-
-**sing-box check** (TSV walk; one row per file; only
-non-zero rc emits a finding):
-
-```bash
-awk -F '\t' '
-  $2 != 0 {
-    rel=$1; msg=$3;
-    line=0;
-    if (match(msg, /line[[:space:]]+([0-9]+)/, arr)) line=arr[1];
-    gsub(/"/, "\\\"", msg);
-    snippet=substr(msg, 1, 200);
-    printf "{\"id\":\"sing-box:invalid-config\",\"severity\":\"MEDIUM\",\"cwe\":\"CWE-1284\",\"title\":\"%s\",\"file\":\"%s\",\"line\":%d,\"evidence\":\"%s\",\"reference\":\"netcfg-tools.md\",\"reference_url\":\"https://sing-box.sagernet.org/configuration/\",\"fix_recipe\":null,\"confidence\":\"high\",\"origin\":\"netcfg\",\"tool\":\"sing-box\"}\n", snippet, rel, line, snippet
-  }
-' "$TMPDIR/netcfg-runner-singbox.tsv"
-```
-
-**xray test** (same shape):
-
-```bash
-awk -F '\t' '
-  $2 != 0 {
-    rel=$1; msg=$3;
-    line=0;
-    if (match(msg, /line[[:space:]]+([0-9]+)/, arr)) line=arr[1];
-    gsub(/"/, "\\\"", msg);
-    snippet=substr(msg, 1, 200);
-    printf "{\"id\":\"xray:invalid-config\",\"severity\":\"MEDIUM\",\"cwe\":\"CWE-1284\",\"title\":\"%s\",\"file\":\"%s\",\"line\":%d,\"evidence\":\"%s\",\"reference\":\"netcfg-tools.md\",\"reference_url\":\"https://xtls.github.io/config/\",\"fix_recipe\":null,\"confidence\":\"high\",\"origin\":\"netcfg\",\"tool\":\"xray\"}\n", snippet, rel, line, snippet
-  }
-' "$TMPDIR/netcfg-runner-xray.tsv"
-```
-
-### Step 5 — Status summary
-
-The unavailable sentinel (no tool ran / preconditions unmet) is exactly
-`{"__netcfg_status__": "unavailable", "tools": []}`.
-
-Standard four shapes: ok / ok+skipped / partial /
-unavailable. Skip vocabulary:
-- `tool-missing`
-- `no-singbox-config` (sing-box-applicable target-shape skip)
-- `no-xray-config` (xray-applicable target-shape skip)
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__netcfg_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 
@@ -196,8 +128,8 @@ unavailable. Skip vocabulary:
 
 ## What you MUST NOT do
 
-- Do NOT use `sing-box run` or `xray run` — those start
-  listeners and may bind ports / contact the network. Use
+- Do NOT use `sing-box run`, or `xray run` without `-test` —
+  those start listeners and may bind ports / contact the network. Use
   ONLY the validation subcommands (`sing-box check`,
   `xray test`).
 - Do NOT lint torrc or WireGuard *.conf with this runner —

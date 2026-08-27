@@ -36,7 +36,29 @@ for reason in tool-missing no-singbox-config no-xray-config; do
 done
 # Critical: must use the STRUCTURAL validator subcommands, not run.
 grep -q "sing-box check" "$plugin_root/agents/netcfg-runner.md" || { echo "netcfg-drill: FAIL — missing sing-box check (must use structural validator, not run)" >&2; exit 1; }
-grep -q "xray test" "$plugin_root/agents/netcfg-runner.md" || { echo "netcfg-drill: FAIL — missing xray test" >&2; exit 1; }
+# `xray test` is NOT a subcommand — it exits `unknown command`, which a runner
+# would report as the caller's config being malformed. The validation form is
+# `xray run -test`, and the bare `run` form (which launches the server) must
+# never appear. Asserted on the lane definition, where the invocation now lives.
+grep -q "xray run -test" "$plugin_root/agents/netcfg-runner.md" || { echo "netcfg-drill: FAIL — missing xray run -test validation form" >&2; exit 1; }
+grep -q '"xray test"' "$plugin_root/scripts/secaudit/lanes/netcfg.json" && { echo "netcfg-drill: FAIL — lane uses the non-existent 'xray test' subcommand" >&2; exit 1; }
+python3 - "$plugin_root/scripts/secaudit/lanes/netcfg.json" <<'PYEOF' || exit 1
+import json, sys
+lane = json.load(open(sys.argv[1]))
+for tool in lane["tools"]:
+    argv = tool["invoke"]
+    if tool["name"] == "xray":
+        if argv[:4] != ["xray", "run", "-test", "-c"]:
+            print(f"netcfg-drill: FAIL — xray invoke is {argv}, expected xray run -test -c", file=sys.stderr)
+            sys.exit(1)
+    if tool["name"] == "sing-box":
+        if argv[:3] != ["sing-box", "check", "-c"]:
+            print(f"netcfg-drill: FAIL — sing-box invoke is {argv}, expected sing-box check -c", file=sys.stderr)
+            sys.exit(1)
+    if "run" in argv and "-test" not in argv:
+        print(f"netcfg-drill: FAIL — {tool['name']} invokes run without -test (would launch a server)", file=sys.stderr)
+        sys.exit(1)
+PYEOF
 
 offline_out="$scratch/netcfg-offline.jsonl"
 echo '{"__netcfg_status__": "unavailable", "tools": [], "skipped": [{"tool": "sing-box", "reason": "tool-missing"}, {"tool": "xray", "reason": "tool-missing"}]}' > "$offline_out"

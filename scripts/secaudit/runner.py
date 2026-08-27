@@ -16,6 +16,7 @@ Modes:
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -278,6 +279,17 @@ def _validator_items(lane, toolcfg, tsv_text):
             m = re.search(line_re, msg)
             if m:
                 line = int(m.group(1))
+        # `message_regex` narrows a chatty validator's combined output to the
+        # part that is actually the diagnostic. xray prints a version banner and
+        # a run of [Info] lines before its error, and without this the finding's
+        # title would be the banner. Group 1 if the pattern captures, else the
+        # whole match; no match leaves the message as-is rather than blanking
+        # it, so a changed output format degrades to noisy, never to empty.
+        msg_re = toolcfg.get("message_regex")
+        if msg_re:
+            mm = re.search(msg_re, msg)
+            if mm:
+                msg = mm.group(1) if mm.groups() else mm.group(0)
         snippet = msg[:200]
         f = dict(lane.get("finding_const", {}))
         for k, v in synth.items():
@@ -389,6 +401,9 @@ def _applicable(toolcfg, target, scope=None):
     return False
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
 def _select_files(target, fsel, scope=None):
     """Files a validator should check: name-glob match, optional content grep
     (e.g. *.xml containing a libvirt root element). Mirrors the agent's
@@ -444,7 +459,11 @@ def run_live(lane, target, scope=None):
                     sys.stderr.write(f"runner: {tc['name']} failed on {fp}: {e}\n")
                     continue
                 rel = os.path.relpath(fp, target)
-                combined = (proc.stdout + proc.stderr).replace("\t", " ").replace("\n", " ").strip()
+                # Strip ANSI SGR sequences: sing-box colourises its diagnostics,
+                # and the raw escapes would land in a finding's title/evidence
+                # and render as garbage in the report.
+                combined = _ANSI_RE.sub("", proc.stdout + proc.stderr)
+                combined = combined.replace("\t", " ").replace("\n", " ").strip()
                 rows.append(f"{rel}\t{proc.returncode}\t{combined}")
             try:
                 findings.extend(map_raw(lane, tc, "\n".join(rows)))
