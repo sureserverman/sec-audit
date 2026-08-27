@@ -328,10 +328,27 @@ def _in_scope(target, path, scope):
     return os.path.relpath(path, target) in scope
 
 
-def _build_argv(invoke, target, tmp, scope=None):
-    """Substitute {target}/{tmp}; expand a `{files:GLOB}` arg into the matching
-    files under target (for tools that take a file list, e.g. shellcheck). When
-    `scope` is a set of changed relpaths (--diff), only those files are passed."""
+def _probe_bin(toolcfg):
+    """First available binary named by `probe`, or None.
+
+    `probe` is normally one name. It may also be a LIST of interchangeable
+    names, for a tool published under more than one (mcp-scan also ships as
+    snyk-agent-scan). The resolved name is substituted for `{probe}` in
+    `invoke`, so a wrapper is handed the binary that was actually found rather
+    than re-deriving it and possibly disagreeing with the probe."""
+    probe = toolcfg["probe"]
+    names = [probe] if isinstance(probe, str) else list(probe)
+    for n in names:
+        if shutil.which(n):
+            return n
+    return None
+
+
+def _build_argv(invoke, target, tmp, scope=None, probe=None):
+    """Substitute {target}/{tmp}/{probe}; expand a `{files:GLOB}` arg into the
+    matching files under target (for tools that take a file list, e.g.
+    shellcheck). When `scope` is a set of changed relpaths (--diff), only those
+    files are passed."""
     import fnmatch
     argv = []
     for a in invoke:
@@ -346,6 +363,7 @@ def _build_argv(invoke, target, tmp, scope=None):
         else:
             argv.append(a.replace("{target}", target)
                          .replace("{tmp}", tmp)
+                         .replace("{probe}", probe or "")
                          .replace("{scripts}", os.path.dirname(os.path.abspath(__file__))))
     return argv
 
@@ -403,7 +421,8 @@ def run_live(lane, target, scope=None):
     ran, skipped = [], []
     tmp = tempfile.mkdtemp()
     for tc in lane["tools"]:
-        if not shutil.which(tc["probe"]):
+        probe_bin = _probe_bin(tc)
+        if probe_bin is None:
             skipped.append({"tool": tc["name"], "reason": "tool-missing"})
             continue
         if tc.get("mode") == "validator":
@@ -416,6 +435,7 @@ def run_live(lane, target, scope=None):
             for fp in files:
                 argv = [a.replace("{file}", fp)
                          .replace("{target}", target)
+                         .replace("{probe}", probe_bin)
                          .replace("{scripts}", os.path.dirname(os.path.abspath(__file__)))
                         for a in tc["invoke"]]
                 try:
@@ -436,7 +456,7 @@ def run_live(lane, target, scope=None):
             skipped.append({"tool": tc["name"],
                             "reason": tc.get("inapplicable_reason", "tool-missing")})
             continue
-        argv = _build_argv(tc["invoke"], target, tmp, scope)
+        argv = _build_argv(tc["invoke"], target, tmp, scope, probe_bin)
         env = os.environ.copy()
         env.update(tc.get("env", {}))
         try:
@@ -444,6 +464,15 @@ def run_live(lane, target, scope=None):
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} failed: {e}\n")
             continue
+        if tc.get("fail_on_rc") and proc.returncode != 0:
+            # A bundled wrapper opts into this: non-zero means it could not
+            # finish reading the target. Its findings are still mapped below —
+            # what changes is that the lane reports `partial` with a reason
+            # instead of a clean `ok` over a target it did not fully inspect.
+            # Deliberately NOT applied to external tools, which routinely exit
+            # non-zero merely because they found something.
+            skipped.append({"tool": tc["name"],
+                            "reason": tc.get("failure_reason", "run-incomplete")})
         out = tc["output"]
         if out == "stdout":
             raw = proc.stdout
