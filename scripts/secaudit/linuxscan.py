@@ -62,17 +62,30 @@ PRUNE = {
 }
 TIMEOUT = 600
 
-# CWE assignments. Deliberately NOT invented here: these are the mappings the
-# repository already carried — the systemd/lintian entries are transcribed from
-# tests/fixtures/vulnerable-linux/.pipeline/linux.jsonl, the checksec ones from
-# linux-runner.md Step 6 ("CWE-693 default; CWE-426 for rpath/runpath"). Any
+# CWE assignments. Deliberately NOT invented here: the systemd table is
+# transcribed from references/desktop/linux-systemd.md and the lintian/checksec
+# ones from linux-runner.md Step 6 ("CWE-693 default; CWE-426 for
+# rpath/runpath") and the same reference pack. Any
 # directive or tag not listed gets `null`, which is the rule the runner already
 # states for unmapped lintian tags. Extend from a cited source, never by guess.
+# Keyed by the directive name systemd-analyze reports in `json_field`, matched
+# on the part before any `_` suffix (`SystemCallFilter_resources` ->
+# `SystemCallFilter`, `RestrictAddressFamilies_AF_UNIX` ->
+# `RestrictAddressFamilies`). Transcribed from
+# references/desktop/linux-systemd.md, which is the cited source of record.
 SYSTEMD_CWE = {
     "ProtectSystem": "CWE-732",
     "PrivateTmp": "CWE-377",
     "NoNewPrivileges": "CWE-250",
+    "CapabilityBoundingSet": "CWE-269",
+    "SystemCallFilter": "CWE-693",
+    "ReadWritePaths": "CWE-732",
+    "User": "CWE-250",
     "UserOrDynamicUser": "CWE-250",
+    "RestrictAddressFamilies": "CWE-284",
+    "SetCredential": "CWE-312",
+    "StandardOutput": "CWE-532",
+    "StandardError": "CWE-532",
 }
 LINTIAN_CWE = {
     "maintainer-script-without-set-e": "CWE-390",
@@ -172,8 +185,9 @@ def do_systemd(target):
                 continue
             sev = "HIGH" if exp >= 0.5 else "MEDIUM" if exp >= 0.2 else "LOW"
             field = str(row.get("json_field") or row.get("name") or "unknown")
+            cwe = SYSTEMD_CWE.get(field) or SYSTEMD_CWE.get(field.split("_", 1)[0])
             out.append(finding(
-                f"systemd-analyze:{field}", sev, SYSTEMD_CWE.get(field),
+                f"systemd-analyze:{field}", sev, cwe,
                 row.get("description", ""), unit, 0,
                 f"exposure {row.get('exposure')}: {row.get('description', '')}",
                 "systemd-analyze", target,
