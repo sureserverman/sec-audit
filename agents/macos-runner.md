@@ -2,7 +2,7 @@
 name: macos-runner
 description: "Desktop macOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, pkgutil, and stapler on macOS hosts with bundle/pkg artifacts under target_path; emits JSONL findings tagged origin: \"macos\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.13."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # macos-runner
@@ -75,140 +75,62 @@ key — matching §2), emit unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
-Extract the iOS subsections (for codesign / spctl invocations and
-their field-mappings — shared with ios-runner) AND the macOS
-subsections added in v0.11 (pkgutil + stapler canonical invocations,
-per-tool finding mappings, the `__macos_status__` sentinel contract
-and the `no-pkg` skip reason).
-
-### Step 2 — Resolve the target path
-
-Try stdin → `$1` → `$MACOS_TARGET_PATH`. Verify readable dir with
-macOS signals. If not, emit unavailable sentinel and exit 0.
-
-### Step 3 — Probe host, tools, target shapes
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-host_os=$(uname -s 2>/dev/null || echo Unknown)
-
-command -v mobsfscan 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v codesign 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v spctl 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v pkgutil 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v xcrun 2>/dev/null
-
-# Target shape detection
-find "$target_path" -maxdepth 6 -type d \( -name '*.app' -o -name '*.framework' -o -name '*.xcarchive' \) \
-    -not -path '*/.git/*' > "$TMPDIR/macos-runner-bundles.txt"
-find "$target_path" -maxdepth 6 -type f \( -name '*.pkg' -o -name '*.dmg' \) \
-    -not -path '*/.git/*' > "$TMPDIR/macos-runner-pkgs.txt"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" macos <target_path>
 ```
 
-Build `tools_available`, `tools_clean_skipped`, `tools_failed`:
+The engine probes each tool — `command -v mobsfscan`, `command -v codesign`,
+`command -v spctl`, `command -v pkgutil`, `command -v xcrun` —
+checks applicability, and maps results to the Finding schema above:
 
-- **mobsfscan** — available iff on PATH (no host gate, no target-
-  shape gate; works against any Swift/Obj-C source).
-- **codesign** — on PATH AND `host_os=Darwin` AND at least one bundle
-  in `macos-runner-bundles.txt`. Else skip with the missing-
-  precondition reason.
-- **spctl** — same preconditions as codesign.
-- **pkgutil** — on PATH AND `host_os=Darwin` AND at least one entry
-  in `macos-runner-pkgs.txt`. Else skip with reason per preconditions
-  (NEW `no-pkg` reason when bundle present but no `.pkg`).
-- **stapler** — on PATH (xcrun) AND `host_os=Darwin` AND at least
-  one artifact (bundle OR pkg). Skip with `no-bundle`+`no-pkg`
-  (whichever matches).
+- **mobsfscan** (`mobsfscan --json <target_path>`, cross-platform, one pass over
+  the Swift/Obj-C source): each rule hit maps to one finding — `ERROR`→HIGH,
+  `WARNING`→MEDIUM, `INFO`→LOW; `cwe` is the rule's own CWE; `reference_url` is
+  the rule's reference. Note `--json` writes to **stdout**; `--output -` does
+  not — it creates a file literally named `-` and leaves stdout empty.
 
-Write one stderr line per classification.
+The Apple signing tools run only on a **Darwin host** and only against
+artifacts that exist under the target; on any other host, or with no artifact,
+each is a clean skip (`requires-macos-host` / `no-bundle` / `no-pkg` /
+`no-notary-profile`), never a failure and never silence.
+- **codesign** (`codesign -dv --entitlements :- --xml --verbose=4 <bundle>`,
+  once per `.app`/`.framework`/`.xcarchive`): the entitlements plist comes back
+  on stdout and the signing metadata on stderr. Each hardened-runtime exception
+  set to true emits one finding, per the table in
+  `references/desktop/macos-hardened-runtime.md` — `cs.allow-jit` CWE-693,
+  `cs.allow-unsigned-executable-memory` CWE-749,
+  `cs.allow-dyld-environment-variables` CWE-426,
+  `cs.disable-library-validation` CWE-347, `get-task-allow` CWE-489. An unsigned
+  bundle, or a signature with no `Authority=` chain, emits its own HIGH finding.
+- **spctl** (`spctl --assess --verbose=2 <bundle>`): a verdict that is not
+  `accepted` emits one HIGH `CWE-693` finding carrying Gatekeeper's own reason.
+- **pkgutil** (`pkgutil --check-signature <pkg>`, once per `.pkg`/`.mpkg`):
+  `no signature` or `signature failed validation` emits one HIGH `CWE-693`
+  finding.
+- **stapler** (`xcrun stapler validate <artifact>`, over bundles and packages):
+  anything other than `The validate action worked!` emits one MEDIUM `CWE-693`
+  finding with a staple-the-ticket fix recipe.
 
-### Step 4 — Handle the "all unavailable" case
+Output is faithful JSONL — every line `origin: "macos"` — then one
+`__macos_status__` record. A tool absent from PATH is a `tool-missing` skip.
+When no tool ran, the only line is the unavailable sentinel:
 
-If `tools_available` is empty, emit
-`{"__macos_status__": "unavailable", "tools": [], "skipped": [...]}`
-with the populated skipped list, exit 0.
-
-### Step 5 — Run each available tool
-
-**mobsfscan**:
-
-```bash
-mobsfscan --json --output - "$target_path" \
-  > "$TMPDIR/macos-runner-mobsfscan.json" \
-  2> "$TMPDIR/macos-runner-mobsfscan.stderr"
-rc_mob=$?
+```json
+{"__macos_status__": "unavailable", "tools": []}
 ```
 
-**codesign** (per bundle):
+### Step 2 — Polish (presentation only)
 
-```bash
-while IFS= read -r bundle; do
-    codesign -dv --entitlements :- --xml --verbose=4 "$bundle" \
-        > "$TMPDIR/macos-runner-codesign-$(basename "$bundle").xml" \
-        2> "$TMPDIR/macos-runner-codesign-$(basename "$bundle").stderr"
-done < "$TMPDIR/macos-runner-bundles.txt"
-```
-
-**spctl** (per bundle):
-
-```bash
-while IFS= read -r bundle; do
-    spctl --assess --verbose=2 "$bundle" \
-        2> "$TMPDIR/macos-runner-spctl-$(basename "$bundle").stderr"
-done < "$TMPDIR/macos-runner-bundles.txt"
-```
-
-**pkgutil** (per pkg):
-
-```bash
-while IFS= read -r pkg; do
-    pkgutil --check-signature "$pkg" \
-        2> "$TMPDIR/macos-runner-pkgutil-$(basename "$pkg").stderr"
-done < "$TMPDIR/macos-runner-pkgs.txt"
-```
-
-**stapler** (per artifact):
-
-```bash
-while IFS= read -r artifact; do
-    xcrun stapler validate "$artifact" \
-        2> "$TMPDIR/macos-runner-stapler-$(basename "$artifact").stderr"
-done < <(cat "$TMPDIR/macos-runner-bundles.txt" "$TMPDIR/macos-runner-pkgs.txt")
-```
-
-Treat exit >= 127 OR missing output as tool failure.
-
-### Step 6 — Parse outputs and emit findings
-
-**mobsfscan**: same parsing as Android/iOS lanes; swap `origin: "macos"`.
-
-**codesign**: parse the entitlements XML for concerning keys
-(`get-task-allow`, `cs.allow-jit`, `cs.allow-unsigned-executable-memory`,
-`cs.allow-dyld-environment-variables`, `cs.disable-library-validation`)
-— emit one finding per true-value key per the mapping in
-`macos-hardened-runtime.md`. Also parse stderr `--verbose=4` for
-`Notarization=rejected` or `Authority=` missing — emit findings for
-those. CWE per `macos-hardened-runtime.md` table.
-
-**spctl**: one finding per rejection (stderr NOT containing
-`"accepted"`). Severity HIGH; CWE-693.
-
-**pkgutil**: parse stderr for `Status: no signature` or `Status:
-signature failed validation` — emit HIGH finding with CWE-693. `file`
-is the pkg basename.
-
-**stapler**: parse stderr for absence of `"The validate action
-worked!"` — emit MEDIUM finding with CWE-693 and a "staple the
-notarization ticket after `notarytool submit`" fix recipe.
-
-### Step 7 — Emit the status summary
-
-Same four shapes as iOS: ok / ok+skipped / partial / unavailable.
-Each skipped entry is `{tool, reason}`; reasons include
-`requires-macos-host`, `no-bundle`, `no-pkg`, `no-notary-profile`,
-`tool-missing`.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__macos_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

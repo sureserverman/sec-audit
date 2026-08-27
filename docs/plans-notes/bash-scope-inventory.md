@@ -412,3 +412,76 @@ or could not work, and in four of five cases the failure was silent — the tool
 own usage error was mapped into a finding blaming the caller, or the tool was
 handed an input it structurally cannot read and its silence recorded as a clean
 scan.
+
+### Outcome: ios + macos migrated (2026-08-27) — exemption 3 → 1
+
+Verified live on a **macOS 26.6.2 (arm64)** host over ssh, not written blind.
+`mobsfscan` is an ordinary lane entry in both (cross-platform, one pass); the
+Apple signing tools go through the bundled `macscan.py`.
+
+**The documented invocations here were correct** — the first lane where that
+was true. `codesign -dv --entitlements :- --xml --verbose=4` (plist on stdout,
+metadata on stderr), `spctl --assess --verbose=2`, `xcrun stapler validate`
+(rc 65 when unstapled) and `pkgutil --check-signature` all behave as written.
+
+**It did remove a construct that could never run.** macos-runner drove its
+stapler loop with `done < <(cat bundles.txt pkgs.txt)` — the process
+substitution the 2026-07-25 probe found is refused outright whatever is granted.
+That step had never executed. Discovery now happens in Python, so the construct
+is gone rather than merely scoped.
+
+**Live evidence, both directions.** Against a copied `Calculator.app`: spctl
+`rejected (resource envelope is obsolete)` — a real broken seal caused by the
+copy — plus `stapler:not-stapled`. Against `Element.app`: two codesign findings,
+`cs.allow-jit` CWE-693 and `cs.disable-library-validation` CWE-347, with spctl
+and stapler both clean. The same lane producing findings on one bundle and
+silence on another is what makes the silence meaningful.
+
+CWEs are transcribed from `references/desktop/macos-hardened-runtime.md`.
+
+**Correction to the linux lane, same session.** Its CWE table was transcribed
+from the fixture because `linux-systemd.md` appeared to be missing. It is not —
+the reference packs live in `references/desktop/` and `references/mobile/`
+subdirectories, and `linux-systemd.md` carries a full directive→CWE table.
+The linux lane now uses that authoritative mapping, matched on the directive
+prefix of systemd-analyze's `json_field` (`SystemCallFilter_resources` →
+`SystemCallFilter` → CWE-693). Ten directives mapped where four were before.
+
+---
+
+## A separate, worse bug found on the way: the android lane scans nothing
+
+Not a BL-002 issue — found because ios/macos share android's mobsfscan entry.
+
+`mobsfscan --json --output -` **does not write to stdout.** It creates a file
+literally named `-` in the working directory and leaves stdout empty. The engine
+read nothing, could not parse it, and reported:
+
+    {"__android_status__": "unavailable", "tools": []}
+
+over its own deliberately-vulnerable fixture — while littering a file named `-`
+into the repo root. The correct form, `mobsfscan --json <target>`, finds **6
+rules** on that same fixture. Fixed in `lanes/android.json`; the lane now
+reports `partial` with mobsfscan ran, and leaves no stray file.
+
+**CI was green throughout**, because `android-e2e.sh` — like `linux-e2e.sh` —
+asserts against a hand-authored `.pipeline` recording rather than a live run.
+That is now two lanes whose gates validate recordings.
+
+**Two suspects left unverified**, same `-`-as-stdout shape, tools not installed
+here: `android-lint --xml -` and `zap-baseline -J -` (dast). Neither is
+confirmed; both should be checked on a host that has the tool.
+
+**Still open, and a decision rather than a bug:** mobsfscan emits some rules as
+metadata only, with no `files` array — app-wide findings like "this app does not
+use certificate pinning". The mapper's `flatten: "files"` drops every one of
+them, which is why the fixed android lane reports `partial` with **0 findings**
+despite 6 rules firing. Fixing it means deciding what `file` such a finding
+carries. Left untouched: ios and macos reuse android's mapping exactly as
+shipped, so all three behave identically and no new semantics were introduced
+unilaterally.
+
+**Final tally: 5 of 6 lanes migrated, 6 latent bugs found.** Only `windows`
+remains — binskim, osslsigncode and sigcheck are on no machine reachable from
+here, and every lane migrated so far concealed at least one bug that only
+running the tool exposed.

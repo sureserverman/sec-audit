@@ -2,7 +2,7 @@
 name: ios-runner
 description: "iOS static-analysis adapter for sec-audit. Runs mobsfscan against Swift/Obj-C source; runs codesign, spctl, and notarytool on macOS hosts with bundle artifacts under target_path; emits JSONL findings tagged origin: \"ios\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.11."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # ios-runner
@@ -79,146 +79,67 @@ the orchestrator's §2 rule), emit the unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/mobile-tools.md`.
-Extract the iOS subsections (added in v0.9.0): canonical invocations
-for codesign / spctl / notarytool, the field-mapping tables, and the
-sentinel contract including all four possible `skipped` reasons.
-
-### Step 2 — Resolve the target path
-
-Try stdin → `$1` → `$IOS_TARGET_PATH`. Verify readable directory with
-iOS signals. If not, emit unavailable sentinel, exit 0.
-
-### Step 3 — Probe host OS and tool availability
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-host_os=$(uname -s 2>/dev/null || echo Unknown)
-command -v mobsfscan 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v codesign 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v spctl 2>/dev/null
-[ "$host_os" = "Darwin" ] && command -v xcrun 2>/dev/null
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" ios <target_path>
 ```
 
-Discover bundles under the target:
+The engine probes each tool — `command -v mobsfscan`, `command -v codesign`,
+`command -v spctl`, `command -v xcrun` —
+checks applicability, and maps results to the Finding schema above:
 
-```bash
-find "$target_path" -maxdepth 6 -type d \( -name '*.app' -o -name '*.framework' -o -name '*.xcarchive' \) \
-  -not -path '*/node_modules/*' -not -path '*/.git/*' \
-  | head -n 10 > "$TMPDIR/ios-runner-bundles.txt"
+- **mobsfscan** (`mobsfscan --json <target_path>`, cross-platform, one pass over
+  the Swift/Obj-C source): each rule hit maps to one finding — `ERROR`→HIGH,
+  `WARNING`→MEDIUM, `INFO`→LOW; `cwe` is the rule's own CWE; `reference_url` is
+  the rule's reference. Note `--json` writes to **stdout**; `--output -` does
+  not — it creates a file literally named `-` and leaves stdout empty.
+
+The Apple signing tools run only on a **Darwin host** and only against
+artifacts that exist under the target; on any other host, or with no artifact,
+each is a clean skip (`requires-macos-host` / `no-bundle` / `no-pkg` /
+`no-notary-profile`), never a failure and never silence.
+- **codesign** (`codesign -dv --entitlements :- --xml --verbose=4 <bundle>`,
+  once per `.app`/`.framework`/`.xcarchive`): the entitlements plist comes back
+  on stdout and the signing metadata on stderr. Each hardened-runtime exception
+  set to true emits one finding, per the table in
+  `references/desktop/macos-hardened-runtime.md` — `cs.allow-jit` CWE-693,
+  `cs.allow-unsigned-executable-memory` CWE-749,
+  `cs.allow-dyld-environment-variables` CWE-426,
+  `cs.disable-library-validation` CWE-347, `get-task-allow` CWE-489. An unsigned
+  bundle, or a signature with no `Authority=` chain, emits its own HIGH finding.
+- **spctl** (`spctl --assess --verbose=2 <bundle>`): a verdict that is not
+  `accepted` emits one HIGH `CWE-693` finding carrying Gatekeeper's own reason.
+- **notarytool** (`xcrun notarytool history --keychain-profile
+  "$NOTARY_PROFILE" --output-format json`): requires `$NOTARY_PROFILE`; without
+  it the tool is a `no-notary-profile` clean skip. History is context, not a
+  defect — no finding is synthesized from it. `notarytool submit` is never
+  invoked; that is a release action, not a review action.
+
+Output is faithful JSONL — every line `origin: "ios"` — then one
+`__ios_status__` record. A tool absent from PATH is a `tool-missing` skip.
+When no tool ran, the only line is the unavailable sentinel:
+
+```json
+{"__ios_status__": "unavailable", "tools": []}
 ```
 
-Build three lists:
+### Step 2 — Polish (presentation only)
 
-- `tools_available` — tools reachable NOW and with a viable target.
-- `tools_clean_skipped` — tools intentionally not run. Each entry
-  carries a reason:
-  - `requires-macos-host` for codesign/spctl/notarytool when
-    `host_os != Darwin`;
-  - `no-bundle` for codesign/spctl when no `.app`/`.framework`/
-    `.xcarchive` was found;
-  - `no-notary-profile` for notarytool when `$NOTARY_PROFILE` is
-    unset;
-  - `tool-missing` for any tool whose binary is not on PATH AND whose
-    host-OS precondition was satisfied (e.g. codesign missing on
-    macOS — unusual, but possible).
-- `tools_failed` — populated by Step 5 when a tool crashes mid-run.
-
-Write one stderr line per classification.
-
-### Step 4 — Handle the "all unavailable" case
-
-If `tools_available` is empty AND `tools_failed` is empty, emit
-`{"__ios_status__": "unavailable", "tools": [], "skipped": [...]}` on
-stdout and exit 0. Do NOT emit any finding lines. The `skipped` list
-still carries each cleanly-skipped tool so downstream consumers know
-the review was partial-by-design.
-
-### Step 5 — Run each available tool
-
-**mobsfscan** (cross-platform; same binary used by the Android lane):
-
-```bash
-mobsfscan --json --output - "$target_path" \
-  > "$TMPDIR/ios-runner-mobsfscan.json" \
-  2> "$TMPDIR/ios-runner-mobsfscan.stderr"
-rc_mob=$?
-```
-
-Non-zero exit with valid JSON is normal. Missing/malformed JSON → failed.
-
-**codesign** (macOS-host + bundle-present; one invocation per bundle):
-
-```bash
-bundle="$target_path/build/Debug-iphoneos/VulnerableiOS.app"  # example
-codesign -dv --entitlements :- --xml "$bundle" \
-  > "$TMPDIR/ios-runner-codesign-$(basename "$bundle").xml" \
-  2> "$TMPDIR/ios-runner-codesign-$(basename "$bundle").stderr"
-rc_cs=$?
-```
-
-**spctl** (macOS-host + bundle-present):
-
-```bash
-spctl --assess --verbose=2 "$bundle" \
-  2> "$TMPDIR/ios-runner-spctl-$(basename "$bundle").stderr"
-rc_sp=$?
-```
-
-**xcrun notarytool** (macOS-host + `$NOTARY_PROFILE` set):
-
-```bash
-xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" \
-  --output-format json \
-  > "$TMPDIR/ios-runner-notarytool.json" \
-  2> "$TMPDIR/ios-runner-notarytool.stderr"
-rc_nt=$?
-```
-
-The runner MUST NOT invoke `notarytool submit` — that is a developer
-release action, not a review action.
-
-Treat exit-code >= 127 OR missing JSON/XML as tool failure.
-
-### Step 6 — Parse each tool's output and emit findings
-
-**mobsfscan**: same parsing logic as the Android lane (see
-`mobile-tools.md` § "mobsfscan → sec-audit finding"). The ONLY
-change is `origin: "ios"` instead of `"android"` on every finding.
-mobsfscan's rule set covers both Android and iOS; language detection
-is automatic.
-
-**codesign**: parse the entitlements XML plist AND the verbose stderr.
-Emit one finding per concerning entitlement key (e.g.
-`get-task-allow`, `cs.allow-jit`, `cs.allow-unsigned-executable-memory`,
-`cs.disable-library-validation`) that appears set to `<true/>`. Emit
-one finding when the stderr indicates notarization is missing or
-the hardened-runtime flag is absent. CWE per the `ios-codesign.md`
-mapping. `file` is the bundle basename. `tool: "codesign"`.
-
-**spctl**: if the exit indicated rejection, emit ONE finding with
-`severity: "HIGH"`, `cwe: "CWE-693"`, `evidence` as the rejection
-string from stderr. Accepted assessments produce no finding.
-`tool: "spctl"`.
-
-**notarytool**: parse the history JSON; emit one finding per entry
-with `status` ∈ {`"Invalid"`, `"Rejected"`}. `severity: "MEDIUM"`,
-`cwe: "CWE-693"`. `tool: "notarytool"`.
-
-### Step 7 — Emit the status summary
-
-- All available tools ran cleanly, no skips: `{"__ios_status__": "ok", "tools": [...], "runs": N, "findings": M}`.
-- Some ran, none failed, some cleanly skipped: `{"__ios_status__": "ok", "tools": [...], "runs": N, "findings": M, "skipped": [...]}`.
-- Some ran successfully, some failed: `{"__ios_status__": "partial", "tools": [...ran...], "runs": N, "findings": M, "failed": [...], "skipped": [...if any...]}`.
-- Every available tool failed OR no tool available: `{"__ios_status__": "unavailable", "tools": [], "skipped": [...if any...]}`.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__ios_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 
-- JSONL on stdout only; telemetry on stderr.
-- Skip reasons are structured `{tool, reason}` entries.
+- JSONL on stdout; telemetry on stderr.
+- Structured `{tool, reason}` skipped entries.
 - Never conflate clean-skip with failure.
-- Never invent CWEs or fabricate tool output.
 
 ## What you MUST NOT do
 
