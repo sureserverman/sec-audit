@@ -1,0 +1,102 @@
+{
+  "lane": "linux",
+  "status_key": "__linux_status__",
+  "origin": "linux",
+  "reference": "linux-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "All three tools need per-artifact discovery AND per-artifact attribution, which this schema cannot express, so each is driven through the bundled linuxscan.py \u2014 one lane entry per tool, so each keeps its own probe, its own clean-skip reason and its own line in the sentinel. rc 3 from the wrapper means 'nothing of this tool's shape under the target' and maps to that tool's skip reason; rc 1 means the run failed.",
+  "tools": [
+    {
+      "name": "systemd-analyze",
+      "probe": "systemd-analyze",
+      "invoke": [
+        "python3",
+        "{scripts}/linuxscan.py",
+        "{target}",
+        "--tool",
+        "systemd-analyze"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-systemd-unit",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "rc 3 covers both 'no .service under target' and 'not a systemd host'; the wrapper distinguishes them on stderr. The runner's older `requires-systemd-host` reason stays in the vocabulary for the host case."
+    },
+    {
+      "name": "lintian",
+      "probe": "lintian",
+      "invoke": [
+        "python3",
+        "{scripts}/linuxscan.py",
+        "{target}",
+        "--tool",
+        "lintian"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-debian-package",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "Applicability is a BUILT package (.deb/.udeb/.ddeb/.dsc/.changes//.buildinfo), not `debian/control`. lintian cannot open a source directory at all, so the old `no-debian-source` gate admitted exactly the targets it cannot analyse and excluded the ones it can. Renamed to `no-debian-package` to say what is actually required."
+    },
+    {
+      "name": "checksec",
+      "probe": "checksec",
+      "invoke": [
+        "python3",
+        "{scripts}/linuxscan.py",
+        "{target}",
+        "--tool",
+        "checksec"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-elf",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "One `checksec dir` pass over the target rather than a per-ELF loop, so no ELF discovery is needed. The wrapper accepts both the Go checksec array-with-`checks` shape and checksec-py's path-keyed object."
+    }
+  ]
+}

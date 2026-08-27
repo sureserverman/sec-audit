@@ -220,7 +220,7 @@ with open(path) as fh:
                         errs += 1
             continue
         # Allow the Linux desktop status summary line emitted by linux-runner.
-        # Same skipped-list schema; adds requires-systemd-host / no-debian-source / no-elf reasons.
+        # Same skipped-list schema; adds requires-systemd-host / no-debian-package / no-elf reasons.
         if "__linux_status__" in obj:
             status = obj.get("__linux_status__")
             if status not in {"ok", "partial", "unavailable"}:
@@ -1748,7 +1748,7 @@ check skills/sec-audit/SKILL.md "__linux_status__" "SKILL.md §3.12 missing linu
 check skills/sec-audit/SKILL.md "requires-systemd-host" "SKILL.md §3.12 missing systemd-host clean-skip reason"
 check skills/sec-audit/SKILL.md "systemd-analyze" "SKILL.md §3.12 missing systemd-analyze"
 check skills/sec-audit/SKILL.md "lintian" "SKILL.md §3.12 missing lintian"
-check skills/sec-audit/SKILL.md "no-elf\|no-debian-source" "SKILL.md §3.12 missing target-shape skip reasons"
+check skills/sec-audit/SKILL.md "no-elf\|no-debian-package" "SKILL.md §3.12 missing target-shape skip reasons"
 echo "linux-orchestrator: SKILL.md §3.12 documents linux-runner wire-up"
 
 # --- orchestrator §3.13 wire-up (v0.11.0 Stage 2 Task 2.2):
@@ -2702,16 +2702,18 @@ echo "v1.27-symmetry: foreign lanes reject phpcs"
 # followed by a token separator (comma/space) or EOL — so a scoped
 # `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
 #
-# KNOWN EXEMPTIONS (BL-002): 4 host-OS-gated runners still carry a bare `Bash`
+# KNOWN EXEMPTIONS (BL-002): 3 host-OS-gated runners still carry a bare `Bash`
 # grant. They cannot be scoped by editing frontmatter: under a per-tool
 # allowlist the matcher refuses `>` output redirection outright, whatever is
 # granted (measured 2026-08-27, see docs/plans-notes/bash-scope-inventory.md
 # § "Second probe round"), and these five redirect each tool's output to a temp
 # file. Scoping them means migrating them onto the runner.py engine the other
-# 21 runners use, whose entire bash surface is one `python3 runner.py <lane>`
-# call with no redirect. `ai-tools` and `netcfg` were migrated that way on
-# 2026-08-27 and left this list; ios/macos/windows/linux still need engine lanes.
-bare_bash_exempt='ios-runner|macos-runner|windows-runner|linux-runner'
+# 22 runners use, whose entire bash surface is one `python3 runner.py <lane>`
+# call with no redirect. `ai-tools`, `netcfg` and `linux` were migrated that way
+# on 2026-08-27 and left this list. The 3 that remain (ios/macos/windows) need
+# tools this host does not have, so their lanes can be written but not
+# live-verified here.
+bare_bash_exempt='ios-runner|macos-runner|windows-runner'
 bare_bash=0; bare_bash_pending=0
 while IFS= read -r offender; do
     [ -z "$offender" ] && continue
@@ -2725,8 +2727,8 @@ while IFS= read -r offender; do
 done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
          | grep -E '\bBash([,[:space:]]|$)' || true)
 echo "no-bare-bash: $bare_bash unexpected + $bare_bash_pending BL-002-exempt file(s) with an unscoped Bash grant"
-if [ "$bare_bash_pending" -ne 4 ]; then
-    echo "CONTRACT FAIL: expected exactly 4 BL-002-exempt host-OS runners with bare Bash," \
+if [ "$bare_bash_pending" -ne 3 ]; then
+    echo "CONTRACT FAIL: expected exactly 3 BL-002-exempt host-OS runners with bare Bash," \
          "found $bare_bash_pending — update the exemption list / BL-002 as lanes are scoped" >&2
     fail=1
 fi

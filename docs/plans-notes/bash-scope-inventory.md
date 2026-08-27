@@ -356,3 +356,59 @@ including that no tool invokes `run` without `-test`.
 bugs found** — each one a documented command that silently did nothing or
 reported the tool's own error as the caller's fault. Whatever else BL-002 is
 worth, porting a lane to the engine is proving to be the thing that finds them.
+
+### Outcome: linux migrated (2026-08-27)
+
+Third lane; exemption list 4 → 3. The remaining three (ios, macos, windows) need
+tools this host does not have.
+
+This one needed a bundled wrapper (`scripts/secaudit/linuxscan.py`): all three
+tools want per-artifact discovery AND per-artifact attribution, which the lane
+schema cannot express. One lane entry per tool still, so each keeps its own
+probe, its own clean-skip reason and its own line in the sentinel.
+
+**One engine addition:** `rc_reasons` maps a bundled wrapper's exit code to a
+per-tool outcome — 3 means "nothing of this tool's shape under the target" (a
+clean skip with that tool's own reason) and 1 means the run failed. A boolean
+could not carry this: a lane's skip vocabulary is per-tool, and a skip is not a
+failure.
+
+**All three documented invocations were wrong, two of them silently.**
+
+| Tool | Was documented | Reality |
+|---|---|---|
+| `lintian` | `--output-format=json <dir>` | **No such option**, in the exact version this repo named as supporting it. And lintian cannot open a source directory at all. Output is text tag lines. |
+| `checksec` | `--file=<elf> --output=json` | `unknown flag: --file`. **Two different programs are named `checksec`** — `checksec-py`, whose CLI the reference documents, and the Go `checksec` installed here. The wrapper accepts both output shapes rather than picking a winner. |
+| `systemd-analyze` | `--offline=true --profile=strict <unit>` | Correct, but text-only; `--json=short` gives the same analysis structured. |
+
+**And lintian's applicability was inverted.** It was gated on `debian/control`
+being present — a source tree, i.e. precisely the input lintian cannot read.
+The real precondition is a built `.deb`/`.udeb`/`.ddeb`/`.dsc`/`.changes`/
+`.buildinfo`. The reason is renamed `no-debian-source` → `no-debian-package`
+across the runner, drill, e2e, SKILL.md, COVERAGE.md and linux-tools.md. **The
+lane never analysed Debian source trees. It only reported that it had.**
+
+**The lane's e2e was validating fiction.** `tests/linux-e2e.sh` asserts
+"≥1 lintian finding" against `tests/fixtures/vulnerable-linux/.pipeline/
+linux.jsonl`, a hand-authored recording in the lintian JSON format that no
+shipping lintian emits — so that assertion has never been evidence that lintian
+works. It is left in place (fixing it needs a real built package in the fixture,
+which is its own change) but it should not be read as coverage. Recorded here
+rather than quietly left.
+
+**Live behaviour now, on the existing fixture:** `partial`, 11 real
+systemd-analyze findings from the live tool, `lintian: no-debian-package`,
+`checksec: no-elf` — where the recording claimed `ok` with lintian findings.
+Verified against a synthetic target holding a real `.deb` and an ELF: lintian 91
+findings, checksec ran clean (`/bin/ls` is fully hardened, correctly yielding
+nothing), systemd-analyze skipped `no-systemd-unit`.
+
+**Verified under real enforcement:** ALLOWED under `Bash(python3:*)`, DENIED
+under `Bash(echo:*)`. `ci-local.sh` 75/75.
+
+**Running total: 3 of 6 migrated, 5 latent invocation bugs found.** Every lane
+ported so far has contained at least one documented command that did not exist
+or could not work, and in four of five cases the failure was silent — the tool's
+own usage error was mapped into a finding blaming the caller, or the tool was
+handed an input it structurally cannot read and its silence recorded as a clean
+scan.

@@ -1363,7 +1363,7 @@ Skill-level invariants:
     (macOS/Windows/Alpine-without-systemd). Parallel to the v0.9
     `requires-macos-host` — this is the second host-OS-gated
     skip reason in the plugin.
-  - `no-debian-source` — `debian/control` absent under the target;
+  - `no-debian-package` — `debian/control` absent under the target;
     lintian has nothing to process. Parallel to v0.8 `no-apk` and
     v0.9 `no-bundle` — target-shape clean-skip.
   - `no-elf` — no ELF binary under the target; checksec has nothing
@@ -1625,7 +1625,7 @@ Skill-level invariants:
   - `no-containerfile` — NEW in v1.4; hadolint is on PATH but
     target has no Dockerfile / Containerfile / `*.dockerfile` /
     `*.containerfile` files. Target-shape clean-skip; parallel
-    to v0.10's `no-debian-source`/`no-elf`, v0.11's `no-pkg`,
+    to v0.10's `no-debian-package`/`no-elf`, v0.11's `no-pkg`,
     and v0.12's `no-pe`.
   - `no-libvirt-xml` — NEW in v1.4; virt-xml-validate is on PATH
     but target has no XML files with a libvirt root element
@@ -1746,7 +1746,7 @@ Skill-level invariants:
     target has no shell-shaped files (after vendored-dir
     exclusions). Target-shape clean-skip; parallel to the
     v0.10–v1.4 target-shape primitives (`no-pe`, `no-elf`,
-    `no-pkg`, `no-debian-source`, `no-containerfile`,
+    `no-pkg`, `no-debian-package`, `no-containerfile`,
     `no-libvirt-xml`).
 
 Shell findings are code-pattern signal against shell-script

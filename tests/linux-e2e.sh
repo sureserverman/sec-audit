@@ -51,7 +51,7 @@ if [ "$tail_status" != "ok" ] && [ "$tail_status" != "partial" ]; then
     echo "linux-e2e: FAIL (d) — expected trailing __linux_status__ ok|partial, got '$tail_status'" >&2
     exit 1
 fi
-valid_reasons=$(echo "$tail_obj" | jq -r '.skipped // [] | map(select(.reason=="requires-systemd-host" or .reason=="no-debian-source" or .reason=="no-elf" or .reason=="no-systemd-unit" or .reason=="tool-missing")) | length')
+valid_reasons=$(echo "$tail_obj" | jq -r '.skipped // [] | map(select(.reason=="requires-systemd-host" or .reason=="no-debian-package" or .reason=="no-elf" or .reason=="no-systemd-unit" or .reason=="tool-missing")) | length')
 if [ "$valid_reasons" -lt 1 ]; then
     echo "linux-e2e: FAIL (d) — expected >=1 skipped entry with a canonical Linux-lane reason, got $valid_reasons" >&2
     exit 1
