@@ -8,6 +8,17 @@
 # lanes are exercised through recorded fixtures and scrubbed-PATH degrade paths,
 # never by invoking the real tools.
 #
+# ONE DOCUMENTED EXCEPTION to the hermeticity above: `lane-live-gate`. Every
+# other per-lane gate reads a recorded fixture, and the 2026-08-27 audit
+# (docs/plans-notes/pipeline-recording-audit.md) found that two lanes had
+# stopped working while the suite stayed green, because nothing in the e2e path
+# executes a lane. That gate therefore RUNS every lane and asserts invariants of
+# the run — never finding counts, which is what rotted the recordings. It uses
+# whatever scanners happen to be installed: on CI none are, so each lane still
+# executes end to end (engine, lane JSON, bundled wrappers, sentinel contract)
+# and the stronger assertions simply do not engage. Set SECAUDIT_LIVE_GATE=0 to
+# skip it and keep the run fully hermetic.
+#
 # Usage: bash tests/ci-local.sh
 # Exit:  0 = all green; 1 = one or more failed (names listed).
 set -uo pipefail
@@ -38,6 +49,9 @@ for t in fixtures-tracked contract-check script-runner script-score script-inven
          script-advisory-cache script-accepted; do
   run "$t" bash "tests/$t.sh"
 done
+
+echo "=== per-lane live gate (executes every lane) ==="
+run "lane-live-gate" bash tests/lane-live-gate.sh
 
 echo "=== per-lane e2e (recorded golden fixtures) ==="
 for f in tests/*-e2e.sh; do
