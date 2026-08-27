@@ -2702,18 +2702,19 @@ echo "v1.27-symmetry: foreign lanes reject phpcs"
 # followed by a token separator (comma/space) or EOL — so a scoped
 # `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
 #
-# KNOWN EXEMPTIONS (BL-002): 3 host-OS-gated runners still carry a bare `Bash`
+# KNOWN EXEMPTION (BL-002): 1 host-OS-gated runner still carries a bare `Bash`
 # grant. They cannot be scoped by editing frontmatter: under a per-tool
 # allowlist the matcher refuses `>` output redirection outright, whatever is
 # granted (measured 2026-08-27, see docs/plans-notes/bash-scope-inventory.md
 # § "Second probe round"), and these five redirect each tool's output to a temp
 # file. Scoping them means migrating them onto the runner.py engine the other
-# 22 runners use, whose entire bash surface is one `python3 runner.py <lane>`
-# call with no redirect. `ai-tools`, `netcfg` and `linux` were migrated that way
-# on 2026-08-27 and left this list. The 3 that remain (ios/macos/windows) need
-# tools this host does not have, so their lanes can be written but not
-# live-verified here.
-bare_bash_exempt='ios-runner|macos-runner|windows-runner'
+# 24 runners use, whose entire bash surface is one `python3 runner.py <lane>`
+# call with no redirect. ai-tools, netcfg, linux, ios and macos were migrated
+# that way on 2026-08-27 — the last two verified live on a macOS 26.6.2 host.
+# Only `windows` remains: binskim/osslsigncode/sigcheck are not installed on any
+# machine reachable from here, and every lane migrated so far hid at least one
+# invocation bug that only running the tool exposed.
+bare_bash_exempt='windows-runner'
 bare_bash=0; bare_bash_pending=0
 while IFS= read -r offender; do
     [ -z "$offender" ] && continue
@@ -2727,8 +2728,8 @@ while IFS= read -r offender; do
 done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
          | grep -E '\bBash([,[:space:]]|$)' || true)
 echo "no-bare-bash: $bare_bash unexpected + $bare_bash_pending BL-002-exempt file(s) with an unscoped Bash grant"
-if [ "$bare_bash_pending" -ne 3 ]; then
-    echo "CONTRACT FAIL: expected exactly 3 BL-002-exempt host-OS runners with bare Bash," \
+if [ "$bare_bash_pending" -ne 1 ]; then
+    echo "CONTRACT FAIL: expected exactly 1 BL-002-exempt host-OS runner with bare Bash," \
          "found $bare_bash_pending — update the exemption list / BL-002 as lanes are scoped" >&2
     fail=1
 fi

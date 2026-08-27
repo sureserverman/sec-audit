@@ -1,0 +1,157 @@
+{
+  "lane": "ios",
+  "status_key": "__ios_status__",
+  "origin": "ios",
+  "reference": "mobile-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "mobsfscan is an ordinary lane entry (cross-platform, one pass over the source). The Apple signing tools need per-artifact discovery AND per-artifact attribution, which this schema cannot express, so they go through the bundled macscan.py \u2014 one entry per tool, so each keeps its own probe, skip reason and sentinel line. Doing the discovery in Python also removes macos-runner's `done < <(cat ...)` process substitution, which the Bash tool refuses outright whatever is granted, and which therefore never ran.",
+  "tools": [
+    {
+      "name": "mobsfscan",
+      "probe": "mobsfscan",
+      "invoke": [
+        "mobsfscan",
+        "--json",
+        "{target}"
+      ],
+      "output": "stdout",
+      "findings_path": "results",
+      "iterate": "values",
+      "flatten": "files",
+      "inapplicable_reason": "no-source",
+      "const": {
+        "confidence": "medium"
+      },
+      "map": {
+        "id": "_parent._key",
+        "severity": {
+          "from": "_parent.metadata.severity",
+          "map": {
+            "ERROR": "HIGH",
+            "WARNING": "MEDIUM",
+            "INFO": "LOW"
+          },
+          "default": "MEDIUM"
+        },
+        "cwe": {
+          "from": "_parent.metadata.cwe",
+          "before": ":",
+          "default": null
+        },
+        "title": "_parent.metadata.description",
+        "file": "file_path",
+        "line": {
+          "from": "match_lines.0",
+          "default": 0
+        },
+        "evidence": {
+          "from": "match_string",
+          "default": ""
+        },
+        "reference_url": {
+          "from": "_parent.metadata.reference",
+          "default": null
+        }
+      },
+      "_note": "Identical to the android lane's entry \u2014 same tool, same shapes. `--json` writes to stdout; `--output -` does NOT, it creates a file literally named `-` and leaves stdout empty."
+    },
+    {
+      "name": "codesign",
+      "probe": "codesign",
+      "invoke": [
+        "python3",
+        "{scripts}/macscan.py",
+        "{target}",
+        "--tool",
+        "codesign",
+        "--lane",
+        "ios"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-bundle",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "rc 3 covers both 'not a macOS host' and 'no artifact of this tool's shape under the target'; the wrapper distinguishes them on stderr and the runner keeps `requires-macos-host` in its vocabulary for the host case."
+    },
+    {
+      "name": "spctl",
+      "probe": "spctl",
+      "invoke": [
+        "python3",
+        "{scripts}/macscan.py",
+        "{target}",
+        "--tool",
+        "spctl",
+        "--lane",
+        "ios"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-bundle",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "rc 3 covers both 'not a macOS host' and 'no artifact of this tool's shape under the target'; the wrapper distinguishes them on stderr and the runner keeps `requires-macos-host` in its vocabulary for the host case."
+    },
+    {
+      "name": "notarytool",
+      "probe": "xcrun",
+      "invoke": [
+        "python3",
+        "{scripts}/macscan.py",
+        "{target}",
+        "--tool",
+        "notarytool",
+        "--lane",
+        "ios"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "3": "no-notary-profile",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      },
+      "_note": "rc 3 covers both 'not a macOS host' and 'no artifact of this tool's shape under the target'; the wrapper distinguishes them on stderr and the runner keeps `requires-macos-host` in its vocabulary for the host case."
+    }
+  ]
+}

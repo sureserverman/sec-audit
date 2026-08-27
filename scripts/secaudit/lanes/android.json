@@ -13,8 +13,6 @@
       "invoke": [
         "mobsfscan",
         "--json",
-        "--output",
-        "-",
         "{target}"
       ],
       "output": "stdout",
@@ -54,7 +52,8 @@
           "from": "_parent.metadata.reference",
           "default": null
         }
-      }
+      },
+      "_note": "`--output -` does NOT mean stdout: mobsfscan 0.4.5 creates a file literally named `-` in the working directory and leaves stdout empty, so the lane read nothing, counted the tool as unparseable, and reported `unavailable` over a target it had actually scanned. Plain `--json` writes to stdout."
     },
     {
       "name": "apkleaks",
