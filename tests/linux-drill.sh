@@ -4,7 +4,7 @@
 #
 # Extends the drill pattern from v0.6-v0.9 with assertions for the
 # new host-systemd clean-skip vocabulary (requires-systemd-host,
-# no-debian-source, no-elf).
+# no-debian-package, no-elf).
 #
 # Usage:
 #   tests/linux-drill.sh         # synthetic mode (default)
@@ -69,8 +69,10 @@ fi
 echo "  probes for all three tools + host-systemd check documented"
 
 # ---- Assertion 3: all clean-skip reasons documented
+# `no-debian-package`, not `no-debian-source`: lintian cannot open a source
+# directory at all, so the tool's real precondition is a BUILT package.
 echo "linux-drill: testing clean-skip reasons..."
-for reason in requires-systemd-host no-debian-source no-elf tool-missing; do
+for reason in requires-systemd-host no-debian-package no-elf tool-missing; do
     if ! grep -q "$reason" "$plugin_root/agents/linux-runner.md"; then
         echo "linux-drill: FAIL — agents/linux-runner.md missing $reason clean-skip reason" >&2
         exit 1

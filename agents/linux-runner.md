@@ -2,7 +2,7 @@
 name: linux-runner
 description: "Desktop Linux static-analysis adapter for sec-audit. Runs systemd-analyze security, lintian, and checksec against target_path; emits JSONL findings tagged origin: \"linux\". Sentinel-exits when tools are unavailable or inapplicable. Dispatched by sec-audit §3.12."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # linux-runner
@@ -31,14 +31,17 @@ never claim a clean scan when a tool was unavailable.
 6. **Respect scope.** Run tools only against `target_path`. Never
    mutate the project tree, never run `./configure`, never run
    `dpkg-buildpackage`, never invoke the kernel.
-7. **Do not write into the caller's project.** Tool output goes to
-   `$TMPDIR`.
+7. **Do not write into the caller's project.** The engine owns every
+   intermediate file and keeps them in its own temp directory; you
+   invoke it and read stdout.
 8. **Per-tool preconditions, with distinct skip reasons:**
    - `systemd-analyze` → `requires-systemd-host` OR `tool-missing`;
      also requires at least one `.service` file under the target
      (without one, nothing to score — skip with `no-systemd-unit`).
-   - `lintian` → `tool-missing` OR `no-debian-source` (absent
-     `debian/control`).
+   - `lintian` → `tool-missing` OR `no-debian-package` (no built
+     `.deb`/`.udeb`/`.ddeb`/`.dsc`/`.changes`/`.buildinfo` under the
+     target). NOT `debian/control`: lintian cannot read a source
+     directory, so gating on it admitted only unanalysable targets.
    - `checksec` → `tool-missing` OR `no-elf` (no ELF binary under
      target).
 
@@ -75,123 +78,66 @@ unavailable sentinel and exit 0.
 
 ## Procedure
 
-### Step 1 — Read the reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `<plugin-root>/skills/sec-audit/references/linux-tools.md`.
-Extract canonical invocations, severity/CWE mappings, version-pin
-caveats (systemd ≥ 252 for `--offline=true`, lintian ≥ 2.117 for
-`--output-format=json`, checksec ≥ 2.5), and the status-line schema.
-
-### Step 2 — Resolve the target path
-
-Try stdin → `$1` → `$LINUX_TARGET_PATH`. Verify readable directory
-with Linux signals. If not, emit unavailable sentinel, exit 0.
-
-### Step 3 — Probe host, tools, and target shape
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-host_os=$(uname -s 2>/dev/null || echo Unknown)
-
-# Host: is systemd present?
-if [ -d /run/systemd/system ] || systemctl --version >/dev/null 2>&1; then
-    systemd_host=yes
-else
-    systemd_host=no
-fi
-
-# Tool binaries
-command -v systemd-analyze 2>/dev/null
-command -v lintian 2>/dev/null
-command -v checksec 2>/dev/null
-
-# Target shapes
-find "$target_path" -type f -name '*.service' -not -path '*/.git/*' \
-    > "$TMPDIR/linux-runner-units.txt"
-[ -f "$target_path/debian/control" ] && echo yes > "$TMPDIR/linux-runner-has-debian"
-find "$target_path" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' \
-    -exec file {} + 2>/dev/null | grep -l 'ELF' \
-    > "$TMPDIR/linux-runner-elf.txt" || true
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" linux <target_path>
 ```
 
-Build `tools_available`, `tools_clean_skipped`, `tools_failed` per
-Step 4 of the iOS runner's pattern:
+The engine probes the three tools — `command -v systemd-analyze`,
+`command -v lintian`, `command -v checksec` — checks applicability, and drives each through
+the bundled `scripts/secaudit/linuxscan.py`, mapping results to the Finding
+schema above per `linux-tools.md`:
 
-- `systemd-analyze` available iff: binary on PATH AND `systemd_host=yes`
-  AND at least one `.service` file found. Else skip with reason per
-  the missing precondition.
-- `lintian` available iff: binary on PATH AND `debian/control` present.
-  Else skip with reason per the missing precondition.
-- `checksec` available iff: binary on PATH AND at least one ELF found.
-  Else skip with reason per the missing precondition.
+- **systemd-analyze** (`systemd-analyze security --offline=true
+  --profile=strict --json=short <unit>`, once per `*.service` found): each
+  structured row that is unset and carries a non-zero `exposure` becomes one
+  finding on that unit — `exposure ≥ 0.5` HIGH, `≥ 0.2` MEDIUM, else LOW; `id`
+  is `systemd-analyze:<json_field>`. Rows the tool reports as already hardened
+  are not findings. Requires a systemd host (`/run/systemd/system` present or
+  `systemctl --version` succeeding) and at least one unit.
+- **lintian** (`lintian <artifact>`, once per built package): each tag line
+  becomes one finding; `E`→HIGH, `W`→MEDIUM, `I`/`P`/`X`→LOW, `C`/`O`→INFO;
+  `id` is `lintian:<tag>`; `reference_url` is
+  `https://lintian.debian.org/tags/<tag>.html`; CWE per the documented table,
+  `null` when the tag is unmapped.
 
-Write one stderr line per classification.
+  **Applicability is a BUILT package** — `.deb`, `.udeb`, `.ddeb`, `.dsc`,
+  `.changes`, or `.buildinfo`. lintian cannot open a source directory at all
+  (`bad package file name . (neither .deb … file)`), so the old
+  `debian/control` gate admitted exactly the targets it cannot analyse and
+  excluded the ones it can. The skip reason is `no-debian-package`. There is no
+  JSON output in shipping lintian — `--output-format=json` is rejected as an
+  unknown option — so the text tag lines are the parsed form.
+- **checksec** (`checksec dir <target> --output json --no-banner`, one pass):
+  a missing `relro`/`nx`/`pie`/`canary` emits MEDIUM `CWE-693`; a present
+  `rpath`/`runpath` emits HIGH `CWE-426`. Two different programs are named
+  `checksec` — the Go one (subcommands, array of objects with a nested
+  `checks` map) and `checksec-py` (an object keyed by binary path) — and both
+  output shapes are accepted. No ELF discovery is needed; the tool reporting
+  no binaries is the `no-elf` skip.
 
-### Step 4 — Handle the "all unavailable" case
+Output is faithful JSONL — every line `origin: "linux"`, `tool:
+"systemd-analyze" | "lintian" | "checksec"` — then one `__linux_status__`
+record. A tool absent from PATH is a `tool-missing` skip; a tool present with
+nothing of its shape under the target is a `no-systemd-unit` /
+`requires-systemd-host` / `no-debian-package` / `no-elf` skip, never a failure.
+When no tool ran, the only line is the unavailable sentinel:
 
-If `tools_available` is empty, emit
-`{"__linux_status__": "unavailable", "tools": [], "skipped": [...]}`
-with each cleanly-skipped tool in the skipped list, and exit 0.
-
-### Step 5 — Run each available tool
-
-**systemd-analyze security** (one invocation per `.service`; collect
-and merge):
-
-```bash
-while IFS= read -r unit; do
-    systemd-analyze security --offline=true --profile=strict "$unit" \
-        > "$TMPDIR/linux-runner-sa-$(basename "$unit").txt" \
-        2> "$TMPDIR/linux-runner-sa-$(basename "$unit").stderr"
-done < "$TMPDIR/linux-runner-units.txt"
+```json
+{"__linux_status__": "unavailable", "tools": []}
 ```
 
-**lintian**:
+### Step 2 — Polish (presentation only)
 
-```bash
-( cd "$target_path" && lintian --output-format=json . ) \
-    > "$TMPDIR/linux-runner-lintian.json" \
-    2> "$TMPDIR/linux-runner-lintian.stderr"
-rc_li=$?
-```
-
-Lintian exits non-zero when tags are found — NOT a crash.
-
-**checksec** (one invocation per ELF):
-
-```bash
-while IFS= read -r elf; do
-    checksec --file="$elf" --output=json \
-        > "$TMPDIR/linux-runner-checksec-$(basename "$elf").json" \
-        2> "$TMPDIR/linux-runner-checksec-$(basename "$elf").stderr"
-done < "$TMPDIR/linux-runner-elf.txt"
-```
-
-Treat exit >= 127 or missing/malformed output as tool failure.
-
-### Step 6 — Parse outputs and emit findings
-
-**systemd-analyze text output**: parse per-directive rows per the
-`linux-tools.md` mapping. Per-directive severity comes from the
-"impact" column; CWE per the `linux-systemd.md` directive→CWE table
-(cross-reference). `file` is the unit filename. `tool: "systemd-analyze"`.
-
-**lintian JSON**: iterate the top-level array; per-tag severity
-remap (error→HIGH, warning→MEDIUM, info/pedantic/experimental→LOW,
-classification→INFO); CWE per the table in `linux-packaging.md`
-(default null when tag not mapped). `reference_url` =
-`"https://lintian.debian.org/tags/<tag>.html"`. `tool: "lintian"`.
-
-**checksec JSON**: iterate properties. Missing hardening flags
-(relro/nx/pie/canary) emit MEDIUM findings; present `rpath`/`runpath`
-emits HIGH. CWE-693 default; CWE-426 for rpath/runpath. `tool: "checksec"`.
-
-### Step 7 — Emit the status summary
-
-- All available tools ran cleanly, no skips: `ok`.
-- All tools ran, some cleanly skipped: `ok` with `skipped` list.
-- Some ran, some failed: `partial` with `failed` + `skipped` lists.
-- Every available tool failed OR none was applicable: `unavailable`
-  with populated `skipped`.
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__linux_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 

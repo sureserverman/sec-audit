@@ -63,7 +63,7 @@ Source: https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.
   on macOS. Perl-based — not pip-installable.
 - Invocation (JSON output, Lintian ≥ 2.117):
   ```bash
-  lintian --output-format=json \
+  lintian \
       "$path_to_debian_source_dir" \
       > "$TMPDIR/linux-runner-lintian.json" \
       2> "$TMPDIR/linux-runner-lintian.stderr"
@@ -85,7 +85,7 @@ Source: https://lintian.debian.org/manual/
   checksec` (Debian/Ubuntu) OR `brew install checksec` (macOS).
 - Invocation (JSON output):
   ```bash
-  checksec --file="$path_to_elf" --output=json \
+  checksec dir "$target_path" --output json --no-banner \
       > "$TMPDIR/linux-runner-checksec.json" \
       2> "$TMPDIR/linux-runner-checksec.stderr"
   rc_ck=$?
@@ -166,7 +166,7 @@ Linux-lane-specific:
 - `"requires-systemd-host"` — `systemd-analyze security` requires a
   systemd host. macOS/Windows/Alpine-without-systemd runners clean-
   skip. Parallel to `requires-macos-host` from v0.9. NEW in v0.10.
-- `"no-debian-source"` — `lintian` needs a `debian/` source dir under
+- `"no-debian-package"` — `lintian` needs a BUILT package under
   the target. Projects without Debian packaging metadata clean-skip.
   NEW in v0.10.
 - `"no-elf"` — `checksec` needs an ELF binary under the target.
@@ -219,3 +219,22 @@ any build tool would be tempted, the runner refuses — build-time
 action is out of scope. Cross-reference with `linux-systemd.md`,
 `linux-sandboxing.md`, and `linux-packaging.md` for pattern-level
 guidance beyond tool-produced findings.
+
+## Verified invocations (2026-08-27)
+
+Every invocation this file previously documented was wrong against the tools as
+actually shipped, and two failed in a way that produced confident nonsense
+rather than an error. Measured on Lintian 2.117.0ubuntu1.5, checksec 3.1.0,
+systemd 255.
+
+| Tool | Was documented | Reality |
+|---|---|---|
+| `lintian` | `--output-format=json <dir>` | **No such option** (`Unknown option: output-format`) — in the very version this file named as supporting it. And lintian cannot read a source directory: `bad package file name . (neither .deb, .udeb, .ddeb, .changes, .dsc or .buildinfo file)`. Output is text tag lines, `E:/W:/I:/P:/X:/C:/O: <pkg>: <tag> [<context>]`. |
+| `checksec` | `--file=<elf> --output=json` | `unknown flag: --file`. **Two different programs are named `checksec`**: `checksec-py` (whose CLI and path-keyed output this file documented) and the Go `checksec` (installed here — subcommands `file`/`dir`, `-o/--output json`, returning an ARRAY of objects with a nested `checks` map). `checksec dir <target>` covers the tree in one pass. |
+| `systemd-analyze` | `security --offline=true --profile=strict <unit>` | Correct, but text-only. `--json=short` returns the same analysis as rows of `{set, name, json_field, description, exposure}`. |
+
+**Applicability correction.** `lintian` was gated on `debian/control` being
+present — a source tree, i.e. exactly the input it cannot open. The real
+precondition is a built `.deb`/`.udeb`/`.ddeb`/`.dsc`/`.changes`/`.buildinfo`,
+and the skip reason is now `no-debian-package`. The lane never analysed Debian
+source trees; it only reported that it had.

@@ -295,7 +295,7 @@ Dispatch discipline.
   `references/linux-tools.md`.
 - **Host-OS gate:** `requires-systemd-host` for systemd-analyze;
   lintian and checksec are cross-platform.
-- **Skip reasons:** `requires-systemd-host`, `no-debian-source`,
+- **Skip reasons:** `requires-systemd-host`, `no-debian-package`,
   `no-elf`, `no-systemd-unit`, `tool-missing`.
 - **Origin tag:** `"linux"`. Tool whitelist: `systemd-analyze`,
   `lintian`, `checksec`.
@@ -1077,7 +1077,7 @@ semantic category:
 | `no-apk`          | android              | No `*.apk` / `*.aab` under target (apkleaks-specific).                  |
 | `no-bundle`       | ios, macos           | No `.app` / `.framework` / `.xcarchive` under target.                   |
 | `no-pkg`          | macos                | No `.pkg` under target (pkgutil-specific).                              |
-| `no-debian-source`| linux                | No `debian/control` under target (lintian-specific).                    |
+| `no-debian-package`| linux                | No built .deb/.dsc/.changes/.buildinfo under target (lintian-specific). |
 | `no-elf`          | linux                | No ELF binary under target (checksec-specific).                         |
 | `no-systemd-unit` | linux                | No `.service` under target (systemd-analyze-specific).                  |
 | `no-pe`           | windows              | No PE artifact (.exe/.dll/.msi/.msix/.sys) under target.                |

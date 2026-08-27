@@ -483,6 +483,16 @@ def run_live(lane, target, scope=None):
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} failed: {e}\n")
             continue
+        rc_reasons = tc.get("rc_reasons")
+        if rc_reasons and proc.returncode != 0:
+            # A bundled wrapper that distinguishes "nothing of my shape is here"
+            # (a clean skip, with this tool's own reason) from "I failed". One
+            # exit code per outcome beats a boolean, because a lane's clean-skip
+            # vocabulary is per-tool and a failure is not a skip.
+            reason = rc_reasons.get(str(proc.returncode)) or rc_reasons.get("*")
+            if reason:
+                skipped.append({"tool": tc["name"], "reason": reason})
+                continue
         if tc.get("fail_on_rc") and proc.returncode != 0:
             # A bundled wrapper opts into this: non-zero means it could not
             # finish reading the target. Its findings are still mapped below —
