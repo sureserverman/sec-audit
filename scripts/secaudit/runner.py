@@ -433,7 +433,13 @@ def _select_files(target, fsel, scope=None):
 
 def run_live(lane, target, scope=None):
     findings = []
-    ran, skipped = [], []
+    # `failed` is the third outcome the runner contracts have always documented
+    # (windows-runner.md: "Build tools_available, tools_clean_skipped,
+    # tools_failed") and that this engine did not implement. Without it a tool
+    # whose output would not parse was appended to NEITHER list: it vanished
+    # from the sentinel, and a lane where 2 of 3 tools failed still reported
+    # `ok` with 0 findings — a clean bill of health over an unscanned target.
+    ran, skipped, failed = [], [], []
     tmp = tempfile.mkdtemp()
     for tc in lane["tools"]:
         probe_bin = _probe_bin(tc)
@@ -470,6 +476,7 @@ def run_live(lane, target, scope=None):
                 ran.append(tc["name"])
             except Exception as e:
                 sys.stderr.write(f"runner: {tc['name']} parse failed: {e}\n")
+                failed.append({"tool": tc["name"], "reason": "parse-failed"})
             continue
         if not _applicable(tc, target, scope):
             skipped.append({"tool": tc["name"],
@@ -482,6 +489,7 @@ def run_live(lane, target, scope=None):
             proc = subprocess.run(argv, capture_output=True, text=True, timeout=600, env=env)
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} failed: {e}\n")
+            failed.append({"tool": tc["name"], "reason": "run-failed"})
             continue
         rc_reasons = tc.get("rc_reasons")
         if rc_reasons and proc.returncode != 0:
@@ -515,15 +523,24 @@ def run_live(lane, target, scope=None):
             ran.append(tc["name"])
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} parse failed: {e}\n")
+            failed.append({"tool": tc["name"], "reason": "parse-failed"})
     for fobj in findings:
         sys.stdout.write(json.dumps(fobj) + "\n")
-    status = "ok" if ran and not skipped else ("partial" if ran else "unavailable")
+    # A failure is never `ok`. A clean skip is a decision the lane made; a
+    # failure is a tool the lane could not read, and reporting that as `ok`
+    # states coverage the run does not have.
+    status = ("ok" if ran and not skipped and not failed
+              else ("partial" if ran else "unavailable"))
     sentinel = {lane["status_key"]: status if ran else "unavailable",
                 "tools": sorted(ran), "runs": len(ran), "findings": len(findings)}
     if skipped:
         sentinel["skipped"] = skipped
+    if failed:
+        sentinel["failed"] = failed
     if not ran:
         sentinel = {lane["status_key"]: "unavailable", "tools": []}
+        if failed:
+            sentinel["failed"] = failed
     sys.stdout.write(json.dumps(sentinel) + "\n")
 
 
