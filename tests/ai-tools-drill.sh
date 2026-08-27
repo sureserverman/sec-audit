@@ -69,7 +69,7 @@ echo "ai-tools-drill: testing ai-tools-runner unavailable-sentinel contract (B).
 
 runner="$plugin_root/agents/ai-tools-runner.md"
 
-if ! grep -q '"__ai_tools_status__":"unavailable"' "$runner"; then
+if ! grep -qE '"__ai_tools_status__": ?"unavailable"' "$runner"; then
     echo "ai-tools-drill: FAIL — agents/ai-tools-runner.md missing unavailable sentinel spec" >&2
     exit 1
 fi
@@ -87,27 +87,39 @@ if ! grep -qE "command -v snyk-agent-scan" "$runner"; then
 fi
 echo "  ai-tools-runner.md probes all three binaries and documents the sentinel"
 
-# Assertion 3: the runner uses ONLY safe mcp-scan modes (`inspect`
-# and `--skills`) and explicitly forbids the dangerous ones. We
-# check by direct presence/absence of canonical invocation strings:
-#   present: `"$mcp_scan_bin" inspect`, `"$mcp_scan_bin" --skills`
-#   absent : `"$mcp_scan_bin" scan` and `--dangerously-run-mcp-servers`
-#            anywhere except inside a documented "MUST NOT" / "Do NOT"
-#            sentence.
-echo "ai-tools-drill: testing safety contract — runner must invoke only 'inspect' mode..."
+# Assertion 3: the safety contract. The invocation moved out of the agent's
+# shell and into the bundled wrapper (scripts/secaudit/mcpscan.py) when the lane
+# was migrated onto the runner.py engine, so the invocation assertions follow it
+# there; the agent markdown keeps the prose prohibitions a reader relies on.
+#   present in wrapper: an ["inspect", <path>] argv, and stdin closed
+#   absent  in wrapper: a "scan" argv element, and the dangerous flag as an
+#                       argv element (it appears in the docstring, in backticks,
+#                       as the thing that must never be passed — which is why
+#                       the check is for the QUOTED form only)
+echo "ai-tools-drill: testing safety contract — wrapper must invoke only 'inspect' mode..."
 
-if ! grep -qE '"\$mcp_scan_bin" +inspect' "$runner"; then
-    echo "ai-tools-drill: FAIL — runner missing canonical \"\$mcp_scan_bin\" inspect invocation" >&2
+wrapper="$plugin_root/scripts/secaudit/mcpscan.py"
+
+if [ ! -f "$wrapper" ]; then
+    echo "ai-tools-drill: FAIL — scripts/secaudit/mcpscan.py missing" >&2
     exit 1
 fi
-if ! grep -qE '"\$mcp_scan_bin" +--skills' "$runner"; then
-    echo "ai-tools-drill: FAIL — runner missing canonical \"\$mcp_scan_bin\" --skills invocation" >&2
+if ! grep -qE '\["inspect", *[a-z_]+\]' "$wrapper"; then
+    echo "ai-tools-drill: FAIL — wrapper missing canonical [\"inspect\", <path>] invocation" >&2
     exit 1
 fi
-# Forbidden invocation: `"$mcp_scan_bin" scan` as a command (NOT
-# `mcp-scan scan` inside a forbid-this prose sentence).
-if grep -qE '"\$mcp_scan_bin" +scan\b' "$runner"; then
-    echo "ai-tools-drill: FAIL — runner uses forbidden 'scan' subcommand as live invocation" >&2
+if grep -qE '"scan"' "$wrapper"; then
+    echo "ai-tools-drill: FAIL — wrapper references the forbidden 'scan' subcommand as an argv element" >&2
+    exit 1
+fi
+if grep -qE '"--dangerously-run-mcp-servers"' "$wrapper"; then
+    echo "ai-tools-drill: FAIL — wrapper passes --dangerously-run-mcp-servers" >&2
+    exit 1
+fi
+# `inspect` on a config declaring stdio servers PROMPTS to launch them. Closing
+# stdin is what makes the answer always "no"; inheriting a terminal would not.
+if ! grep -qE 'stdin=subprocess\.DEVNULL' "$wrapper"; then
+    echo "ai-tools-drill: FAIL — wrapper does not close stdin, so a server-launch consent prompt could be answered" >&2
     exit 1
 fi
 # Documentation must explicitly forbid the dangerous flag and subcmd.
@@ -119,7 +131,7 @@ if ! grep -qE 'NOT.*--dangerously-run-mcp-servers|MUST NOT pass.*--dangerously-r
     echo "ai-tools-drill: FAIL — runner does not explicitly forbid --dangerously-run-mcp-servers" >&2
     exit 1
 fi
-echo "  runner uses inspect/--skills only and explicitly forbids 'scan' + --dangerously-run-mcp-servers"
+echo "  wrapper uses inspect only with stdin closed; runner prose forbids 'scan' + --dangerously-run-mcp-servers"
 
 # Assertion 4: synthesize the unavailable stdout the agent must emit.
 offline_out="$scratch/ai-tools-offline.jsonl"

@@ -34,7 +34,7 @@ is safe.
 | `ios-runner` | codesign, spctl, mobsfscan, xcrun, find, head, command -v, basename, uname, echo | `Bash(codesign:*), Bash(spctl:*), Bash(mobsfscan:*), Bash(xcrun:*), Bash(find:*), Bash(head:*), Bash(command -v:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)` |
 | `macos-runner` | codesign, spctl, pkgutil, mobsfscan, xcrun, find, command -v, basename, uname, echo | `Bash(codesign:*), Bash(spctl:*), Bash(pkgutil:*), Bash(mobsfscan:*), Bash(xcrun:*), Bash(find:*), Bash(command -v:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)` |
 | `windows-runner` | binskim, osslsigncode, sigcheck.exe, jq, find, tr, wc, command -v, basename, uname, echo | `Bash(binskim:*), Bash(osslsigncode:*), Bash(sigcheck.exe:*), Bash(jq:*), Bash(find:*), Bash(tr:*), Bash(wc:*), Bash(command -v:*), Bash(basename:*), Bash(uname:*), Bash(echo:*)` |
-| `ai-tools-runner` | jq, mcp-scan, find, sed, printf, command -v, basename | `Bash(jq:*), Bash(mcp-scan:*), Bash(find:*), Bash(sed:*), Bash(printf:*), Bash(command -v:*), Bash(basename:*)` |
+| `ai-tools-runner` | ~~jq, mcp-scan, find, sed, printf, command -v, basename~~ **SUPERSEDED 2026-08-27** — migrated to the engine; now `python3` only | `Bash(python3:*)` |
 
 ## Class D — BLOCKED: agent-body `find -exec` (cannot be expressed as a scoped allowlist)
 
@@ -183,3 +183,127 @@ present to re-verify behaviour.
 ship UNSCOPED, and under the permissive/`auto` modes users actually run, loops and
 process substitution execute normally.** So this is not a live outage; it is the
 reason the lanes cannot simply be scoped.
+
+## Second probe round (2026-08-27): the blocker is `>`, and the remedy on file is wrong
+
+Pilot scoping of **one** lane (`ios` — the cheapest of the six: zero loops) to
+test whether the six could be taken one at a time. It cannot be, but not for the
+reason recorded above. Harness: `docs/plans-notes/ios-scope-probe.sh`; raw
+transcripts: `docs/plans-notes/ios-scope-probe-transcripts.txt`.
+
+**Environment:** Claude Code **2.1.247**, Linux 7.0.0-28-generic, same
+harness-owned strict settings and marker-file method as the 2026-07-25 run.
+Controls behaved on every round reported here.
+
+**Two verdicts from the first round were discarded, and why matters:**
+
+| Discarded verdict | What it reported | Actual cause |
+|---|---|---|
+| `$(basename …)` in a redirect target | DENIED | `Error: Reached max turns (3)` — the probe never got a verdict. No marker, so it read as a denial. The harness now reports INCONCLUSIVE on max-turns. |
+| `find … \| head > f` | DENIED "for security, Claude Code may only write to files in the allowed working directories" | The path *was* inside the allowed root. The message is misleading; re-probing under a bare `Bash` grant showed it ALLOWED, so it is a scoped-allowlist refusal, not a sandbox one. |
+
+### Results
+
+| # | Construct | Allowlist | Verdict |
+|---|---|---|---|
+| A1 | `[ -f X ] && touch M` | `Bash(touch:*)` | **ALLOWED** (replicates 2026-07-25 Q1 on 2.1.247) |
+| A2 | `[ "$VAR" != "" ] && touch M` | `Bash(touch:*)` | **DENIED** |
+| A3 | same as A2 | `+ Bash([:*)` | **ALLOWED** |
+| B1 | `echo hi > f && touch M` | `Bash(echo:*),Bash(touch:*)` | **DENIED** |
+| B2 | same as B1 | `Bash` (bare) | **ALLOWED** |
+| B3 | `echo ok > "f-$(basename P).txt"` | `Bash(echo:*),Bash(basename:*),Bash(touch:*)` | **DENIED** |
+| B4 | same as B3 | `Bash` (bare) | **ALLOWED** |
+| C1 | `find … \| head -n 10 && touch M` | `Bash(find:*),Bash(head:*),Bash(touch:*)` | **ALLOWED** |
+| C2 | same as C1 **plus `> f`** | same | **DENIED** |
+| D1 | `host_os=$(uname -s … \|\| echo Unknown) && touch M` | `Bash(uname:*),Bash(echo:*),Bash(touch:*)` | **ALLOWED** |
+
+### What this corrects and what it adds
+
+1. **Conclusion 1 above is wrong for the form the runners actually use.**
+   "`[ … ] && …` needs no grant … no `Bash([:*)` is required anywhere" holds only
+   for a test with no variable expansion (A1). Every real gate is
+   `[ "$host_os" = "Darwin" ] && …`, which is **DENIED** (A2) and fixed by
+   granting `Bash([:*)` (A3). That is a frontmatter addition, not a rewrite —
+   and it is missing from all six drafted scopes in `886a60a`.
+
+2. **Output redirection is the blocker, and it is unconditional.** A bare
+   `echo hi > f` is refused under a scoped allowlist with `echo` itself granted
+   (B1) and allowed under bare `Bash` (B2). The pipe is innocent: the same
+   pipeline passes without a redirect (C1) and fails with one (C2).
+   `$(…)` inside a redirect target is a refused sub-case with its own message
+   (`Redirect target contains $(cmd) output — path is runtime-determined`, B3).
+   Command substitution *on its own* is fine (D1).
+
+3. **This — not loops — is why 24 scoped cleanly and 6 did not.** Of the 25
+   runners, the 19 scoped ones all carry `Bash(python3:*)` and their entire bash
+   surface is one line:
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" <lane> <target>`.
+   **Zero** of them contain a `>` redirect — the engine does the file writing.
+   The six exempt runners are exactly the six that still shell out directly and
+   redirect each tool's stdout/stderr to `$TMPDIR/…`.
+
+4. **BL-002's recorded remedy is therefore the wrong one.** "Per-artifact loops
+   become `xargs -I{}`, `$(…)` captures become files" cannot work: *writing those
+   files is itself the unscopeable act*. Rewriting the loops would leave every
+   lane still refused at its first `>`.
+
+5. **The right remedy is the migration this repo already performs 19 times:**
+   give each of the six a `scripts/secaudit/lanes/<lane>` definition and reduce
+   its agent body to the one-line engine invocation. `ai-tools` is **already
+   half-migrated** — `scripts/secaudit/lanes/ai-tools` exists (commit `b91a43c`)
+   but `agents/ai-tools-runner.md` still shells out directly (7 loops, 3
+   redirects) and still carries a bare `Bash` grant. Lanes missing entirely:
+   `ios`, `macos`, `windows`, `linux`, `netcfg`.
+
+### Residual uncertainty (do not overstate these results)
+
+- Probes drove `claude -p --allowedTools`; the runners are dispatched as
+  sub-agents granted through `tools:` frontmatter. Same caveat as the 2026-07-25
+  run — the two are believed to share a permission engine, still not proven here.
+- Verified on Linux, one Claude Code version (2.1.247). A1 replicating the
+  2026-07-25 Q1 result is evidence the matcher did not drift between 2.1.220 and
+  2.1.247, but only for that one construct.
+- No lane was scoped or dispatched as part of this round. The migration in
+  finding 5 is a *proposal* sized from the existing pattern, not a measured one.
+
+### Outcome: ai-tools migrated (2026-08-27)
+
+`ai-tools` was taken through the finding-5 migration as the pilot, and left the
+exemption list. What it took:
+
+- **`scripts/secaudit/mcpscan.py`** (new, bundled) — the one thing that had kept
+  this lane agent-driven. It does the skill-directory discovery the lane schema
+  cannot express, normalises mcp-scan's path-keyed output, and closes stdin so
+  the server-launch consent prompt is always declined.
+- **`scripts/secaudit/runner.py`** — two small general additions: `probe` may be
+  a LIST of interchangeable binary names (mcp-scan also ships as
+  snyk-agent-scan) with the resolved name available as `{probe}`; and
+  `fail_on_rc` lets a bundled wrapper degrade its lane to `partial` instead of
+  reporting a clean `ok` over a target it did not finish reading.
+- **`agents/ai-tools-runner.md`** — 415 lines to 207, all shell replaced by the
+  one-line engine call, grant `Bash` → `Bash(python3:*)`.
+- **`tests/ai-tools-drill.sh`** — the mcp-scan safety assertions follow the
+  invocation into the wrapper (inspect-only, no `scan`, no
+  `--dangerously-run-mcp-servers`, stdin closed); the prose prohibitions stay
+  asserted on the agent markdown.
+- **`tests/contract-check.sh`** — exempt list 6 → 5.
+
+**Verified under real enforcement, not by inspection.** Paired probe of the
+agent's exact command: ALLOWED under `Bash(python3:*)`, emitting
+`{"__ai_tools_status__": "ok", "tools": ["agentscan", "jq", "mcp-scan"], ...}`;
+DENIED (`requires approval`) under a deliberately wrong `Bash(echo:*)`. Full
+suite `ci-local.sh` 75/75.
+
+**Two pre-existing bugs surfaced while porting, both now fixed in the wrapper:**
+
+1. The old runner invoked `"$mcp_scan_bin" --skills "$dir"`. `--skills` is a
+   BOOLEAN toggle on this CLI, not a path-taking option — that call exits
+   non-zero and scans nothing. Skills were never actually scanned by mcp-scan.
+   The correct form is `inspect <dir>` positionally.
+2. `inspect` reports **without security verification** — its `issues` array is
+   empty by construction, confirmed against the deliberately poisoned fixture.
+   Verification is `mcp-scan scan`, which launches MCP servers and posts to a
+   remote analysis endpoint, both forbidden by this lane. So mcp-scan can only
+   ever contribute coverage here, never findings; `agentscan` is what actually
+   finds poisoned agents and skills. **This is a product decision left open, not
+   something the migration settled** — see BL-002.

@@ -2,17 +2,19 @@
 name: ai-tools-runner
 description: "AI-tools static-analysis adapter for sec-audit. Runs jq (JSON structural validator) and mcp-scan (tool-poisoning + malicious-description scanner) against AI-tool-config files under target_path; emits JSONL findings tagged origin: \"ai-tools\". Sentinel-exits when tools are unavailable. Dispatched by sec-audit §3.25."
 model: haiku
-tools: Read, Bash
+tools: Read, Bash(python3:*)
 ---
 
 # ai-tools-runner
 
-You are the AI-tools static-analysis adapter. You run two
-tools against the caller's AI-tool-config files: jq for JSON
-structural validation, and mcp-scan (in `inspect` mode only)
-for tool-poisoning and malicious-description detection. You
-map their outputs to sec-audit's finding schema and emit
-JSONL on stdout. You never invent findings, never invent CWE
+You are the AI-tools static-analysis adapter. A deterministic
+engine runs three tools against the caller's AI-tool-config
+files — jq for JSON structural validation, agentscan for
+tool-poisoning checks over agent/skill/command markdown, and
+mcp-scan (in `inspect` mode only) for MCP server and skill
+coverage — and maps their output to sec-audit's finding schema
+as JSONL on stdout. You dispatch that engine and polish
+presentation. You never invent findings, never invent CWE
 numbers, never claim a clean scan when a tool was unavailable
 or no applicable files existed, and never launch any MCP
 server under any circumstance.
@@ -51,8 +53,9 @@ server under any circumstance.
    `partial`, never to `unavailable`, as long as agentscan ran.
    Fold its stderr coverage line (`scanned N skill + M agent
    file(s)`) into the status record.
-7. **Output goes to `$TMPDIR`.** Never write into the
-   caller's tree.
+7. **Never write into the caller's tree.** The engine owns
+   every intermediate file and keeps them in its own temp
+   directory; you invoke it and read stdout.
 8. **No host-OS gate** — both tools are cross-platform.
 9. **Pattern findings come from sec-expert.** mcp-scan
    contributes runner findings tagged `tool: "mcp-scan"`;
@@ -116,281 +119,73 @@ and exit 0.
 
 ## Procedure
 
-### Step 1 — Read reference file
+Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM)
+**polish** presentation only. Do NOT hand-map, invent, drop, or re-rank findings.
 
-Load `references/ai-tools-tools.md`; extract invocations,
-field mappings, and skip vocabulary.
-
-### Step 2 — Resolve target + probe both tools
+### Step 1 — Extract (deterministic engine)
 
 ```bash
-target_path="${target_path:-$1}"
-target_path="${target_path:-$AI_TOOLS_TARGET_PATH}"
-[ -d "$target_path" ] || { emit_unavailable "no-target"; exit 0; }
-
-have_jq=0
-command -v jq >/dev/null 2>&1 && have_jq=1
-
-mcp_scan_bin=""
-if command -v mcp-scan >/dev/null 2>&1; then
-    mcp_scan_bin="mcp-scan"
-elif command -v snyk-agent-scan >/dev/null 2>&1; then
-    mcp_scan_bin="snyk-agent-scan"
-fi
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" ai-tools <target_path>
 ```
 
-### Step 3 — Enumerate inputs per tool
+The engine probes the tools (`command -v jq`, `command -v mcp-scan` falling back
+to `command -v snyk-agent-scan`, `command -v python3`), checks applicability,
+runs each, and maps results to the Finding schemas above per
+`ai-tools-tools.md`:
 
-#### jq inputs (six AI-tool-config JSON shapes)
+- **jq** (`jq --exit-status .`, a per-file **validator** over the AI-tool-config
+  shapes `plugin.json`, `marketplace.json`, `.mcp.json`, `settings.json`,
+  `settings.local.json`, `opencode.json`, `claude_desktop_config.json`): a
+  non-zero exit synthesizes one `jq:invalid-json` finding (`CWE-1284`, MEDIUM)
+  from the parse diagnostic — one finding per malformed file. Arbitrary `*.json`
+  under the target is never validated.
+- **agentscan** (bundled `scripts/secaudit/agentscan.py`, so it can never be
+  missing): deterministic tool-poisoning checks over every agent, skill, and
+  command markdown file found by shape — unscoped/interpreter tool grants,
+  hidden unicode, hidden instructions, instruction override, exfiltration
+  shapes. This is the lane's floor: it is why a missing mcp-scan degrades the
+  lane to `partial` and never to `unavailable`.
+- **mcp-scan** (bundled `scripts/secaudit/mcpscan.py` driving whichever binary
+  is present): discovers every `.mcp.json` / `claude_desktop_config.json` and
+  every directory that DIRECTLY contains skill folders (derived from
+  `*/SKILL.md`, so a marketplace's `plugins/<plugin>/skills/` is found — the old
+  fixed `<target>/skills` path missed it), then runs `inspect <path>` once per
+  discovered path with stdin closed.
 
-```bash
-ai_config_files=""
-for path in \
-    "$target_path/.claude-plugin/plugin.json" \
-    "$target_path/.claude-plugin/marketplace.json" \
-    "$target_path/.claude/settings.json" \
-    "$target_path/.claude/settings.local.json" \
-    "$target_path/opencode.json"; do
-    [ -f "$path" ] && ai_config_files="$ai_config_files
-$path"
-done
-mcp_files=$( find "$target_path" -type f -name '.mcp.json' 2>/dev/null )
-ai_config_files="$ai_config_files
-$mcp_files"
-ai_config_files=$( printf '%s\n' "$ai_config_files" | sed '/^$/d' )
-```
+  **`inspect` reports what exists; it does not verify it.** Its `issues` array
+  is empty by construction — verification lives in `mcp-scan scan`, which
+  launches MCP servers locally and posts to a remote analysis endpoint, and is
+  forbidden here by Hard rules 3 and the network prohibition below. Treat this
+  tool as coverage, not as findings: the findings for poisoned agents and skills
+  come from `agentscan`. If a discovered path errors, the wrapper exits non-zero
+  and the lane reports `partial` with an `inspect-incomplete` skip rather than a
+  clean `ok` over a target it did not finish reading.
 
-#### mcp-scan inputs (.mcp.json, claude_desktop_config.json, skills tree)
-
-```bash
-mcp_scan_files=""
-# .mcp.json files (already enumerated above)
-mcp_scan_files="$mcp_scan_files
-$mcp_files"
-# claude_desktop_config.json anywhere under target
-cdc_files=$( find "$target_path" -type f -name 'claude_desktop_config.json' 2>/dev/null )
-mcp_scan_files="$mcp_scan_files
-$cdc_files"
-mcp_scan_files=$( printf '%s\n' "$mcp_scan_files" | sed '/^$/d' )
-
-# skills tree paths (passed via --skills, not as individual files)
-mcp_scan_skills_paths=""
-for sp in \
-    "$target_path/skills" \
-    "$target_path/.claude/skills" \
-    "$target_path/agents" \
-    "$target_path/.claude/agents"; do
-    [ -d "$sp" ] && mcp_scan_skills_paths="$mcp_scan_skills_paths
-$sp"
-done
-mcp_scan_skills_paths=$( printf '%s\n' "$mcp_scan_skills_paths" | sed '/^$/d' )
-```
-
-### Step 4 — Determine status + early-exit
-
-If both `have_jq=0` and `mcp_scan_bin=""`, emit unavailable
-sentinel with two `tool-missing` skipped entries; exit 0.
-
-If `have_jq=1` but `ai_config_files` is empty AND
-`mcp_scan_bin=""`, emit unavailable with one
-`no-ai-tool-config` skipped entry for jq and one
-`tool-missing` for mcp-scan; exit 0.
-
-(All other input-empty / tool-missing combinations roll up
-into the partial / ok status emitted at Step 7.)
-
-### Step 5 — Run jq
-
-Per file, capture stderr only (stdout goes to /dev/null):
-
-```bash
-: > "$TMPDIR/ai-tools-runner-jq.tsv"
-if [ "$have_jq" = 1 ] && [ -n "$ai_config_files" ]; then
-  while IFS= read -r f; do
-      [ -z "$f" ] && continue
-      out=$( jq --exit-status . "$f" 2>&1 >/dev/null )
-      rc=$?
-      rel="${f#$target_path/}"
-      if [ "$rc" -ne 0 ]; then
-          printf '%s\t%d\t%s\n' "$rel" "$rc" "$out" \
-              >> "$TMPDIR/ai-tools-runner-jq.tsv"
-      fi
-  done <<< "$ai_config_files"
-fi
-```
-
-Parse the TSV; emit one MEDIUM finding per failing file:
-
-```bash
-awk -F '\t' '
-  $2 != 0 {
-    rel=$1; msg=$3;
-    line=0;
-    if (match(msg, /at line ([0-9]+)/, arr)) line=arr[1];
-    gsub(/"/, "\\\"", msg);
-    snippet=substr(msg, 1, 200);
-    printf "{\"id\":\"jq:invalid-json\",\"severity\":\"MEDIUM\",\"cwe\":\"CWE-1284\",\"title\":\"%s\",\"file\":\"%s\",\"line\":%d,\"evidence\":\"%s\",\"reference\":\"ai-tools-tools.md\",\"reference_url\":\"https://stedolan.github.io/jq/manual/\",\"fix_recipe\":null,\"confidence\":\"high\",\"origin\":\"ai-tools\",\"tool\":\"jq\"}\n", snippet, rel, line, snippet
-  }
-' "$TMPDIR/ai-tools-runner-jq.tsv"
-```
-
-### Step 6 — Run mcp-scan (inspect mode only)
-
-```bash
-mcp_scan_ran=0
-mcp_scan_failed=0
-mcp_scan_findings_count=0
-
-if [ -n "$mcp_scan_bin" ] && { [ -n "$mcp_scan_files" ] || [ -n "$mcp_scan_skills_paths" ]; }; then
-  mcp_scan_ran=1
-  i=0
-  while IFS= read -r f; do
-      [ -z "$f" ] && continue
-      i=$((i+1))
-      out_file="$TMPDIR/ai-tools-runner-mcpscan-$i.json"
-      "$mcp_scan_bin" inspect "$f" --json \
-          > "$out_file" 2>/dev/null
-      rc=$?
-      if [ "$rc" -ne 0 ] || [ ! -s "$out_file" ]; then
-          mcp_scan_failed=1
-          continue
-      fi
-      # Parse output (permissive — see Step 6.1)
-      emit_mcp_scan_findings_from "$out_file" "$f" "$target_path"
-  done <<< "$mcp_scan_files"
-
-  while IFS= read -r sp; do
-      [ -z "$sp" ] && continue
-      i=$((i+1))
-      out_file="$TMPDIR/ai-tools-runner-mcpscan-skills-$i.json"
-      "$mcp_scan_bin" --skills "$sp" --json \
-          > "$out_file" 2>/dev/null
-      rc=$?
-      if [ "$rc" -ne 0 ] || [ ! -s "$out_file" ]; then
-          mcp_scan_failed=1
-          continue
-      fi
-      emit_mcp_scan_findings_from "$out_file" "$sp" "$target_path"
-  done <<< "$mcp_scan_skills_paths"
-fi
-```
-
-#### Step 6.1 — Permissive mcp-scan output parser
-
-Implement `emit_mcp_scan_findings_from` as a jq-driven mapper
-that tolerates the three known top-level shapes
-(`{issues:[…]}`, `{findings:[…]}`, `{results:[…]}`) and the
-top-level-array fallback:
-
-```bash
-emit_mcp_scan_findings_from() {
-    local out_file="$1"
-    local source_file="$2"
-    local target_path="$3"
-    local rel="${source_file#$target_path/}"
-
-    # Pick whichever array is present; null-coalesce safely.
-    jq -c --arg rel "$rel" '
-      ( .issues // .findings // .results //
-        ( if (type == "array") then . else [] end ) ) as $items
-      | $items[]?
-      | {
-          id:           ( .id // .rule_id // .check_id // "mcp-scan:unknown" ),
-          severity:     (
-              ( .severity // "MEDIUM" | ascii_upcase )
-              | if . == "CRITICAL" or . == "HIGH" then "HIGH"
-                elif . == "MEDIUM" or . == "MODERATE" then "MEDIUM"
-                else "LOW" end
-          ),
-          cwe:          ( .cwe // .cwe_id // "CWE-94" ),
-          title:        ( ( .title // .name // .description // "" ) | tostring | .[0:200] ),
-          file:         ( .file // .path // .config_file // $rel ),
-          line:         ( .line // .line_number // 0 ),
-          evidence:     ( ( .evidence // .description // .message // .title // "" ) | tostring | .[0:200] ),
-          reference:    "ai-tools-tools.md",
-          reference_url:( .url // .reference // "https://github.com/invariantlabs-ai/mcp-scan" ),
-          fix_recipe:   null,
-          confidence:   "medium",
-          origin:       "ai-tools",
-          tool:         "mcp-scan"
-        }
-    ' "$out_file" 2>/dev/null
-    rc=$?
-    if [ "$rc" -ne 0 ]; then
-        mcp_scan_failed=1
-        return 1
-    fi
-}
-```
-
-If jq returns non-zero for the parser (the document was not
-a recognized shape), set `mcp_scan_failed=1` and continue.
-Do NOT fabricate findings.
-
-### Step 7 — Status summary
-
-Compute final status from the four flags:
-
-```
-have_jq           ∈ {0,1}
-ai_config_files   non-empty?     (jq inputs available)
-mcp_scan_bin      non-empty?
-mcp_scan_ran      ∈ {0,1}
-mcp_scan_failed   ∈ {0,1}
-```
-
-Decision matrix:
-
-| jq state                                  | mcp-scan state                                                | status        |
-|-------------------------------------------|---------------------------------------------------------------|---------------|
-| ran (have_jq=1, inputs present)           | ran (mcp_scan_ran=1, not failed)                              | `ok`          |
-| ran                                       | tool present, no inputs                                       | `partial`     |
-| ran                                       | tool missing                                                  | `partial`     |
-| ran                                       | tool present, parser failed                                   | `partial`     |
-| have_jq=1, no inputs                      | ran                                                           | `partial`     |
-| tool missing                              | ran                                                           | `partial`     |
-| have_jq=1, no inputs                      | tool present, no inputs                                       | `unavailable` |
-| have_jq=1, no inputs                      | tool missing                                                  | `unavailable` |
-| tool missing                              | tool present, no inputs                                       | `unavailable` |
-| tool missing                              | tool missing                                                  | `unavailable` |
-| tool missing                              | tool present, parser failed                                   | `partial`*    |
-
-*The parser-failed mcp-scan does not contribute findings,
-but the tool is reported in the `tools` array with a
-`parse-failed` skipped reason.
-
-Emit on success:
+Output is faithful JSONL — every line `origin: "ai-tools"`, `tool: "jq" |
+"agentscan" | "mcp-scan"` — then one `__ai_tools_status__` record. A tool absent
+from PATH is a `tool-missing` skip; a tool present with no applicable input is a
+`no-ai-tool-config` skip. When no tool ran, the only line is the unavailable
+sentinel:
 
 ```json
-{"__ai_tools_status__":"ok","tools":["jq","mcp-scan"],"runs":2,"findings":<n>,"skipped":[]}
+{"__ai_tools_status__": "unavailable", "tools": []}
 ```
 
-Emit on partial (one tool missing):
+### Step 2 — Polish (presentation only)
 
-```json
-{"__ai_tools_status__":"partial","tools":["jq"],"runs":1,"findings":<n>,"skipped":[{"tool":"mcp-scan","reason":"tool-missing"}]}
-```
-
-Emit on unavailable (both missing):
-
-```json
-{"__ai_tools_status__":"unavailable","tools":[],"skipped":[{"tool":"jq","reason":"tool-missing"},{"tool":"mcp-scan","reason":"tool-missing"}]}
-```
-
-Emit on unavailable (no applicable inputs for either):
-
-```json
-{"__ai_tools_status__":"unavailable","tools":[],"skipped":[{"tool":"jq","reason":"no-ai-tool-config"},{"tool":"mcp-scan","reason":"no-ai-tool-config"}]}
-```
+You MAY rewrite `title` for readability and refine `severity` with project
+context. You MUST NOT change `id`, `file`, `line`, `cwe`, `tool`, `origin`, or
+`fix_recipe`, MUST NOT add or remove findings, and MUST relay the
+`__ai_tools_status__` sentinel verbatim. Extraction is deterministic; the "never
+fabricate" guarantees in **Hard rules** are enforced by the engine.
 
 ## Output discipline
 
 - JSONL on stdout; telemetry on stderr.
 - Structured `{tool, reason}` skipped entries.
 - Never conflate clean-skip with failure.
-- `tools` array lists the names of tools that ran AND
-  produced parseable output; tools that were probed but
-  missing or parser-failed appear in `skipped` only.
+- `tools` lists the tools that ran AND produced parseable output; a tool that
+  was probed but missing, inapplicable, or incomplete appears in `skipped`.
 
 ## What you MUST NOT do
 
