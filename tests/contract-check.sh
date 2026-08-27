@@ -2702,16 +2702,16 @@ echo "v1.27-symmetry: foreign lanes reject phpcs"
 # followed by a token separator (comma/space) or EOL — so a scoped
 # `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
 #
-# KNOWN EXEMPTIONS (BL-002): 5 host-OS-gated runners still carry a bare `Bash`
+# KNOWN EXEMPTIONS (BL-002): 4 host-OS-gated runners still carry a bare `Bash`
 # grant. They cannot be scoped by editing frontmatter: under a per-tool
 # allowlist the matcher refuses `>` output redirection outright, whatever is
 # granted (measured 2026-08-27, see docs/plans-notes/bash-scope-inventory.md
 # § "Second probe round"), and these five redirect each tool's output to a temp
 # file. Scoping them means migrating them onto the runner.py engine the other
-# 20 runners use, whose entire bash surface is one `python3 runner.py <lane>`
-# call with no redirect. `ai-tools` was migrated that way on 2026-08-27 and left
-# this list; ios/macos/windows/linux/netcfg still need their engine lanes.
-bare_bash_exempt='ios-runner|macos-runner|windows-runner|linux-runner|netcfg-runner'
+# 21 runners use, whose entire bash surface is one `python3 runner.py <lane>`
+# call with no redirect. `ai-tools` and `netcfg` were migrated that way on
+# 2026-08-27 and left this list; ios/macos/windows/linux still need engine lanes.
+bare_bash_exempt='ios-runner|macos-runner|windows-runner|linux-runner'
 bare_bash=0; bare_bash_pending=0
 while IFS= read -r offender; do
     [ -z "$offender" ] && continue
@@ -2725,8 +2725,8 @@ while IFS= read -r offender; do
 done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
          | grep -E '\bBash([,[:space:]]|$)' || true)
 echo "no-bare-bash: $bare_bash unexpected + $bare_bash_pending BL-002-exempt file(s) with an unscoped Bash grant"
-if [ "$bare_bash_pending" -ne 5 ]; then
-    echo "CONTRACT FAIL: expected exactly 5 BL-002-exempt host-OS runners with bare Bash," \
+if [ "$bare_bash_pending" -ne 4 ]; then
+    echo "CONTRACT FAIL: expected exactly 4 BL-002-exempt host-OS runners with bare Bash," \
          "found $bare_bash_pending — update the exemption list / BL-002 as lanes are scoped" >&2
     fail=1
 fi

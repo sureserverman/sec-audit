@@ -1,0 +1,72 @@
+{
+  "lane": "netcfg",
+  "status_key": "__netcfg_status__",
+  "origin": "netcfg",
+  "reference": "netcfg-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "Both tools are self-validators: they parse a config and exit non-zero with a diagnostic, which is exactly the `validator` shape jq and virt-xml-validate already use. Only the VALIDATION subcommands appear here \u2014 `sing-box check` and `xray test`, never `run`, which would bind ports and touch the network. Shape detection is a two-clause lookahead rather than a filename glob because both tools eat `*.json`: a file qualifies only if it has an `inbounds` array AND that dialect's protocol vocabulary, so a sing-box config is never handed to xray or vice versa.",
+  "tools": [
+    {
+      "name": "sing-box",
+      "probe": "sing-box",
+      "mode": "validator",
+      "file_select": {
+        "glob": "*.json",
+        "grep": "(?=[\\s\\S]*\"inbounds\")(?=[\\s\\S]*\"type\"\\s*:\\s*\"(socks|http|mixed|vless|trojan|hysteria|hysteria2|tuic|naive|shadowsocks)\")"
+      },
+      "invoke": [
+        "sing-box",
+        "check",
+        "-c",
+        "{file}"
+      ],
+      "inapplicable_reason": "no-singbox-config",
+      "dedupe_by": "file",
+      "message_regex": "(?:ERROR|FATAL)\\[\\d+\\]\\s*(.*)",
+      "line_regex": "line\\s+([0-9]+)",
+      "synth": {
+        "id": "sing-box:invalid-config",
+        "severity": "MEDIUM",
+        "cwe": "CWE-1284",
+        "title": "{msg}",
+        "evidence": "{msg}",
+        "reference_url": "https://sing-box.sagernet.org/configuration/",
+        "fix_recipe": null,
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "xray",
+      "probe": "xray",
+      "mode": "validator",
+      "file_select": {
+        "glob": "*.json",
+        "grep": "(?=[\\s\\S]*\"inbounds\")(?=[\\s\\S]*\"protocol\"\\s*:\\s*\"(vless|vmess|trojan|shadowsocks|dokodemo-door|freedom|blackhole)\")"
+      },
+      "invoke": [
+        "xray",
+        "run",
+        "-test",
+        "-c",
+        "{file}"
+      ],
+      "inapplicable_reason": "no-xray-config",
+      "dedupe_by": "file",
+      "message_regex": "Failed to start:.*",
+      "line_regex": "line\\s+([0-9]+)",
+      "synth": {
+        "id": "xray:invalid-config",
+        "severity": "MEDIUM",
+        "cwe": "CWE-1284",
+        "title": "{msg}",
+        "evidence": "{msg}",
+        "reference_url": "https://xtls.github.io/config/",
+        "fix_recipe": null,
+        "confidence": "high"
+      },
+      "_note": "`run -test` is xray's ONLY validation path \u2014 there is no `xray test` subcommand (the previous agent documented one; it exits `unknown command`, which a naive port turns into a finding claiming the user's config is malformed). `-test` loads and checks the config and exits WITHOUT launching the server: 0 on success printing `Configuration OK.`, 23 on a bad config. Per-FILE (`-c`) rather than per-directory (`-confdir`): -confdir parses every JSON in the directory, so it would hand a sing-box config to xray and report the dialect mismatch as an xray error."
+    }
+  ]
+}

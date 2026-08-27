@@ -307,3 +307,52 @@ suite `ci-local.sh` 75/75.
    ever contribute coverage here, never findings; `agentscan` is what actually
    finds poisoned agents and skills. **This is a product decision left open, not
    something the migration settled** — see BL-002.
+
+### Outcome: netcfg migrated (2026-08-27)
+
+Second lane through the finding-5 migration; exemption list 5 → 4. Cheaper than
+ai-tools — both tools are pass/fail self-validators, which is exactly the
+engine's existing `validator` mode (as used by jq and virt-xml-validate), so
+`scripts/secaudit/lanes/netcfg.json` needed no bundled wrapper at all.
+
+Shape detection is a two-clause lookahead rather than a filename glob, because
+both tools eat `*.json`: a file qualifies only if it carries an `inbounds` array
+AND that dialect's protocol vocabulary. Without that, `-confdir`-style
+invocation hands a sing-box config to xray and reports the dialect mismatch as
+an xray error.
+
+**Three engine additions, all general:**
+
+- ANSI SGR stripping on validator output — sing-box colourises its diagnostics
+  and the raw escapes were landing in finding titles.
+- `message_regex` narrows a chatty validator's output to the actual diagnostic.
+  xray prints a version banner and a run of `[Info]` lines before its error;
+  without this the finding's title was the banner. No match leaves the message
+  untouched, so a changed output format degrades to noisy, never to empty.
+- (A `parent-dirs` validator selector was added and then reverted — see below.)
+
+**A third pre-existing bug, same class as the other two.** The runner documented
+`xray test -confdir <dir>`. **There is no `xray test` subcommand** — it exits
+`unknown command`, and the faithful port dutifully turned the tool's own usage
+error into a finding claiming the caller's config was malformed. Worse,
+`tests/netcfg-drill.sh` asserted `grep -q "xray test"`, so the test suite was
+actively holding the bug in place. The validation form is `xray run -test -c
+<file>`: it loads and checks the config and exits without launching the server,
+0 with `Configuration OK.` when valid and 23 with a `Failed to start:`
+diagnostic when not. Per-FILE, not per-directory — which is why the
+`parent-dirs` selector written for `-confdir` was reverted rather than kept.
+
+That invocation required amending Hard rule 5, which read "NEVER use `sing-box
+run` or `xray run`". The rule's intent is *never start a listener*; `run -test`
+satisfies it. The rule now states the intent precisely — `-test` is mandatory
+whenever `xray run` appears — and the drill asserts the lane's argv directly,
+including that no tool invokes `run` without `-test`.
+
+**Verified under real enforcement:** ALLOWED under `Bash(python3:*)` emitting
+`{"__netcfg_status__": "ok", "tools": ["sing-box", "xray"], "runs": 2,
+"findings": 2}`; DENIED under a wrong `Bash(echo:*)`. `ci-local.sh` 75/75.
+
+**Running total: 2 of 6 migrated. Three lanes ported, three latent invocation
+bugs found** — each one a documented command that silently did nothing or
+reported the tool's own error as the caller's fault. Whatever else BL-002 is
+worth, porting a lane to the engine is proving to be the thing that finds them.
