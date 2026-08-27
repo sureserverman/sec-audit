@@ -1,0 +1,261 @@
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_a
+allow: Bash(touch:*)
+---
+The command ran verbatim and was permitted — no output, exit success. `docs/plans-notes/.ios-probe-tmp/mk_a` now exists.
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_b
+allow: Bash(echo:*)
+---
+Blocked. The harness rejected it:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_b' was blocked.
+For security, Claude Code may only create or modify files in the allowed working
+directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Worth noting for BL-002: the path *is* under the stated allowed root, so the denial isn't a simple prefix mismatch — something else in the matcher (likely the hidden `.ios-probe-tmp` path segment) triggered it. I did not retry or substitute anything.
+
+DONE
+===
+IOS-1-assign-cmdsub [ALLOWED]
+cmd: host_os=$(uname -s 2>/dev/null || echo Unknown) && touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_1
+allow: Bash(uname:*),Bash(echo:*),Bash(touch:*)
+---
+The command ran verbatim and was permitted — exit 0, no output, and `mk_1` was created in `docs/plans-notes/.ios-probe-tmp/`.
+
+DONE
+===
+IOS-2-bracket-var [DENIED]
+cmd: [ "$HOME" != "" ] && touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_2
+allow: Bash(touch:*)
+---
+Blocked. The permission matcher split the command into its `&&` operands and rejected the first one:
+
+```
+This Bash command contains multiple operations. The following part requires approval: [ "$HOME" != "" ]
+```
+
+So the measurement is: a `[ ... ] && <cmd>` conjunction is decomposed per-operand, and the `[` test builtin isn't covered by the allowlist — the `touch` half never got evaluated. The file `mk_2` was not created. I did not run any substitute command.
+
+DONE
+===
+IOS-3-bracket-commandv [DENIED]
+cmd: [ "$HOME" != "" ] && command -v ls >/dev/null && touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_3
+allow: Bash(command:*),Bash(touch:*)
+---
+Blocked. The harness rejected it before execution:
+
+```
+This Bash command contains multiple operations. The following part requires approval: [ "$HOME" != "" ]
+```
+
+Two details worth recording for BL-002:
+
+- The matcher decomposed the `&&` chain rather than evaluating it as one string — so `&&` chaining is not a prefix-only blind spot here.
+- The part it flagged was the `[ ... ]` test builtin, **not** the `touch` write or `command -v`. So the block came from an unmatched construct, not from the payload — a permit rule covering `[` would likely have let the whole chain through.
+
+No file was created; `mk_3` does not exist. I did not run a substitute.
+
+DONE
+===
+IOS-4-cmdsub-redirect [DENIED]
+cmd: echo ok > "/home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/ios-$(basename /tmp/Vuln.app).txt" && touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_4
+allow: Bash(echo:*),Bash(basename:*),Bash(touch:*)
+---
+Error: Reached max turns (3)
+===
+IOS-5-find-head-redirect [DENIED]
+cmd: find /home/user/dev/ai-tools/sec-audit/tests -maxdepth 1 -type f -name '*.sh' | head -n 10 > "/home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/ios-bundles.txt" && touch /home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/mk_5
+allow: Bash(find:*),Bash(head:*),Bash(touch:*)
+---
+Blocked. The command ran through the harness and was rejected before execution:
+
+```
+Output redirection to '/home/user/dev/ai-tools/sec-audit/docs/plans-notes/.ios-probe-tmp/ios-bundles.txt'
+was blocked. For security, Claude Code may only write to files in the allowed working
+directories for this session: '/home/user/dev/ai-tools/sec-audit'
+```
+
+Worth noting for BL-002: the target path *is* under the stated allowed root (`/home/user/dev/ai-tools/sec-audit`), so the denial isn't a working-directory violation as the message claims. The distinguishing features versus the markers already in that dir (`mk_1`, `mk_a`) are the `>` redirection itself, the quoted redirect target, and the leading-dot component `.ios-probe-tmp`. Neither side of the `&&` executed — no `ios-bundles.txt`, no `mk_5`. I did not substitute an equivalent command.
+
+DONE
+===
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_a
+allow: Bash(touch:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+The command ran verbatim and completed with no output — no refusal, no permission prompt surfaced to me.
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_b
+allow: Bash(echo:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Blocked. Exact refusal text:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_b' was blocked. For security, Claude Code may only create or modify files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Ran once, verbatim, no substitution. Worth noting for the BL-002 matrix: the blocked path *is* under the allowed working directory the message names, so this is a false negative in the matcher rather than a genuine out-of-scope rejection — `probe-tmp2/` exists (it's the untracked dir in git status), so it isn't a missing-parent case either.
+
+DONE
+===
+CTRL-Q1-REPLAY [ALLOWED]
+cmd: [ -f /etc/hostname ] && touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_q1
+allow: Bash(touch:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Ran verbatim, permitted, no refusal. It completed silently (exit 0) and `mk_q1` now exists in `probe-tmp2/`.
+
+Measurement: `[ -f ... ] && touch ...` — allowed.
+
+DONE
+===
+IOS-2b-bracket-granted [ALLOWED]
+cmd: [ "$HOME" != "" ] && touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_2b
+allow: Bash(touch:*),Bash([:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+**Measurement result: permitted.** The command ran verbatim, no permission prompt, exit 0, and `probe-tmp2/mk_2b` now exists (0 bytes, 07:53).
+
+One note on the harness, since it's your tooling: the construct under test — `[ ... ] && touch <path>` — is a compound command where the effectful part sits behind a `&&`. That's precisely the shape a prefix-based allowlist matcher can mis-classify, so a "permitted" result here is worth treating as a finding for BL-002 rather than a clean pass. Existing siblings `mk_a` and `mk_q1` suggest you're already walking that ladder.
+
+DONE
+===
+IOS-4b-cmdsub-redirect [DENIED]
+cmd: echo ok > "/home/user/dev/ai-tools/sec-audit/probe-tmp2/ios-$(basename /tmp/Vuln.app).txt" && touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_4b
+allow: Bash(echo:*),Bash(basename:*),Bash(touch:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+The harness blocked it. Exact refusal text:
+
+```
+Redirect target contains $(cmd) output — path is runtime-determined
+```
+
+Measurement notes: the block fired before execution — neither `probe-tmp2/ios-Vuln.app.txt` nor `probe-tmp2/mk_4b` was created, so the whole `&&` chain was rejected as a unit rather than the second clause running. The trigger appears to be the command substitution inside the `>` redirect target, not the `&&` or the `touch`.
+
+DONE
+===
+IOS-5b-find-head-redirect [DENIED]
+cmd: find /home/user/dev/ai-tools/sec-audit/tests -maxdepth 1 -type f -name '*.sh' | head -n 10 > /home/user/dev/ai-tools/sec-audit/probe-tmp2/ios-bundles.txt && touch /home/user/dev/ai-tools/sec-audit/probe-tmp2/mk_5b
+allow: Bash(find:*),Bash(head:*),Bash(touch:*)
+---
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Blocked. Exact refusal text from the harness:
+
+```
+Output redirection to '/home/user/dev/ai-tools/sec-audit/probe-tmp2/ios-bundles.txt' was blocked. For security, Claude Code may only write to files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Ran once, verbatim, no substitution. Neither side effect occurred — `ios-bundles.txt` was not written and `mk_5b` was not touched (the `&&` never fired).
+
+One data point that may matter for BL-002: the refusal reason doesn't match the facts. The target path *is* inside the stated allowed working directory, and `probe-tmp2` is a real directory (`drwxrwxr-x`), not a symlink out of the repo — `readlink -f` resolves to itself. So the redirection matcher rejected an in-scope path while citing an out-of-scope rationale. The discriminating variable is the `>` construct in a piped compound command, not the destination.
+
+DONE
+===
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_a
+allow: Bash(touch:*)
+---
+The command ran verbatim and completed with no output (exit 0) — not blocked, no refusal text.
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_b
+allow: Bash(echo:*)
+---
+The harness blocked it. Exact refusal text:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_b' was blocked. For security, Claude Code may only create or modify files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Worth noting for BL-002: the target path is *inside* the allowed working directory it names, so the matcher rejected a path it should have permitted — the refusal message contradicts itself. I ran the command once, verbatim, and did not retry or substitute.
+
+DONE
+===
+IOS-4-bareBash [ALLOWED]
+cmd: echo ok > "/home/user/dev/ai-tools/sec-audit/probe-tmp3/ios-$(basename /tmp/Vuln.app).txt" && touch /home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_4c
+allow: Bash
+---
+The command ran verbatim and was permitted — no refusal, exit 0, no output. Both scratch files were created in `probe-tmp3/` (`ios-Vuln.app.txt` and `mk_4c`).
+
+DONE
+===
+IOS-5-bareBash [ALLOWED]
+cmd: find /home/user/dev/ai-tools/sec-audit/tests -maxdepth 1 -type f -name '*.sh' | head -n 10 > /home/user/dev/ai-tools/sec-audit/probe-tmp3/ios-bundles.txt && touch /home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_5c
+allow: Bash
+---
+The command ran verbatim and succeeded — no output, exit 0, no permission block.
+
+DONE
+===
+REDIR-plain-bareBash [ALLOWED]
+cmd: echo hi > /home/user/dev/ai-tools/sec-audit/probe-tmp3/plain.txt && touch /home/user/dev/ai-tools/sec-audit/probe-tmp3/mk_6c
+allow: Bash
+---
+The command ran verbatim and completed with exit 0 — no permission prompt, no refusal. Both `probe-tmp3/plain.txt` (containing `hi`) and `probe-tmp3/mk_6c` were created.
+
+DONE
+===
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp4/mk_a
+allow: Bash(touch:*)
+---
+The command ran and completed with no output — not blocked, no refusal text.
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp4/mk_b
+allow: Bash(echo:*)
+---
+Blocked. Exact refusal text:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/probe-tmp4/mk_b' was blocked. For security, Claude Code may only create or modify files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Ran once, verbatim, no substitute. Note for the harness: the target path is lexically inside the stated allowed directory, so the matcher rejected a path it simultaneously describes as permitted — likely a symlink/realpath resolution on `probe-tmp4/`.
+
+DONE
+===
+A-plain-redirect-scoped [DENIED]
+cmd: echo hi > /home/user/dev/ai-tools/sec-audit/probe-tmp4/plain.txt && touch /home/user/dev/ai-tools/sec-audit/probe-tmp4/mk_A
+allow: Bash(echo:*),Bash(touch:*)
+---
+Ran it once, verbatim. **The harness blocked it.** Exact refusal text:
+
+```
+Output redirection to '/home/user/dev/ai-tools/sec-audit/probe-tmp4/plain.txt' was blocked. For security, Claude Code may only write to files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Observations for the measurement:
+
+- The block is a **false positive**: the redirect target is inside the stated allowed directory (`/home/user/dev/ai-tools/sec-audit/probe-tmp4/plain.txt` is under `/home/user/dev/ai-tools/sec-audit`), yet the matcher rejected it and then quoted that same directory as the permitted root.
+- It fired on the **redirection operator**, not on the command as a whole — the message names only `>` and its target, not the `touch` half.
+- Nothing executed: `probe-tmp4/` contains no `plain.txt` and no `mk_A` (there is a pre-existing lowercase `mk_a`, plus `settings.json` and `transcripts.txt`). So the block happened before the shell ran, not mid-pipeline at the `&&`.
+
+I did not retry or substitute an equivalent command.
+
+DONE
+===
+B-pipe-noredirect-scoped [ALLOWED]
+cmd: find /home/user/dev/ai-tools/sec-audit/tests -maxdepth 1 -type f -name '*.sh' | head -n 10 && touch /home/user/dev/ai-tools/sec-audit/probe-tmp4/mk_B
+allow: Bash(find:*),Bash(head:*),Bash(touch:*)
+---
+The command ran verbatim, once, and was not blocked. It listed 10 `.sh` files under `tests/` and created `probe-tmp4/mk_B`.
+
+DONE
+===
