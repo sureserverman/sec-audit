@@ -336,7 +336,12 @@ Dispatch discipline.
 - **Skip reasons:** `requires-windows-host`, `no-pe`, `tool-missing`.
 - **Origin tag:** `"windows"`. Tool whitelist: `binskim`,
   `osslsigncode`, `sigcheck`.
-- **Shipped in:** v0.12.0.
+- **Engine:** `lanes/windows.json` over the bundled `winscan.py` (per-PE
+  discovery and attribution; agent grant `Bash(python3:*)`). Verified
+  2026-09-02 against binskim 4.4.9 + osslsigncode 2.14 on real PEs
+  (fixture `build/`); sigcheck's CSV mapping is implemented but has not
+  run on a Windows host.
+- **Shipped in:** v0.12.0; engine-backed since v1.39.0 (BL-002 closed).
 
 ### k8s (Kubernetes admission)
 
@@ -998,9 +1003,9 @@ contract, `contract-check`, drills, and e2e are unchanged.
 **Tier 2 — config-driven runner engine** (`runner.py` + `lanes/<lane>.json`).
 Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
 severity/evidence from tool output); the agent polishes title/severity only.
-Script-backed lanes (16): `sast`, `go`, `shell`, `ansible`, `gh-actions`,
-`python`, `iac`, `image`, `dast`, `supply-chain`, `k8s`, `webext`, `webapp`,
-`rust`, `android`, `virt`. Parity is proven per lane by `tests/script-runner.sh
+Script-backed lanes: every lane (25) since v1.39.0 — the last six host-OS
+runners (`ai-tools`, `netcfg`, `linux`, `ios`, `macos`, `windows`) go through
+bundled wrappers (`mcpscan.py`, `linuxscan.py`, `macscan.py`, `winscan.py`). Parity is proven per lane by `tests/script-runner.sh
 <lane>`. The config-driven engine (`runner.py` + `lanes/<lane>.json`) supports:
 dotted/numeric paths, `concat`, `map`/`lookup`, `int`/`truncate`/`before`/
 `cvss_band` transforms, single- and nested-`flatten` (`_parent`), multi-

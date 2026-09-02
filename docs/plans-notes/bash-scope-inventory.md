@@ -485,3 +485,44 @@ unilaterally.
 remains — binskim, osslsigncode and sigcheck are on no machine reachable from
 here, and every lane migrated so far concealed at least one bug that only
 running the tool exposed.
+
+## `windows` migrated (2026-09-02): 6 of 6, exemption 0, BL-002 closed
+
+Tools obtained without root: osslsigncode 2.14 built from source into
+`~/.local`; BinSkim 4.4.9.11 unpacked from its NuGet package (the documented
+`dotnet tool install` does NOT work — the package is not a dotnet tool) over a
+.NET 9 runtime from `dotnet-install.sh`. sigcheck is Windows-only and remains
+unexecuted; its CSV mapping in `winscan.py` is marked unverified.
+
+**Latent invocation bugs found, running total 6 lanes / 9 bugs:**
+
+1. binskim's documented `--level Error Warning` is not the tool's syntax — it
+   takes a quoted semicolon list — and the documented `--force` does not exist.
+2. binskim SARIF results carry `message.id` + `arguments`, never
+   `message.text`; the documented `jq` mapping on `.message.text` yields null
+   titles and evidence for every result.
+3. osslsigncode prints `No signature found` / `Timestamp is not available` /
+   `Message digest algorithm: SHA1`; the documented signals (`Timestamp: none`,
+   lower-case `sha1`, "stderr lacks `Signature verification: ok`") match none of
+   them, so two of four documented findings could never fire and a third only
+   by accident.
+
+Plus the fixture: it contained **no PE at all** (its README said so) while its
+recording claimed five PE findings. Two real PEs are now tracked in
+`build/` (pip's distlib launcher, and the same file self-signed with SHA-1 and
+no timestamp), and the recording is the engine's real output over them.
+
+**Verified under real enforcement** (`docs/plans-notes/windows-scope-probe.sh`,
+Claude Code 2.1.258, transcripts alongside): the agent's exact command
+ALLOWED under `Bash(python3:*)` — sentinel
+`{"__windows_status__": "partial", "tools": ["binskim", "osslsigncode"], "runs": 2, "findings": 6, "skipped": [{"tool": "sigcheck", "reason": "requires-windows-host"}]}`
+— and DENIED (`This command requires approval`) under `Bash(echo:*)`; both
+controls behaved. The first attempt of the day returned DENIED for the scoped
+run because the nested `claude -p` had hit the account session limit; the
+harness now reports that as INCONCLUSIVE, and the verdict above is from the
+re-run after the limit cleared.
+
+`tests/contract-check.sh`: `bare_bash_exempt` empty, expected count 0.
+`agentscan` on this repo now reports 25 interpreter-grants and 0 unscoped
+grants — which is BL-00B's question, not BL-002's.
+

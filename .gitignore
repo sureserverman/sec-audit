@@ -106,3 +106,7 @@ dist/
 *.bak
 *.tmp
 *.temp
+# A PE artifact under tests/fixtures/ is test INPUT, not build output (see the
+# Cargo.lock note above). The blanket build/ rule would drop the windows fixture.
+!tests/fixtures/vulnerable-windows/build/
+!tests/fixtures/vulnerable-windows/build/**
