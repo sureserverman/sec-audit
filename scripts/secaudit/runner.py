@@ -67,7 +67,7 @@ def _field(spec, item):
       - {"concat":[lit|spec,...], "default":d}  -> string concat (literal strings
         as-is, dict parts resolved; if any dict part is None -> default)
       - {"from":path, "map"/"lookup":{}, "index":i, "int":true, "truncate":N,
-         "default":d}
+         "fallback":spec, "default":d}
     """
     if isinstance(spec, str):
         return _get(item, spec)
@@ -112,6 +112,10 @@ def _field(spec, item):
                     return tbl[k]
         return default
     if val is None:
+        # `fallback`: a second spec tried only when the first resolves to
+        # nothing (cargo-audit: prefer the CVE alias, else the RUSTSEC id).
+        if "fallback" in spec:
+            return _field(spec["fallback"], item)
         return default
     if spec.get("int"):
         try:
@@ -152,10 +156,12 @@ def map_item(lane, toolcfg, block, ctx):
     return out
 
 
-def _flatten(arr, flatten):
+def _flatten(arr, flatten, flatten_missing=None):
     """Walk `flatten` (None | key | [keys...]) producing (leaf, immediate_parent)
     pairs. Nested keys (e.g. ["packages","vulnerabilities"]) descend levels;
-    the leaf's immediate parent is exposed to the map as `_parent`."""
+    the leaf's immediate parent is exposed to the map as `_parent`.
+    `flatten_missing: "self"` keeps a parent that has no children under the
+    key as a leaf of its own instead of dropping it."""
     if not flatten:
         return [(it, None) for it in arr]
     keys = [flatten] if isinstance(flatten, str) else list(flatten)
@@ -164,6 +170,17 @@ def _flatten(arr, flatten):
         nxt = []
         for parent, _gp in level:
             if not isinstance(parent, dict):
+                continue
+            if flatten_missing == "self" and not _get(parent, k):
+                # The parent carries no children under this key. mobsfscan's
+                # app-wide rules are the live case: "does not use certificate
+                # pinning" has no `files` array because it is a claim about
+                # the whole target, not a line in it. With plain `flatten` such
+                # a rule is discarded, which is how the repaired android lane
+                # reported 0 findings while 6 rules fired. Yield the parent as
+                # its own leaf (and its own `_parent`, so the same `_parent.*`
+                # map applies); per-file fields fall to their map defaults.
+                nxt.append((parent, parent))
                 continue
             # Dotted keys descend several levels in one step, so the leaf's
             # `_parent` stays the element that carries the identifying fields
@@ -202,6 +219,8 @@ def _flatten(arr, flatten):
 def _passes_filter(filt, ctx):
     if not filt:
         return True
+    if isinstance(filt, list):                  # every clause must pass
+        return all(_passes_filter(f, ctx) for f in filt)
     val = _get(ctx, filt["field"])
     if "startswith" in filt:
         return isinstance(val, str) and val.startswith(filt["startswith"])
@@ -209,6 +228,16 @@ def _passes_filter(filt, ctx):
         return val == filt["equals"]
     if "in" in filt:
         return val in filt["in"]
+    if "not_in" in filt:
+        # Exclusion list: a tool whose diagnostics mix security findings with
+        # config/licence lint (cargo-deny) keeps every code it may add later
+        # and drops only the families named here.
+        return val not in filt["not_in"]
+    if "gt" in filt:
+        try:
+            return float(val) > float(filt["gt"])
+        except (TypeError, ValueError):
+            return False
     return True
 
 
@@ -325,7 +354,8 @@ def map_raw(lane, toolcfg, raw_text):
                 # iterate the values, exposing the key as `_key`.
                 base = [{**v, "_key": k} for k, v in base.items() if isinstance(v, dict)]
         filt = block.get("filter")
-        for leaf, parent in _flatten(base, block.get("flatten")):
+        for leaf, parent in _flatten(base, block.get("flatten"),
+                                     block.get("flatten_missing")):
             ctx = leaf if parent is None else {**leaf, "_parent": parent}
             if not _passes_filter(filt, ctx):
                 continue
@@ -431,6 +461,24 @@ def _select_files(target, fsel, scope=None):
     return sel
 
 
+def _relativize(fobj, target):
+    """A `file` the tool reported as an absolute path under the target becomes
+    target-relative. mobsfscan and others echo the path they were handed, and
+    an absolute path would make the finding's fingerprint (which hashes
+    `file`) specific to the host and the checkout location, so the same
+    finding would read as NEW on every machine and every re-clone."""
+    f = fobj.get("file")
+    if not isinstance(f, str) or not os.path.isabs(f):
+        return
+    root = os.path.abspath(target)
+    try:
+        rel = os.path.relpath(f, root)
+    except ValueError:
+        return
+    if not rel.startswith(".."):
+        fobj["file"] = rel
+
+
 def run_live(lane, target, scope=None):
     findings = []
     # `failed` is the third outcome the runner contracts have always documented
@@ -484,7 +532,13 @@ def run_live(lane, target, scope=None):
             continue
         argv = _build_argv(tc["invoke"], target, tmp, scope, probe_bin)
         env = os.environ.copy()
-        env.update(tc.get("env", {}))
+        # `{tmp}`/`{target}` substitute in env values too, so a tool that
+        # writes build output next to its input (cargo-geiger compiles the
+        # target and fills `target/`) can be pointed at the scratch dir and
+        # honour rule 6 of every runner contract: never write into the
+        # caller's project.
+        env.update({k: str(v).replace("{tmp}", tmp).replace("{target}", target)
+                    for k, v in tc.get("env", {}).items()})
         try:
             proc = subprocess.run(argv, capture_output=True, text=True, timeout=600, env=env)
         except Exception as e:
@@ -513,6 +567,10 @@ def run_live(lane, target, scope=None):
         out = tc["output"]
         if out == "stdout":
             raw = proc.stdout
+        elif out == "stderr":
+            # cargo-deny writes every diagnostic, JSON format included, to
+            # stderr and nothing to stdout.
+            raw = proc.stderr
         elif out.startswith("file:"):
             path = out[5:].replace("{tmp}", tmp)
             raw = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
@@ -523,8 +581,15 @@ def run_live(lane, target, scope=None):
             ran.append(tc["name"])
         except Exception as e:
             sys.stderr.write(f"runner: {tc['name']} parse failed: {e}\n")
+            # The tool's own last words are the only clue to WHY its output
+            # would not parse (a build error, a missing index, a usage
+            # error); without them a failure is a bare reason code.
+            tail = (proc.stderr or "").strip().splitlines()[-5:]
+            for ln in tail:
+                sys.stderr.write(f"runner:   {tc['name']} stderr: {ln[:300]}\n")
             failed.append({"tool": tc["name"], "reason": "parse-failed"})
     for fobj in findings:
+        _relativize(fobj, target)
         sys.stdout.write(json.dumps(fobj) + "\n")
     # A failure is never `ok`. A clean skip is a decision the lane made; a
     # failure is a tool the lane could not read, and reporting that as `ok`

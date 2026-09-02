@@ -74,9 +74,11 @@ Notes on the schema:
   (e.g. `time`) when the tool reports no file. Never absolutise.
 - `line` is the integer line number the tool supplied when applicable
   (cargo-deny reports spans in `labels[]`); otherwise `0`.
-- `cwe` for cargo-audit comes from `advisory.cwe[0]` when present,
-  else `CWE-1104` fallback for "Use of Unmaintained Third-Party
-  Components." Document in rust-tools.md; never invent a CWE.
+- `cwe` for cargo-audit is the `CWE-1104` fallback ("Use of Unmaintained
+  Third-Party Components") — cargo-audit 0.22 emits no CWE field. For
+  cargo-deny it comes from the code→CWE table in rust-tools.md
+  (`vulnerability` → CWE-1395, `source-not-allowed` → CWE-494, ...);
+  never invent a CWE.
 - `id` prefers the CVE alias (`advisory.aliases[0]` when it starts
   with `CVE-`) so the cve-enricher downstream picks it up. If no CVE
   alias, use the RUSTSEC ID. For deny/geiger/vet findings that have
@@ -123,7 +125,7 @@ skip; when none are present the only line is the unavailable sentinel:
 {"__rust_status__": "unavailable", "tools": []}
 ```
 
-The engine probes the cargo subcommands: `cargo audit --version`, `cargo deny --version`, `cargo geiger --version`, `cargo vet --version`. cargo-audit severity is derived from the advisory CVSS band; cargo-geiger findings are capped at INFO (never elevated). Skip reason: `tool-missing`.
+The engine probes the cargo subcommands: `cargo audit --version`, `cargo deny --version`, `cargo geiger --version`, `cargo vet --version`. cargo-audit's `advisory.cvss` is a vector string, not a score, so its findings default to MEDIUM until the cve-enricher re-scores them by CVE id; cargo-deny diagnostics are read from stderr (the tool writes nothing to stdout) with licence and config-lint codes excluded; cargo-geiger findings are capped at INFO (never elevated) and only packages with used unsafe expressions are emitted. Skip reason: `tool-missing`.
 
 ### Step 2 - Polish (presentation only)
 

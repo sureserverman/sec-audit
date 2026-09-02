@@ -39,7 +39,10 @@
           "default": null
         },
         "title": "_parent.metadata.description",
-        "file": "file_path",
+        "file": {
+          "from": "file_path",
+          "default": "."
+        },
         "line": {
           "from": "match_lines.0",
           "default": 0
@@ -53,7 +56,9 @@
           "default": null
         }
       },
-      "_note": "`--output -` does NOT mean stdout: mobsfscan 0.4.5 creates a file literally named `-` in the working directory and leaves stdout empty, so the lane read nothing, counted the tool as unparseable, and reported `unavailable` over a target it had actually scanned. Plain `--json` writes to stdout."
+      "_note": "`--output -` does NOT mean stdout: mobsfscan 0.4.5 creates a file literally named `-` in the working directory and leaves stdout empty, so the lane read nothing, counted the tool as unparseable, and reported `unavailable` over a target it had actually scanned. Plain `--json` writes to stdout.",
+      "flatten_missing": "self",
+      "_note_app_wide": "Rules with no `files` array are app-wide claims (\"does not use certificate pinning\") — `flatten_missing: \"self\"` keeps them as findings at file \".\", line 0, with the rule's description as title and no evidence, instead of discarding them. Decided 2026-09-02 (BL-00A open decision); the three mobsfscan lanes share it."
     },
     {
       "name": "apkleaks",

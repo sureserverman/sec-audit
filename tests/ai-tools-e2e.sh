@@ -205,7 +205,13 @@ fi
 if [ -n "$mcp_scan_bin" ]; then
     echo "ai-tools-e2e: invoking $mcp_scan_bin inspect --json on fixture..."
     out="$scratch/mcp.json"
-    "$mcp_scan_bin" inspect "$mcp" --json > "$out" 2> "$scratch/mcp.stderr" || true
+    # stdin from /dev/null and a hard timeout: `inspect` on a config that
+    # declares stdio servers PROMPTS for consent to launch them (mcpscan.py
+    # header), and under a non-TTY stdin that never closes (a harness socket)
+    # the prompt blocks forever — this step hung ci-local for 10+ minutes on
+    # 2026-09-02. /dev/null answers the prompt with EOF, which is also what
+    # GitHub CI's stdin does; the runner's own wrapper never inherits stdin.
+    timeout 120 "$mcp_scan_bin" inspect "$mcp" --json < /dev/null > "$out" 2> "$scratch/mcp.stderr" || true
     if [ -s "$out" ]; then
         if python3 -c 'import json,sys; json.loads(open(sys.argv[1]).read())' "$out" 2>/dev/null; then
             echo "  mcp-scan emitted parseable JSON ($(wc -c < "$out") bytes)"

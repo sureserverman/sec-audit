@@ -1007,7 +1007,17 @@ dotted/numeric paths, `concat`, `map`/`lookup`, `int`/`truncate`/`before`/
 `sources` per tool, dict `iterate: values`, `filter`, `input_format: jsonl|xml`,
 list-valued `applicable_glob` + multi-glob `{files:a|b}`, a per-file pass/fail
 `validator` mode (exit-code → synthesized finding, with `line_regex` and
-`dedupe_by`), and per-tool `env`.
+`dedupe_by`), per-tool `env` (with `{tmp}`/`{target}` substitution, e.g.
+`CARGO_TARGET_DIR`), `output: stdout|stderr|file:{tmp}/...` (cargo-deny
+writes JSON to stderr), filter lists (every clause must pass) with `equals`
+/ `in` / `not_in` / `startswith` / `gt`, a `fallback` field spec (try a
+second path when the first is empty), `flatten_missing: "self"` (a parent
+with no children under the flatten key — mobsfscan's app-wide rules — is
+kept as its own leaf instead of dropped), and target-relative `file` paths
+on emit (an absolute path would make the finding's fingerprint specific to
+the host). Since 1.38 every `.pipeline` recording is a capture of a real
+run, and `tests/lane-live-gate.sh` executes every lane against a staged copy
+of its fixture (mobsfscan ignores any path containing `fixtures`).
 
 **Still agent-backed (LLM runner agents).** These split into two groups by
 whether engine conversion is actually worthwhile:
@@ -1099,6 +1109,8 @@ semantic category:
 | `no-supply-chain-source` | supply-chain  | guarddog / osv-scanner on PATH but target has no dependency manifest that tool can read (guarddog: npm/PyPI/Go; osv-scanner: any of its 28 lockfiles). |
 | `no-prior-version` | deep-deps           | A flagged dependency's installed release is the first published version — no N-1 to diff against.                      |
 | `no-git-history`  | secrets              | trufflehog on PATH but the target is not a git repository (no `.git`) — no history to scan. gitleaks' working-tree scan still runs. NEW in v1.21. |
+| `no-lockfile`     | rust                 | cargo-audit on PATH but no `Cargo.lock` under target — nothing to audit, and generating one would write into the caller's project. NEW in v1.38. |
+| `no-manifest`     | rust                 | cargo-deny / cargo-geiger on PATH but no `Cargo.toml` under target. NEW in v1.38. |
 
 ### Host-OS-gated (3)
 

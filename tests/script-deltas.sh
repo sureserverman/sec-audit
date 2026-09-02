@@ -431,7 +431,10 @@ fs = [{"fingerprint": fps[0], "status": "NEW", "severity": "HIGH"},
 reg = {"entries": {fp: {"fingerprint": fp, "reason": "r", "accepted": "2026-07-20",
                         "expires": "2026-09-01", "accepted_by": ""} for fp in fps},
        "warnings": [], "expired": []}
-out, info = deltas.apply_acceptances(fs, {}, {}, reg, "20260724-1200")
+# `today` pinned to the run date: left to default (wall clock) this test
+# expired on 2026-09-02, the day after the register's hardcoded `expires`.
+from datetime import date
+out, info = deltas.apply_acceptances(fs, {}, {}, reg, "20260724-1200", today=date(2026, 7, 24))
 assert [g["fingerprint"] for g in out] == fps, [g["fingerprint"] for g in out]
 got = {g["fingerprint"]: g["status"] for g in out}
 assert got[fps[0]] == "ACCEPTED" and got[fps[2]] == "ACCEPTED" and got[fps[4]] == "ACCEPTED", got
@@ -493,7 +496,8 @@ fs = [{"fingerprint": "v1:" + "a"*64, "status": "NEW", "severity": "HIGH"},
 reg = {"entries": {"v1:" + "a"*64: {"fingerprint": "v1:" + "a"*64, "reason": "r",
                                     "accepted": "2026-07-20", "expires": "2026-09-01",
                                     "accepted_by": ""}}, "warnings": [], "expired": []}
-out, info = deltas.apply_acceptances(fs, {}, {}, reg, "20260724-1200")
+from datetime import date
+out, info = deltas.apply_acceptances(fs, {}, {}, reg, "20260724-1200", today=date(2026, 7, 24))
 assert len(out) == len(fs), (len(out), len(fs))
 assert info["accepted"] == 1, info
 print("  apply_acceptances is finding-count preserving OK")

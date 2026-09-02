@@ -60,10 +60,21 @@ for lane_json in scripts/secaudit/lanes/*.json; do
         continue
     fi
 
+    # Run against a STAGED COPY, never the tree under tests/fixtures/. Two
+    # reasons, both learned the hard way: mobsfscan hard-codes `fixtures` (and
+    # `spec`) as ignored path segments, so a lane run in place scanned nothing
+    # and reported the absence-of-best-practice rules only; and some tools
+    # write next to their input (mobsfscan `--output -` left a file named `-`,
+    # cargo tools fill `target/`), which would dirty the checkout. The copy
+    # drops `.pipeline/` so a recording is never scanned as if it were source.
+    stage="$(mktemp -d)"
+    cp -a "tests/fixtures/$fixture" "$stage/"
+    rm -rf "$stage/$fixture/.pipeline"
     out="$(mktemp)"; err="$(mktemp)"
     timeout "$PER_LANE_TIMEOUT" python3 scripts/secaudit/runner.py \
-        "$lane" "tests/fixtures/$fixture" >"$out" 2>"$err"
+        "$lane" "$stage/$fixture" >"$out" 2>"$err"
     rc=$?
+    rm -rf "$stage"
     if [ "$rc" -ne 0 ]; then
         echo "lane-live-gate: FAIL — $lane exited $rc" >&2
         sed 's/^/  | /' "$err" | tail -n 8 >&2
@@ -163,12 +174,10 @@ for name in declared:
 # lane on this list still runs and is still checked for everything else; only
 # this one assertion is waived, and the entry is a debt with a backlog id.
 FAILED_ALLOWED = {
-    # cargo-audit and cargo-geiger resolve the dependency graph before they can
-    # analyse it, and tests/fixtures/vulnerable-rust pins
-    # `https://example.com/gremlin.git`, which cannot resolve offline. The lane
-    # invocations also carry no {target}, so they run in the runner's cwd. Both
-    # are BL-00A; remove this entry when the fixture and invocations are fixed.
-    "rust": {"cargo-audit", "cargo-geiger"},
+    # Empty since 2026-09-02. The one entry it ever held (rust: cargo-audit and
+    # cargo-geiger, whose fixture pinned an unresolvable git dependency and
+    # whose invocations carried no {target}) was removed when both were fixed.
+    # An entry here is a debt with a backlog id, never a convenience.
 }
 waived = FAILED_ALLOWED.get(lane, set())
 for entry in failed:
@@ -205,6 +214,45 @@ PY
     checked=$((checked + 1))
     rm -f "$out" "$err"
 done
+
+# ---------------------------------------------------------------------------
+# Lane scenario: secrets — a secret deleted from HEAD is still found in history.
+#
+# The fixture under tests/fixtures/ cannot carry this claim: it is a
+# subdirectory of this repo and has no history of its own, so trufflehog
+# (a git-history scanner) skips it `no-git-history` and the recording says so.
+# The claim is worth a gate of its own because it is the one thing the
+# working-tree scan structurally cannot see. Runs only where trufflehog and
+# git exist; elsewhere it is reported as skipped, never as passed.
+# ---------------------------------------------------------------------------
+if command -v trufflehog >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
+    repo="$(mktemp -d)"
+    cp -a tests/fixtures/vulnerable-secrets/. "$repo/"
+    rm -rf "$repo/.pipeline"
+    G="git -C $repo -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false"
+    git -C "$repo" init -q
+    $G add -A && $G commit -q --no-verify -m init
+    # A URI with an embedded password (trufflehog `Postgres` detector). Not an
+    # AWS-shaped key: GitHub push protection blocks that shape in this script
+    # as readily as in a fixture, so it could never be pushed.
+    printf 'DATABASE_URL=postgres://admin:S3cretPassw0rd-fixture-only@db.example.internal:5432/app\n' > "$repo/deleted_secrets.txt"
+    $G add deleted_secrets.txt && $G commit -q --no-verify -m leak
+    $G rm -q deleted_secrets.txt && $G commit -q --no-verify -m remove
+    out="$(mktemp)"
+    if timeout "$PER_LANE_TIMEOUT" python3 scripts/secaudit/runner.py secrets "$repo" >"$out" 2>/dev/null \
+       && [ "$(jq -rs 'map(select(.tool=="trufflehog" and .file=="deleted_secrets.txt")) | length' "$out")" -ge 1 ] \
+       && [ "$(tail -n 1 "$out" | jq -r '.tools | index("trufflehog") // empty')" != "" ] \
+       && ! grep -q 'S3cretPassw0rd' "$out"; then
+        echo "  secrets/history   ok           trufflehog found the deleted file's secret; secret value not echoed"
+    else
+        echo "lane-live-gate: FAIL — secrets git-history scenario" >&2
+        tail -n 3 "$out" | cut -c1-200 | sed 's/^/  | /' >&2
+        failures=$((failures + 1))
+    fi
+    rm -rf "$repo" "$out"
+else
+    echo "  secrets/history   SKIPPED      (trufflehog or git not on PATH)"
+fi
 
 echo ""
 if [ "$failures" -ne 0 ]; then
