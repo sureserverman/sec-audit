@@ -1,6 +1,68 @@
-Current PE checksum   : 00012345
-Calculated PE checksum: 00012345
+### osslsigncode verify -in build/t64.exe (2026-09-02, osslsigncode 2.14; stdout then stderr)
+No signature found
+Unable to extract existing signature
+PE checksum   : 0002A492
+Failed
+### exit: 0
 
-No signature found.
+### osslsigncode verify -in build/t64-selfsigned-sha1.exe (2026-09-02, osslsigncode 2.14; stdout then stderr)
+8060CBC125710000:error:10800075:PKCS7 routines:PKCS7_verify:certificate verify error:../crypto/pkcs7/pk7_smime.c:296:Verify error: self-signed certificate
+PE checksum   : 000206C5
+
+Signature Index: 0  (Primary Signature)
+
+Message digest algorithm  : SHA1
+Current message digest    : D76C88C29AE217666511E00CC8B85B163248003A 
+Calculated message digest : D76C88C29AE217666511E00CC8B85B163248003A 
+
+Signer's certificate:
+	------------------
+	Signer #0:
+		Subject: CN=sec-audit fixture self-signed
+		Issuer : CN=sec-audit fixture self-signed
+		Serial : 53DC9355936CC4646CDB2436AC1A986E6A0E9341
+		Certificate expiration date:
+			notBefore : Sep  2 18:04:04 2026 GMT
+			notAfter : Aug 30 18:04:04 2036 GMT
+
+Message digest algorithm: SHA1
+
+Authenticated attributes:
+	Signing time: Sep  2 18:04:04 2026 GMT
+	Microsoft Individual Code Signing purpose
+	Message digest: 9139916C703E8D0E1038953E6FFC569F397770E3 
+
+CAfile: /etc/ssl/certs/ca-certificates.crt
+TSA's certificates file: /etc/ssl/certs/ca-certificates.crt
+
+Timestamp is not available
+
+Signing certificate chain verified using:
+	------------------
+	Signer #0:
+		Subject: CN=sec-audit fixture self-signed
+		Issuer : CN=sec-audit fixture self-signed
+		Serial : 53DC9355936CC4646CDB2436AC1A986E6A0E9341
+		Certificate expiration date:
+			notBefore : Sep  2 18:04:04 2026 GMT
+			notAfter : Aug 30 18:04:04 2036 GMT
+
+	Error: self-signed certificate
+
+PKCS7_verify error
+Failed signing certificate chain retrieved from the signature:
+	------------------
+	Signer #0:
+		Subject: CN=sec-audit fixture self-signed
+		Issuer : CN=sec-audit fixture self-signed
+		Serial : 53DC9355936CC4646CDB2436AC1A986E6A0E9341
+		Certificate expiration date:
+			notBefore : Sep  2 18:04:04 2026 GMT
+			notAfter : Aug 30 18:04:04 2036 GMT
+
 Signature verification: failed
-Timestamp: none
+
+Number of verified signatures: 1
+Failed
+### exit: 0
+

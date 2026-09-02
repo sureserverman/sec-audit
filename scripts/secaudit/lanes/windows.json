@@ -1,0 +1,103 @@
+{
+  "lane": "windows",
+  "status_key": "__windows_status__",
+  "origin": "windows",
+  "reference": "windows-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "All three tools are per-artifact (one PE in, findings attributed to that PE), which the lane schema cannot express, so each goes through the bundled winscan.py — one entry per tool so each keeps its own probe, skip reason and sentinel line. The wrapper's exit code maps to that tool's clean-skip reason via rc_reasons; a skip is never a failure. sigcheck is probed as `python3` deliberately: it is a Windows-only binary, and the documented precedence is `requires-windows-host` over `no-pe` over `tool-missing` — a plain binary probe would report tool-missing on every Linux/macOS host and lose that distinction. The wrapper enforces the host gate (rc 4) and the binary probe (rc 1) itself.",
+  "tools": [
+    {
+      "name": "binskim",
+      "probe": "binskim",
+      "invoke": [
+        "python3",
+        "{scripts}/winscan.py",
+        "{target}",
+        "--tool",
+        "binskim"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "1": "tool-missing",
+        "3": "no-pe",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      }
+    },
+    {
+      "name": "osslsigncode",
+      "probe": "osslsigncode",
+      "invoke": [
+        "python3",
+        "{scripts}/winscan.py",
+        "{target}",
+        "--tool",
+        "osslsigncode"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "1": "tool-missing",
+        "3": "no-pe",
+        "*": "run-incomplete"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      }
+    },
+    {
+      "name": "sigcheck",
+      "probe": "python3",
+      "invoke": [
+        "python3",
+        "{scripts}/winscan.py",
+        "{target}",
+        "--tool",
+        "sigcheck"
+      ],
+      "output": "stdout",
+      "input_format": "jsonl",
+      "rc_reasons": {
+        "1": "tool-missing",
+        "3": "no-pe",
+        "*": "run-incomplete",
+        "4": "requires-windows-host"
+      },
+      "map": {
+        "id": "id",
+        "severity": "severity",
+        "cwe": "cwe",
+        "title": "title",
+        "file": "file",
+        "line": "line",
+        "evidence": "evidence",
+        "confidence": "confidence",
+        "reference_url": "reference_url",
+        "fix_recipe": "fix_recipe"
+      }
+    }
+  ]
+}

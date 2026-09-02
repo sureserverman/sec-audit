@@ -140,6 +140,7 @@ recordings.
 | `rust` `{target}` | Every invocation names the target (`--file`, `--manifest-path`); `CARGO_TARGET_DIR` keeps geiger's build out of the target. The fixture's unresolvable git dep is gone, `Cargo.lock` committed; the live gate's only waiver removed. |
 | `rust` mappings | cargo-deny and cargo-geiger were mapped against hand-authored shapes; both remapped against captures (deny writes to **stderr**, word codes under `fields`). |
 | mobsfscan metadata-only rules | Decided: kept as app-wide findings at file `.`, line 0 (`flatten_missing: "self"`) on ios, macos and android. |
+| `windows` recording | Was "not assessable"; now a capture of binskim 4.4.9 + osslsigncode 2.14 over two real PEs added to the fixture (BL-002 windows port). The old recording claimed findings on a fixture that contained no PE at all. |
 | Redundant recording-only e2e assertions | Decided: **not trimmed.** With every recording now a capture of a real run, the e2e suites are the hermetic shape/contract check the live gate cannot be on CI (where no scanner is installed). What was wrong was the recordings, not the assertions. |
 
 ### Why the 2026-08-27 comparison saw "0 live" for ios and macos

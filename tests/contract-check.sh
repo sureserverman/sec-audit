@@ -2702,19 +2702,16 @@ echo "v1.27-symmetry: foreign lanes reject phpcs"
 # followed by a token separator (comma/space) or EOL — so a scoped
 # `Bash(python3:*)` is correctly NOT flagged, only a bare `Bash` grant.
 #
-# KNOWN EXEMPTION (BL-002): 1 host-OS-gated runner still carries a bare `Bash`
-# grant. They cannot be scoped by editing frontmatter: under a per-tool
-# allowlist the matcher refuses `>` output redirection outright, whatever is
-# granted (measured 2026-08-27, see docs/plans-notes/bash-scope-inventory.md
-# § "Second probe round"), and these five redirect each tool's output to a temp
-# file. Scoping them means migrating them onto the runner.py engine the other
-# 24 runners use, whose entire bash surface is one `python3 runner.py <lane>`
-# call with no redirect. ai-tools, netcfg, linux, ios and macos were migrated
-# that way on 2026-08-27 — the last two verified live on a macOS 26.6.2 host.
-# Only `windows` remains: binskim/osslsigncode/sigcheck are not installed on any
-# machine reachable from here, and every lane migrated so far hid at least one
-# invocation bug that only running the tool exposed.
-bare_bash_exempt='windows-runner'
+# BL-002 CLOSED 2026-09-02: no runner carries a bare `Bash` grant any more.
+# The six host-OS-gated runners could not be scoped by editing frontmatter —
+# under a per-tool allowlist the matcher refuses `>` output redirection
+# outright, whatever is granted (measured 2026-08-27, see
+# docs/plans-notes/bash-scope-inventory.md) — so each was migrated onto the
+# runner.py engine, whose entire bash surface is one `python3 runner.py <lane>`
+# call. `windows` was the last, ported against binskim 4.4.9 + osslsigncode
+# 2.14 run for real. The exemption list is kept (empty) so a regression is a
+# one-line diff to explain, not a rewrite of this block.
+bare_bash_exempt='^$'   # nothing is exempt; see the note above
 bare_bash=0; bare_bash_pending=0
 while IFS= read -r offender; do
     [ -z "$offender" ] && continue
@@ -2728,9 +2725,9 @@ while IFS= read -r offender; do
 done < <(grep -nE '^(tools|allowed-tools):' agents/*.md commands/*.md \
          | grep -E '\bBash([,[:space:]]|$)' || true)
 echo "no-bare-bash: $bare_bash unexpected + $bare_bash_pending BL-002-exempt file(s) with an unscoped Bash grant"
-if [ "$bare_bash_pending" -ne 1 ]; then
-    echo "CONTRACT FAIL: expected exactly 1 BL-002-exempt host-OS runner with bare Bash," \
-         "found $bare_bash_pending — update the exemption list / BL-002 as lanes are scoped" >&2
+if [ "$bare_bash_pending" -ne 0 ]; then
+    echo "CONTRACT FAIL: expected 0 BL-002-exempt runners with bare Bash (BL-002 is closed)," \
+         "found $bare_bash_pending" >&2
     fail=1
 fi
 if [ "$bare_bash" -ne 0 ]; then

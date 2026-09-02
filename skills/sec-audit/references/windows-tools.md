@@ -38,25 +38,34 @@ server / kernel driver review.
 
 ### binskim
 
-- Install: `dotnet tool install --global Microsoft.CodeAnalysis.BinSkim`
-  (requires .NET SDK 6.0+). The `dotnet` runtime is cross-platform
-  (Linux/macOS/Windows). Can also be pulled as a standalone release
-  binary from the BinSkim GitHub releases page.
-- Invocation (SARIF JSON output):
+- Install: **not** `dotnet tool install` — the NuGet package
+  `Microsoft.CodeAnalysis.BinSkim` is not a dotnet tool (the install fails
+  with "Settings file 'DotnetToolSettings.xml' was not found"). It ships
+  platform binaries inside the package: download the `.nupkg`
+  (`https://www.nuget.org/api/v2/package/Microsoft.CodeAnalysis.BinSkim/`),
+  unzip, and run `tools/net9.0/<rid>/BinSkim` (4.4.9 needs the .NET 9
+  runtime; `dotnet-install.sh --channel 9.0 --runtime dotnet` provides it
+  without root). Put a `binskim` launcher on PATH. Verified 2026-09-02.
+- Invocation (SARIF JSON output), one PE per call:
   ```bash
-  binskim analyze "$path_to_pe" \
-      --output "$TMPDIR/windows-runner-binskim.sarif" \
-      --sarif-output-version Current \
-      --level Error Warning \
-      2> "$TMPDIR/windows-runner-binskim.stderr"
-  rc_bs=$?
+  binskim analyze "$path_to_pe" -o "$scratch/binskim.sarif" --sarif-output-version Current
   ```
-- Output: SARIF v2.1.0 JSON. The runner parses `runs[].results[]`;
-  each result has `ruleId`, `level`, `message.text`,
-  `locations[].physicalLocation.artifactLocation.uri`,
-  `locations[].physicalLocation.region.startLine`.
-- Tool behaviour: exit code 0 even when findings are present. Treat
-  any exit with a valid SARIF file as success.
+  `--level` / `--kind` are optional filters taking a QUOTED, semicolon-
+  delimited list (`--level "Error;Warning"`, `--kind "Fail;Pass"`) — not
+  space-separated words. The default kind is `Fail`, which is what a
+  finding is. There is no `--force`; binskim refuses to overwrite an
+  existing output file, so write to a fresh scratch path.
+- Output: SARIF v2.1.0 JSON. The runner parses `runs[].results[]`; each
+  result has `ruleId`, `ruleIndex`, `level`, `kind` (`fail` | `pass` |
+  `notApplicable`), `locations[].physicalLocation.artifactLocation.uri`
+  (a `file://` URI of the PE). **`message` carries `id` + `arguments`, not
+  `text`**: the text template lives in
+  `runs[].tool.driver.rules[ruleIndex].messageStrings[<id>].text` with
+  `{0}`, `{1}` placeholders — resolve it there. `rules[].helpUri` is the
+  rule-doc link; `rules[].fullDescription.text` is the remediation.
+- Tool behaviour: exit 0 even when findings are present. Treat any exit
+  with a valid SARIF file as success. Stderr always carries a note about
+  rules disabled as not applicable; it is not an error.
 - Primary source: https://github.com/microsoft/binskim (README +
   `docs/UserGuide.md`).
 
@@ -65,23 +74,27 @@ Source: https://github.com/microsoft/binskim
 ### osslsigncode
 
 - Install: `apt install osslsigncode` (Debian/Ubuntu);
-  `brew install osslsigncode` (macOS); Windows builds on GitHub
-  releases. Cross-platform C binary linked against OpenSSL.
-- Invocation (verify an existing signature):
+  `brew install osslsigncode` (macOS); or build from source (cmake +
+  OpenSSL headers, `cmake --install` into `~/.local`). Cross-platform C
+  binary linked against OpenSSL.
+- Invocation (verify an existing signature), one PE per call:
   ```bash
-  osslsigncode verify \
-      -in "$path_to_pe" \
-      2> "$TMPDIR/windows-runner-osslsigncode-$(basename "$path_to_pe").stderr"
-  rc_os=$?
+  osslsigncode verify -in "$path_to_pe"
   ```
-- Output: stderr text with structured lines —
-  `Signature verification: ok` / `Signature verification: failed`;
-  `Timestamp: ok` / `Timestamp: none`; `Number of signers: N`;
-  `Subject: CN=<subject>`; `Message digest algorithm: sha256`.
-  Parse with regex against these key strings.
-- Tool behaviour: exit 0 on successful verification, non-zero on
-  verification failure. Non-zero is NOT a crash; it's a finding
-  signal.
+- Output (osslsigncode 2.14, verified 2026-09-02): the report goes to
+  **stdout**; stderr carries only OpenSSL error lines. Signals, as the
+  tool actually prints them:
+  - unsigned PE → stderr `No signature found` (stdout ends `Failed`);
+  - signed but untrusted (self-signed / unknown CA) → stdout
+    `Signature verification: failed`, preceded by an `Error: <reason>` line
+    (e.g. `Error: self-signed certificate`);
+  - no timestamp → stdout `Timestamp is not available` (NOT `Timestamp: none`);
+  - digest → stdout `Message digest algorithm: SHA1` / `SHA256` (upper case);
+  - a trusted, timestamped signature → `Signature verification: ok`,
+    `Number of verified signatures: 1`, `Succeeded`.
+- Tool behaviour: exit 0 only for a fully trusted signature; **non-zero is
+  the normal outcome** for unsigned, self-signed and untimestamped
+  binaries and is a finding signal, never a crash.
 - Primary source: https://github.com/mtrojnar/osslsigncode
 
 Source: https://github.com/mtrojnar/osslsigncode
@@ -136,12 +149,12 @@ stderr signals:
 | signal                                      | emitted finding                  |
 |---------------------------------------------|----------------------------------|
 | `Signature verification: failed`            | HIGH, `id: "osslsigncode:signature-invalid"`, CWE-347 Improper Verification of Cryptographic Signature |
-| stderr lacks `Signature verification: ok` (no signature present) | HIGH, `id: "osslsigncode:unsigned"`, CWE-693 |
-| `Timestamp: none` (present but no timestamp) | MEDIUM, `id: "osslsigncode:no-timestamp"`, CWE-324 |
-| `Message digest algorithm: sha1`            | MEDIUM, `id: "osslsigncode:sha1-digest"`, CWE-327 |
+| `No signature found` (stderr)               | HIGH, `id: "osslsigncode:unsigned"`, CWE-693 — the other signals are not evaluated for an unsigned file |
+| `Timestamp is not available` (signed, no timestamp) | MEDIUM, `id: "osslsigncode:no-timestamp"`, CWE-324 |
+| `Message digest algorithm: SHA1` (case-insensitive) | MEDIUM, `id: "osslsigncode:sha1-digest"`, CWE-327 |
 
-`file` is the PE basename; `line` is 0; `evidence` is the verbatim
-stderr line; `reference_url` is null; `fix_recipe` synthesised per
+`file` is the PE's path relative to the target; `line` is 0; `evidence` is
+the verbatim signal line (for `signature-invalid`, the tool's `Error:` line); `reference_url` is null; `fix_recipe` synthesised per
 finding type (e.g. `"Re-sign the binary with SignTool + /tr <TSA URL> + /fd sha256"`);
 `confidence: "high"`.
 
@@ -152,12 +165,14 @@ Windows-only. Parse the CSV line for the target PE. Emit:
 | CSV condition                               | emitted finding                  |
 |---------------------------------------------|----------------------------------|
 | `Verified` column = `Unsigned`              | HIGH, `id: "sigcheck:unsigned"`, CWE-693 |
-| `Verified` = `Signed (catalog)` but runner was invoked with expected Authenticode sig | MEDIUM, `id: "sigcheck:catalog-only"`, CWE-295 |
 | `Verified` starts with `Signed (expired certificate)` | HIGH, `id: "sigcheck:expired"`, CWE-324 |
 | `Publisher` = empty string on signed file   | MEDIUM, `id: "sigcheck:no-publisher"`, CWE-295 |
 
-`file` is the PE basename; `line` 0; `evidence` is the verbatim CSV
-row; `confidence: "high"`.
+`file` is the PE's relative path; `line` 0; `evidence` is the row's Path /
+Verified / Publisher / Date columns; `confidence: "high"`. sigcheck is
+Windows-only and this mapping is implemented in `winscan.py` but has never
+been executed on a Windows host by this project (2026-09-02); treat it as
+unverified until it has.
 
 ## Degrade rules
 

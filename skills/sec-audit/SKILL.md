@@ -1432,7 +1432,7 @@ duplicated per lane.
 When the inventory emitted by §2 contains `windows` (any of: .NET
 project files, WiX sources, MSIX manifests, PE artifacts, or
 AppLocker/WDAC policy XML), dispatch the `windows-runner` agent
-(`agents/windows-runner.md`, pinned to haiku, tools: Read + Bash).
+(`agents/windows-runner.md`, pinned to haiku, tools: Read + Bash(python3:*)).
 The agent runs up to three tools: `binskim` (Microsoft PE hardening
 scanner — cross-platform via dotnet), `osslsigncode` (cross-platform
 Authenticode verifier), and `sigcheck` (Sysinternals — Windows host

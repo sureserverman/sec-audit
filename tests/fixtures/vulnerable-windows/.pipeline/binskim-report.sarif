@@ -1,64 +1,239 @@
 {
+  "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.6.json",
   "version": "2.1.0",
-  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
   "runs": [
     {
+      "results": [
+        {
+          "ruleId": "BA2015",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "id": "Error_NoHighEntropyVA",
+            "arguments": [
+              "t64.exe"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///fixture/vulnerable-windows/build/t64.exe"
+                }
+              }
+            }
+          ]
+        }
+      ],
       "tool": {
         "driver": {
           "name": "BinSkim",
-          "version": "4.3.1"
+          "organization": "Microsoft",
+          "product": "BinSkim Portable Executable Analyzer",
+          "fullName": "BinSkim 4.4.9.0",
+          "version": "4.4.9",
+          "semanticVersion": "4.4.9.11",
+          "dottedQuadFileVersion": "4.4.9.0",
+          "rules": [
+            {
+              "id": "BA2015",
+              "name": "EnableHighEntropyVirtualAddresses",
+              "fullDescription": {
+                "text": "Binaries should be marked as high entropy Address Space Layout Randomization (ASLR) compatible. High entropy allows ASLR to be more effective in mitigating memory corruption vulnerabilities.\r\nTo resolve this issue, don't set /HIGHENTROPYV:NO on link.exe command line and allow it to be enabled by default. "
+              },
+              "help": {
+                "text": "Binaries should be marked as high entropy Address Space Layout Randomization (ASLR) compatible. High entropy allows ASLR to be more effective in mitigating memory corruption vulnerabilities.\r\nTo resolve this issue, don't set /HIGHENTROPYV:NO on link.exe command line and allow it to be enabled by default. "
+              },
+              "messageStrings": {
+                "Pass": {
+                  "text": "'{0}' is high entropy ASLR compatible, reducing an attacker's ability to exploit code in well-known locations."
+                },
+                "Error_NoHighEntropyVA": {
+                  "text": "'{0}' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities.\r\nTo resolve this issue, don't set /HIGHENTROPYVA:NO on link.exe command line and allow it to be enabled by default. (This image was determined to have been properly compiled as /LARGEADDRESSAWARE.)"
+                },
+                "Error_NoLargeAddressAware": {
+                  "text": "'{0}' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities.\r\nTo resolve this issue, don't set /LARGEADDRESSAWARE:NO on link.exe command line and allow it to be enabled by default. (This image was determined to have been properly compiled as /HIGHENTROPYVA.)"
+                },
+                "Error_NeitherHighEntropyVANorLargeAddressAware": {
+                  "text": "'{0}' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities.\r\nTo resolve this issue, don't set /HIGHENTROPYVA:NO and /LARGEADDRESSAWARE:NO on link.exe command line and allow then to be enabled by default."
+                },
+                "NotApplicable_InvalidMetadata": {
+                  "text": "'{0}' was not evaluated for check '{1}' as the analysis is not relevant based on observed metadata: {2}."
+                }
+              },
+              "helpUri": "https://github.com/microsoft/binskim/blob/main/docs/BinSkimRules.md#rule-BA2015EnableHighEntropyVirtualAddresses",
+              "properties": {
+                "equivalentBinScopeRuleReadableName": "HighEntropyVACheck"
+              }
+            }
+          ],
+          "properties": {
+            "comments": "A security and correctness analyzer for portable executable and MSIL formats."
+          }
         }
       },
-      "results": [
+      "invocations": [
         {
-          "ruleId": "BA2009",
-          "level": "error",
-          "message": {
-            "text": "Image 'VulnerableWin.exe' does not have the ASLR flag set in the PE header — CWE-693 Protection Mechanism Failure."
-          },
-          "locations": [
+          "startTimeUtc": "2026-09-02T18:06:27.599Z",
+          "endTimeUtc": "2026-09-02T18:06:27.770Z",
+          "toolConfigurationNotifications": [
             {
-              "physicalLocation": {
-                "artifactLocation": {"uri": "VulnerableWin.exe"},
-                "region": {"startLine": 0}
+              "message": {
+                "text": "Rule 'DoNotIncorporateVulnerableDependencies' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableSecureSourceCodeHashing' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'DoNotShipVulnerableBinaries' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'BuildWithSecureTools' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableCriticalCompilerWarnings' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableStackProtection' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'InitializeStackProtection' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'DoNotDisableStackProtectionForFunctions' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'SignSecurely' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableSpectreMitigations' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableShadowStack' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableMicrosoftCompilerSdlSwitch' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableSourceLink' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'ReportPECompilerData' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'DisableIncrementalLinkingInReleaseBuilds' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EliminateDuplicateStrings' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableComdatFolding' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableOptimizeReferences' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
+              }
+            },
+            {
+              "message": {
+                "text": "Rule 'EnableLinkTimeCodeGeneration' was disabled as it cannot run on the current platform 'Linux'.  It can only run on 'Windows'."
+              },
+              "descriptor": {
+                "id": "WRN998.UnsupportedPlatform"
               }
             }
           ],
-          "help": {"text": "Rebuild with /DYNAMICBASE (MSVC) or -Wl,--dynamicbase (MinGW)."}
-        },
-        {
-          "ruleId": "BA2008",
-          "level": "error",
-          "message": {
-            "text": "Image 'VulnerableWin.exe' does not have Control Flow Guard enabled."
-          },
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {"uri": "VulnerableWin.exe"},
-                "region": {"startLine": 0}
-              }
-            }
-          ],
-          "help": {"text": "Rebuild with /guard:cf (MSVC)."}
-        },
-        {
-          "ruleId": "BA2011",
-          "level": "warning",
-          "message": {
-            "text": "Image 'VulnerableWin.exe' has stack protection but some functions are marked /GS-."
-          },
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {"uri": "VulnerableWin.exe"},
-                "region": {"startLine": 0}
-              }
-            }
-          ],
-          "help": {"text": "Remove /GS- from any function not explicitly requiring it."}
+          "executionSuccessful": true
         }
-      ]
+      ],
+      "columnKind": "utf16CodeUnits"
     }
   ]
 }

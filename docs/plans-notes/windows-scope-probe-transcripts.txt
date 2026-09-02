@@ -1,3 +1,36 @@
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp/mk_a && echo MARKER_OK_A
+allow: Bash(touch:*)
+---
+The command ran, unmodified, and was not blocked. Complete stdout:
+
+```
+MARKER_OK_A
+```
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp/mk_b && echo MARKER_OK_B
+allow: Bash(echo:*)
+---
+The command was blocked. No stdout was produced. Exact refusal text:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/probe-tmp/mk_b' was blocked. For security, Claude Code may only create or modify files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Ran once, verbatim, no substitution. Worth noting for the BL-002 measurement: the blocked path is *inside* the stated allowed directory (`probe-tmp/` already exists there per git status), so the refusal message contradicts itself — that looks like a matcher bug rather than an intended deny. I did not retry or use a sandbox override.
+
+DONE
+===
+LANE-scoped-python3 [ALLOWED]
+cmd: python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py windows /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-windows
+allow: Bash(python3:*)
+---
+The command ran; the harness did not block it. Complete stdout:
+
+```
 {"fix_recipe": "Binaries should be marked as high entropy Address Space Layout Randomization (ASLR) compatible. High entropy allows ASLR to be more effective in mitigating memory corruption vulnerabilities. To resolve this issue, don't set /HIGHENTROPYV:NO on link.exe command line and allow it to be enabled by default.", "id": "binskim:BA2015", "severity": "HIGH", "cwe": "CWE-693", "title": "'t64-selfsigned-sha1.exe' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities.", "file": "build/t64-selfsigned-sha1.exe", "line": 0, "evidence": "'t64-selfsigned-sha1.exe' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities.", "confidence": "high", "reference_url": "https://github.com/microsoft/binskim/blob/main/docs/BinSkimRules.md#rule-BA2015EnableHighEntropyVirtualAddresses", "reference": "windows-tools.md", "origin": "windows", "tool": "binskim"}
 {"fix_recipe": "Binaries should be marked as high entropy Address Space Layout Randomization (ASLR) compatible. High entropy allows ASLR to be more effective in mitigating memory corruption vulnerabilities. To resolve this issue, don't set /HIGHENTROPYV:NO on link.exe command line and allow it to be enabled by default.", "id": "binskim:BA2015", "severity": "HIGH", "cwe": "CWE-693", "title": "'t64.exe' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities. To resolve this", "file": "build/t64.exe", "line": 0, "evidence": "'t64.exe' does not declare itself as high entropy ASLR compatible. High entropy makes Address Space Layout Randomization more effective in mitigating memory corruption vulnerabilities. To resolve this", "confidence": "high", "reference_url": "https://github.com/microsoft/binskim/blob/main/docs/BinSkimRules.md#rule-BA2015EnableHighEntropyVirtualAddresses", "reference": "windows-tools.md", "origin": "windows", "tool": "binskim"}
 {"fix_recipe": "Re-sign with a certificate that chains to a trusted code-signing CA", "id": "osslsigncode:signature-invalid", "severity": "HIGH", "cwe": "CWE-347", "title": "Authenticode signature does not verify against the system trust store", "file": "build/t64-selfsigned-sha1.exe", "line": 0, "evidence": "Error: self-signed certificate", "confidence": "high", "reference_url": null, "reference": "windows-tools.md", "origin": "windows", "tool": "osslsigncode"}
@@ -5,3 +38,33 @@
 {"fix_recipe": "Re-sign with /fd sha256 (signtool) or -h sha256 (osslsigncode)", "id": "osslsigncode:sha1-digest", "severity": "MEDIUM", "cwe": "CWE-327", "title": "Signature uses a SHA-1 message digest", "file": "build/t64-selfsigned-sha1.exe", "line": 0, "evidence": "Message digest algorithm  : SHA1", "confidence": "high", "reference_url": null, "reference": "windows-tools.md", "origin": "windows", "tool": "osslsigncode"}
 {"fix_recipe": "Sign the binary (signtool sign /fd sha256 /tr <TSA URL> /td sha256, or osslsigncode sign -h sha256 -ts <TSA URL>)", "id": "osslsigncode:unsigned", "severity": "HIGH", "cwe": "CWE-693", "title": "PE binary carries no Authenticode signature", "file": "build/t64.exe", "line": 0, "evidence": "No signature found", "confidence": "high", "reference_url": null, "reference": "windows-tools.md", "origin": "windows", "tool": "osslsigncode"}
 {"__windows_status__": "partial", "tools": ["binskim", "osslsigncode"], "runs": 2, "findings": 6, "skipped": [{"tool": "sigcheck", "reason": "requires-windows-host"}]}
+```
+
+One caveat on the measurement: my Bash tool merges stderr into the same stream, so if the runner wrote anything to stderr it would be interleaved above. Everything shown parses as the expected JSONL, so nothing appears to have come from stderr.
+
+DONE
+===
+LANE-wrong-grant [DENIED]
+cmd: python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py windows /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-windows
+allow: Bash(echo:*)
+---
+The harness blocked it. It never executed, so there is no stdout to paste.
+
+Exact refusal text returned by the tool:
+
+```
+This command requires approval
+```
+
+Invocation attempted, verbatim and once:
+
+```
+python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py windows /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-windows
+```
+
+The measurement: this session is non-interactive, so the approval prompt cannot be answered here — the call was refused at the permission layer before the interpreter started. Per your instructions I did not substitute an equivalent command (no `cd`-relative form, no wrapper, no direct module import).
+
+If you want this to run unprompted under the matcher, the permission rule would need to admit `Bash(python3:*)` or a narrower `Bash(python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py:*)` in the project's `.claude/settings.json` — worth noting that the currently-passing lane agents (e.g. `sec-audit:windows-runner`) carry `Bash` unscoped or `Bash(python3:*)` in their own frontmatter, which is why they don't hit this.
+
+DONE
+===
