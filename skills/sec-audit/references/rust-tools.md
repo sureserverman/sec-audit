@@ -35,8 +35,15 @@ root.
 **Run command:**
 
 ```bash
-cargo audit --json
+cargo audit --json --file <target>/Cargo.lock
 ```
+
+Always name the lockfile: a bare `cargo audit` reads `Cargo.lock` from the
+**current working directory**, which for the engine is the runner's cwd,
+not the target — the lane scanned the wrong tree until 2026-09-02. A
+target with no `Cargo.lock` is skipped `no-lockfile` (cargo-audit has
+nothing to audit; it would otherwise generate one inside the caller's
+project, which the runner contract forbids).
 
 Emits a single JSON object to stdout. Exits 0 when no vulnerabilities are
 found and non-zero when vulnerabilities are present. Both exit codes
@@ -66,10 +73,10 @@ NOT a crash — parse the JSON and emit findings regardless.
           "title": "Use-after-free in SSL_free_buffers",
           "description": "A use-after-free vulnerability exists...",
           "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-          "aliases": ["CVE-2024-12345"],
-          "url": "https://rustsec.org/advisories/RUSTSEC-2024-0001.html",
+          "aliases": ["CVE-2024-12345", "GHSA-xxxx-xxxx-xxxx"],
+          "url": "https://github.com/example/issue-link",
           "categories": ["memory-corruption"],
-          "cwe": [416]
+          "date": "2024-01-01", "keywords": [], "related": [], "withdrawn": null
         },
         "package": {
           "name": "openssl",
@@ -84,7 +91,15 @@ NOT a crash — parse the JSON and emit findings regardless.
 
 Top-level keys: `database`, `lockfile`, `vulnerabilities`, `warnings`.
 The `vulnerabilities.list[]` array contains the security findings; each
-entry has an `advisory` sub-object and a `package` sub-object.
+entry has an `advisory` sub-object, a `package` sub-object, `versions`
+(`patched[]`, `unaffected[]`) and `affected`. Two shape facts that matter
+(cargo-audit 0.22.1): `advisory.cvss` is the CVSS **vector string**, not a
+score, so no band can be read from it (the engine defaults to MEDIUM and the
+cve-enricher re-scores by CVE id downstream); and there is **no `cwe`
+field** — `CWE-1104` is the documented fallback. `advisory.url` is whatever
+link the advisory author supplied; the canonical page is
+`https://rustsec.org/advisories/<advisory.id>.html`, which is what the
+engine emits as `reference_url`.
 
 **Worked example:**
 
@@ -105,46 +120,56 @@ Source: https://github.com/rustsec/rustsec
 **Run command:**
 
 ```bash
-cargo deny --format json check all
+cargo deny --manifest-path <target>/Cargo.toml --format json check 2>&1 >/dev/null
 ```
 
-Emits JSON diagnostic objects to stdout (one per line, or a combined
-array depending on the version). Exits non-zero when any enabled check
-produces an error. A non-zero exit because checks failed is NOT a crash —
-parse the JSON diagnostics and emit findings regardless. Only treat as
-tool failure when stdout is empty or not valid JSON, or when the process
-exits >= 127.
+cargo-deny writes **every diagnostic to stderr** — stdout stays empty even
+with `--format json` (verified against cargo-deny 0.19.4; the engine reads
+`output: "stderr"`). One JSON object per line. Exits non-zero when any
+enabled check produces an error; that is NOT a crash — parse the diagnostics
+and emit findings regardless. Treat as tool failure only when stderr holds
+no JSON lines or the process exits >= 127. Without a `deny.toml` the tool
+logs `unable to find a config path, falling back to default config` and the
+default licence policy rejects every crate — the engine drops the licence
+and config-lint families (see below) so those do not become findings.
 
-**Expected JSON output shape (one diagnostic per line):**
+**Expected JSON output shape (one object per line; captured 2026-09-02):**
 
 ```json
-{
-  "type": "diagnostic",
-  "severity": "error",
-  "code": "A001",
-  "message": "vulnerable crate 'openssl 0.10.55' (RUSTSEC-2024-0001)",
-  "labels": [
-    {
-      "span": {
-        "path": "Cargo.lock",
-        "line": 42,
-        "column": 1
-      },
-      "message": "this crate"
-    }
-  ],
-  "graphs": []
-}
+{"type":"log","fields":{"level":"WARN","message":"unable to find a config path, falling back to default config","timestamp":"..."}}
+{"type":"diagnostic","fields":{"code":"vulnerability","severity":"error","message":"Potential segfault in the time crate","labels":[{"line":2,"column":1,"message":"","span":"time 0.1.45 registry+https://github.com/rust-lang/crates.io-index"}],"graphs":[{"Krate":{"name":"time","version":"0.1.45"},"parents":[...]}],"notes":["ID: RUSTSEC-2020-0071","Advisory: https://rustsec.org/advisories/RUSTSEC-2020-0071","..."]}}
+{"type":"summary","fields":{"advisories":{"errors":1,"warnings":0,"notes":0,"helps":0},"...":"..."}}
 ```
 
-Each diagnostic object carries: `type`, `severity` (`"error"` /
-`"warning"` / `"note"` / `"help"`), `code`, `message`, `labels[]`
-(file/line spans), and `graphs` (dependency graph slices). The `code`
-field identifies which cargo-deny check produced the diagnostic:
-advisory-related codes begin with `A`, ban-related with `B`, license-
-related with `L`, and source-related with `S`.
+Each line carries `type` (`log` | `diagnostic` | `summary`) and a `fields`
+object. Only `type: "diagnostic"` lines are findings. Their `fields` hold
+`code`, `severity` (`"error"` / `"warning"` / `"note"` / `"help"`),
+`message`, `labels[]` (each with `line`, `column`, `span` — the span TEXT,
+not a path; lines refer to `Cargo.lock`), `graphs[]` (dependency-graph
+slices rooted at `Krate: {name, version}`) and `notes[]`.
 
-Check categories exposed by `check all`:
+Codes are words, not `A`/`B`/`L`/`S` numbers (the earlier revision of this
+file described a numbering scheme cargo-deny has never emitted). The
+security-relevant codes and their CWE mapping:
+
+| `fields.code` | check | CWE |
+|---|---|---|
+| `vulnerability`, `unsound` | advisories | CWE-1395 |
+| `unmaintained`, `yanked`, `wildcard` | advisories / bans | CWE-1104 |
+| `notice` | advisories | null |
+| `source-not-allowed`, `git-source-underspecified`, `checksum-mismatch` | sources / bans | CWE-494 |
+| `detected-executable`, `detected-executable-script` | bans | CWE-506 |
+| `build-script-not-allowed` | bans | CWE-829 |
+| `banned`, `duplicate`, `feature-banned`, anything cargo-deny adds later | bans | null (passes through) |
+
+Excluded by the engine as non-security noise: the licence family
+(`accepted`, `rejected`, `unlicensed`, `no-license-field`,
+`license-not-encountered`, ...) and config-lint / bookkeeping codes
+(`allowed*`, `skipped*`, `unmatched-*`, `unnecessary-skip`, `unused-*`,
+`advisory-ignored`, `advisory-not-detected`, `yanked-*`, `index-*`).
+Full code lists: https://embarkstudios.github.io/cargo-deny/checks/
+
+Check categories exposed by `check` (all four run by default):
 - `advisories` — cross-references Cargo.lock against the RustSec DB.
 - `bans` — detects disallowed crates and duplicate dependency versions.
 - `licenses` — flags unacceptable license expressions.
@@ -153,14 +178,14 @@ Check categories exposed by `check all`:
 **Worked example:**
 
 ```bash
-# Run all checks, JSON diagnostics to stdout
-cargo deny --format json check all
+# All checks, JSON diagnostics on stderr
+cargo deny --manifest-path ./Cargo.toml --format json check 2>diag.jsonl
 
-# Run only the advisory and bans checks
-cargo deny --format json check advisories bans
+# Only the advisory and bans checks
+cargo deny --manifest-path ./Cargo.toml --format json check advisories bans
 
 # With a deny.toml config in a non-standard location
-cargo deny --config path/to/deny.toml --format json check all
+cargo deny --config path/to/deny.toml --format json check
 ```
 
 Source: https://github.com/EmbarkStudios/cargo-deny
@@ -174,10 +199,14 @@ Requires cargo-geiger >= 0.11.5 for the `Json` output format flag.
 **Run command:**
 
 ```bash
-cargo geiger --output-format Json --all-targets
+cargo geiger --manifest-path <target>/Cargo.toml --output-format Json
 ```
 
-Emits a JSON object to stdout. Exits 0 on success. The scan walks the
+cargo-geiger **compiles the crate graph** to count unsafe usage, so the
+engine sets `CARGO_TARGET_DIR` to its scratch directory — otherwise the run
+fills `target/` inside the caller's project. The output lists every package
+in the graph; only those whose `unsafety.used.exprs.unsafe_` is non-zero
+become findings. Emits a JSON object to stdout. Exits 0 on success. The scan walks the
 full dependency tree and counts safe and unsafe usages per crate.
 
 **Expected JSON output shape:**

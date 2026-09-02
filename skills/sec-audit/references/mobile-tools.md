@@ -33,8 +33,22 @@ the `android-runner` sub-agent invokes each tool, not anti-patterns in user code
 **Run command:**
 
 ```bash
-mobsfscan --json --output - <path-to-source-tree>
+mobsfscan --json <path-to-source-tree>
 ```
+
+`--json` alone writes the report to stdout. **Do not pass `--output -`**:
+mobsfscan 0.4.5 treats `-` as a filename, creates a file literally named `-`
+in the working directory and leaves stdout empty — the android lane
+reported `unavailable` over its own fixture for as long as it used that
+form (fixed 2026-08-27).
+
+**Paths mobsfscan silently ignores:** any path containing a segment named
+`fixtures`, `spec`, `__MACOSX`, `.git` or `.svn` (`settings.IGNORE_PATHS`),
+plus `.DS_Store` and `.apk`/`.zip`/`.ipa` files. A `.mobsf` config can add
+to that list but cannot remove from it. A project whose sources live under
+`spec/` or `fixtures/` is therefore unscanned with no error — the report is
+simply empty of file-level results. When that is a possibility, copy the
+tree somewhere neutral before scanning (the plugin's own live gate does).
 
 Emits a single JSON object to stdout. Exits 0 on success regardless of
 whether findings are present. A non-zero exit indicates a tool error (bad
@@ -81,7 +95,7 @@ three sec-audit findings.
 
 ```bash
 # Scan a source tree; JSON to stdout
-mobsfscan --json --output - ./app/src/
+mobsfscan --json ./app/src/
 
 # Write JSON to a file instead (useful in CI)
 mobsfscan --json --output /tmp/mobsfscan-out.json ./app/src/
@@ -387,6 +401,16 @@ Every finding produced by the `android-runner` sub-agent carries:
 
 One finding is emitted per `files[]` entry within each rule key. A rule
 matching three source files produces three sec-audit findings.
+
+**App-wide rules.** Some rules carry `metadata` but no `files[]` at all —
+they are claims about the whole target ("This app does not have Certificate
+Pinning implemented in code", `android_root_detection`,
+`ios_jailbreak_detect`, ...). Since 2026-09-02 (engine `flatten_missing:
+"self"`) each becomes ONE finding at `file: "."`, `line: 0`, `evidence: ""`,
+with the rule's description as title; before that they were dropped without
+trace, which is how a repaired lane reported 0 findings while 6 rules fired.
+They are all `INFO` in mobsfscan (LOW after remapping) and read as
+best-practice absences, which is what they are.
 
 | mobsfscan JSON field                    | sec-audit finding field | Notes                                                                                                                                 |
 |-----------------------------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
