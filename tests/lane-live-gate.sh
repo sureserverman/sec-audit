@@ -215,6 +215,45 @@ PY
     rm -f "$out" "$err"
 done
 
+# ---------------------------------------------------------------------------
+# Lane scenario: secrets — a secret deleted from HEAD is still found in history.
+#
+# The fixture under tests/fixtures/ cannot carry this claim: it is a
+# subdirectory of this repo and has no history of its own, so trufflehog
+# (a git-history scanner) skips it `no-git-history` and the recording says so.
+# The claim is worth a gate of its own because it is the one thing the
+# working-tree scan structurally cannot see. Runs only where trufflehog and
+# git exist; elsewhere it is reported as skipped, never as passed.
+# ---------------------------------------------------------------------------
+if command -v trufflehog >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
+    repo="$(mktemp -d)"
+    cp -a tests/fixtures/vulnerable-secrets/. "$repo/"
+    rm -rf "$repo/.pipeline"
+    G="git -C $repo -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false"
+    git -C "$repo" init -q
+    $G add -A && $G commit -q --no-verify -m init
+    # A URI with an embedded password (trufflehog `Postgres` detector). Not an
+    # AWS-shaped key: GitHub push protection blocks that shape in this script
+    # as readily as in a fixture, so it could never be pushed.
+    printf 'DATABASE_URL=postgres://admin:S3cretPassw0rd-fixture-only@db.example.internal:5432/app\n' > "$repo/deleted_secrets.txt"
+    $G add deleted_secrets.txt && $G commit -q --no-verify -m leak
+    $G rm -q deleted_secrets.txt && $G commit -q --no-verify -m remove
+    out="$(mktemp)"
+    if timeout "$PER_LANE_TIMEOUT" python3 scripts/secaudit/runner.py secrets "$repo" >"$out" 2>/dev/null \
+       && [ "$(jq -rs 'map(select(.tool=="trufflehog" and .file=="deleted_secrets.txt")) | length' "$out")" -ge 1 ] \
+       && [ "$(tail -n 1 "$out" | jq -r '.tools | index("trufflehog") // empty')" != "" ] \
+       && ! grep -q 'S3cretPassw0rd' "$out"; then
+        echo "  secrets/history   ok           trufflehog found the deleted file's secret; secret value not echoed"
+    else
+        echo "lane-live-gate: FAIL — secrets git-history scenario" >&2
+        tail -n 3 "$out" | cut -c1-200 | sed 's/^/  | /' >&2
+        failures=$((failures + 1))
+    fi
+    rm -rf "$repo" "$out"
+else
+    echo "  secrets/history   SKIPPED      (trufflehog or git not on PATH)"
+fi
+
 echo ""
 if [ "$failures" -ne 0 ]; then
     echo "lane-live-gate: FAIL — $failures of $checked lane(s)" >&2

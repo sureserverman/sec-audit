@@ -17,9 +17,24 @@ gl=$(jq -rs 'map(select(.origin=="secrets" and .tool=="gitleaks")) | length' "$j
 [ "$gl" -ge 1 ] || { echo "secrets-e2e: FAIL (a) gitleaks findings: $gl" >&2; exit 1; }
 echo "  (a) gitleaks findings: $gl"
 
-th=$(jq -rs 'map(select(.origin=="secrets" and .tool=="trufflehog")) | length' "$jsonl")
-[ "$th" -ge 1 ] || { echo "secrets-e2e: FAIL (b) trufflehog findings: $th" >&2; exit 1; }
-echo "  (b) trufflehog findings: $th"
+# (b) trufflehog is a git-HISTORY scanner and this fixture, checked in as a
+# subdirectory of the plugin repo, has no history of its own — so the honest
+# recording shows it skipped `no-git-history`, not producing findings. The
+# recording that used to claim two trufflehog findings here could not have
+# been produced by any run (2026-08-27 recording audit). The history claim
+# ("a secret deleted from HEAD is still found") is proven by the live
+# scenario in tests/lane-live-gate.sh, which builds a real repo.
+th_ran=$(tail -n 1 "$jsonl" | jq -r '.tools // [] | index("trufflehog") // empty')
+th_skip=$(tail -n 1 "$jsonl" | jq -r '.skipped // [] | map(select(.tool=="trufflehog" and .reason=="no-git-history")) | length')
+if [ -n "$th_ran" ]; then
+    th=$(jq -rs 'map(select(.origin=="secrets" and .tool=="trufflehog")) | length' "$jsonl")
+    [ "$th" -ge 1 ] || { echo "secrets-e2e: FAIL (b) trufflehog ran but produced no findings" >&2; exit 1; }
+    echo "  (b) trufflehog findings: $th"
+elif [ "$th_skip" -eq 1 ]; then
+    echo "  (b) trufflehog skipped no-git-history (fixture has no history; live gate proves the history scan)"
+else
+    echo "secrets-e2e: FAIL (b) trufflehog neither ran nor skipped no-git-history" >&2; exit 1
+fi
 
 # Every secrets finding must be CWE-798 (hard-coded credentials).
 non798=$(jq -rs 'map(select(.origin=="secrets" and .cwe!="CWE-798")) | length' "$jsonl")
@@ -27,8 +42,8 @@ non798=$(jq -rs 'map(select(.origin=="secrets" and .cwe!="CWE-798")) | length' "
 echo "  (c) every secrets finding is CWE-798: OK"
 
 # Redaction invariant: the plaintext canary in the raw trufflehog fixture's Raw
-# field must NEVER appear in the mapped golden.
-canary=$(grep -c 'CANARY_RAW_SECRET' "$jsonl" || true)
+# field must NEVER appear in the mapped golden (nor in the parity expected.jsonl).
+canary=$(cat "$jsonl" "$plugin_root/tests/fixtures/raw-tool-output/secrets/expected.jsonl" | grep -c 'CANARY_RAW_SECRET' || true)
 [ "$canary" -eq 0 ] || { echo "secrets-e2e: FAIL (d) — raw-secret canary leaked into golden ($canary)" >&2; exit 1; }
 echo "  (d) redaction invariant: 0 raw-secret canary leaks"
 
