@@ -9,9 +9,11 @@ build = "build.rs"
 # in localtime_r on unix. Intentionally pinned here for fixture purposes.
 time = "0.1.43"
 
-# A git-URL dep to trigger cargo-ecosystem.md CWE-494 pattern.
-# NOT resolvable; fixture is static — tools read the manifest, not the repo.
-serde_gremlin = { git = "https://example.com/gremlin.git" }
+# No git-URL dependency here on purpose. cargo-audit, cargo-deny and
+# cargo-geiger all resolve the dependency graph before analysing it, and an
+# unresolvable git source made every one of them fail before scanning
+# anything (2026-08-27 recording audit, BL-00A). The graph must resolve
+# from crates.io alone; Cargo.lock is committed so the audit is reproducible.
 
 [profile.release]
 overflow-checks = false

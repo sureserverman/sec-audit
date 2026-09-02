@@ -163,12 +163,10 @@ for name in declared:
 # lane on this list still runs and is still checked for everything else; only
 # this one assertion is waived, and the entry is a debt with a backlog id.
 FAILED_ALLOWED = {
-    # cargo-audit and cargo-geiger resolve the dependency graph before they can
-    # analyse it, and tests/fixtures/vulnerable-rust pins
-    # `https://example.com/gremlin.git`, which cannot resolve offline. The lane
-    # invocations also carry no {target}, so they run in the runner's cwd. Both
-    # are BL-00A; remove this entry when the fixture and invocations are fixed.
-    "rust": {"cargo-audit", "cargo-geiger"},
+    # Empty since 2026-09-02. The one entry it ever held (rust: cargo-audit and
+    # cargo-geiger, whose fixture pinned an unresolvable git dependency and
+    # whose invocations carried no {target}) was removed when both were fixed.
+    # An entry here is a debt with a backlog id, never a convenience.
 }
 waived = FAILED_ALLOWED.get(lane, set())
 for entry in failed:

@@ -1,42 +1,277 @@
 {
-  "lane": "rust", "status_key": "__rust_status__", "origin": "rust", "reference": "rust-tools.md",
-  "finding_const": {"fix_recipe": null},
+  "lane": "rust",
+  "status_key": "__rust_status__",
+  "origin": "rust",
+  "reference": "rust-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "_note": "Every invocation names the target explicitly (`--file` / `--manifest-path`): a bare `cargo audit` runs in the RUNNER's cwd, so the lane used to scan whatever tree it was invoked from. CARGO_TARGET_DIR points at the scratch dir because cargo-geiger compiles the crate and would otherwise fill `target/` inside the caller's project. Field maps follow the shapes cargo-audit 0.22 / cargo-deny 0.19 / cargo-geiger 0.13 actually emit (captured in tests/fixtures/raw-tool-output/rust/), not the hand-authored ones the lane carried before 2026-09-02, which matched nothing.",
   "tools": [
     {
-      "name": "cargo-audit", "probe": "cargo-audit",
-      "invoke": ["cargo", "audit", "--json"], "output": "stdout", "findings_path": "vulnerabilities.list",
-      "const": {"confidence": "high", "file": "Cargo.toml", "line": 0},
+      "name": "cargo-audit",
+      "probe": "cargo-audit",
+      "applicable_glob": "Cargo.lock",
+      "inapplicable_reason": "no-lockfile",
+      "invoke": [
+        "cargo",
+        "audit",
+        "--json",
+        "--file",
+        "{target}/Cargo.lock"
+      ],
+      "output": "stdout",
+      "findings_path": "vulnerabilities.list",
+      "const": {
+        "confidence": "high",
+        "file": "Cargo.lock",
+        "line": 0
+      },
       "map": {
-        "id": {"from": "advisory.aliases.0", "default": null},
-        "severity": {"from": "advisory.cvss", "cvss_band": true, "default": "MEDIUM"},
-        "cwe": {"concat": ["CWE-", {"from": "advisory.cwe.0"}], "default": "CWE-1104"},
-        "title": "advisory.title", "evidence": "advisory.description",
-        "reference_url": {"from": "advisory.url", "default": null},
-        "fix_recipe": {"concat": ["Upgrade ", {"from": "package.name"}, " to ", {"from": "versions.patched.0"}]}
-      }
+        "id": {
+          "from": "advisory.aliases.0",
+          "fallback": {
+            "from": "advisory.id"
+          }
+        },
+        "severity": {
+          "from": "advisory.cvss",
+          "cvss_band": true,
+          "default": "MEDIUM"
+        },
+        "cwe": {
+          "from": "advisory.cwe.0",
+          "default": "CWE-1104"
+        },
+        "title": "advisory.title",
+        "evidence": {
+          "from": "advisory.description",
+          "truncate": 300,
+          "default": ""
+        },
+        "reference_url": {
+          "concat": [
+            "https://rustsec.org/advisories/",
+            {
+              "from": "advisory.id"
+            },
+            ".html"
+          ],
+          "default": null
+        },
+        "fix_recipe": {
+          "concat": [
+            "Upgrade ",
+            {
+              "from": "package.name"
+            },
+            " to ",
+            {
+              "from": "versions.patched.0"
+            }
+          ],
+          "default": null
+        }
+      },
+      "_note": "`advisory.cvss` is a vector string, not a score, so cvss_band falls to MEDIUM; the cve-enricher re-scores by CVE id downstream. cargo-audit ships no CWE; CWE-1104 is the documented fallback (rust-runner.md)."
     },
     {
-      "name": "cargo-deny", "probe": "cargo-deny",
-      "invoke": ["cargo", "deny", "--format", "json", "check"], "output": "stdout", "input_format": "jsonl",
-      "const": {"confidence": "medium", "reference_url": null},
+      "name": "cargo-deny",
+      "probe": "cargo-deny",
+      "applicable_glob": "Cargo.toml",
+      "inapplicable_reason": "no-manifest",
+      "invoke": [
+        "cargo",
+        "deny",
+        "--manifest-path",
+        "{target}/Cargo.toml",
+        "--format",
+        "json",
+        "check"
+      ],
+      "env": {
+        "CARGO_TARGET_DIR": "{tmp}/target"
+      },
+      "output": "stderr",
+      "input_format": "jsonl",
+      "filter": [
+        {
+          "field": "type",
+          "equals": "diagnostic"
+        },
+        {
+          "field": "fields.code",
+          "not_in": [
+            "accepted",
+            "rejected",
+            "unlicensed",
+            "no-license-field",
+            "license-not-encountered",
+            "license-exception-not-encountered",
+            "missing-clarification-file",
+            "deprecated",
+            "unused-license-exception",
+            "unused-licenses-allowed",
+            "allowed",
+            "allowed-source",
+            "allowed-by-organization",
+            "allowed-by-wrapper",
+            "skipped",
+            "skipped-by-root",
+            "advisory-ignored",
+            "advisory-not-detected",
+            "yanked-ignored",
+            "yanked-not-detected",
+            "checksum-match",
+            "unmatched-source",
+            "unmatched-organization",
+            "unmatched-bypass",
+            "unmatched-glob",
+            "unmatched-path-bypass",
+            "unmatched-root",
+            "unmatched-skip",
+            "unmatched-skip-root",
+            "unmatched-wrapper",
+            "unnecessary-skip",
+            "unused-wrapper",
+            "unused-workspace-dependency",
+            "path-bypassed",
+            "path-bypassed-by-glob",
+            "index-cache-load-failure",
+            "index-failure",
+            "unknown-advisory",
+            "empty-license-field",
+            "gather-failure",
+            "parse-error",
+            "skipped-private-workspace-crate"
+          ]
+        }
+      ],
+      "const": {
+        "confidence": "medium",
+        "reference_url": null,
+        "file": "Cargo.lock"
+      },
       "map": {
-        "id": "code",
-        "severity": {"from": "severity", "map": {"error": "HIGH", "warning": "MEDIUM", "note": "LOW", "help": "LOW"}, "default": "MEDIUM"},
-        "cwe": {"from": "code", "lookup": {"B0001": "CWE-1104", "A0003": "CWE-1104", "S0001": "CWE-494"}, "default": null},
-        "title": "message", "evidence": "message",
-        "file": {"from": "labels.0.span.path", "default": null},
-        "line": {"from": "labels.0.span.line", "default": 0}
-      }
+        "id": "fields.code",
+        "severity": {
+          "from": "fields.severity",
+          "map": {
+            "error": "HIGH",
+            "warning": "MEDIUM",
+            "note": "LOW",
+            "help": "LOW"
+          },
+          "default": "MEDIUM"
+        },
+        "cwe": {
+          "from": "fields.code",
+          "lookup": {
+            "vulnerability": "CWE-1395",
+            "unsound": "CWE-1395",
+            "unmaintained": "CWE-1104",
+            "yanked": "CWE-1104",
+            "wildcard": "CWE-1104",
+            "source-not-allowed": "CWE-494",
+            "git-source-underspecified": "CWE-494",
+            "checksum-mismatch": "CWE-494",
+            "detected-executable": "CWE-506",
+            "detected-executable-script": "CWE-506",
+            "build-script-not-allowed": "CWE-829"
+          },
+          "default": null
+        },
+        "title": "fields.message",
+        "evidence": {
+          "from": "fields.labels.0.span",
+          "default": ""
+        },
+        "line": {
+          "from": "fields.labels.0.line",
+          "default": 0
+        }
+      },
+      "_note": "Diagnostics go to STDERR (stdout stays empty) and nest under `fields` and carry `type: diagnostic|log|summary`; codes are words (`vulnerability`, `unmaintained`, `source-not-allowed`), not the A/B/S numbers the reference once described. The exclusion list drops licence and config-lint families so a target without deny.toml does not drown in `rejected: license is not explicitly allowed`; any code cargo-deny adds later passes through."
     },
     {
-      "name": "cargo-geiger", "probe": "cargo-geiger",
-      "invoke": ["cargo", "geiger", "--output-format", "Json"], "output": "stdout", "findings_path": "packages",
-      "const": {"confidence": "low", "severity": "INFO", "cwe": null, "file": "Cargo.lock", "line": 0, "reference_url": null},
+      "name": "cargo-geiger",
+      "probe": "cargo-geiger",
+      "applicable_glob": "Cargo.toml",
+      "inapplicable_reason": "no-manifest",
+      "invoke": [
+        "cargo",
+        "geiger",
+        "--manifest-path",
+        "{target}/Cargo.toml",
+        "--output-format",
+        "Json"
+      ],
+      "env": {
+        "CARGO_TARGET_DIR": "{tmp}/target"
+      },
+      "output": "stdout",
+      "findings_path": "packages",
+      "filter": {
+        "field": "unsafety.used.exprs.unsafe_",
+        "gt": 0
+      },
+      "const": {
+        "confidence": "low",
+        "severity": "INFO",
+        "cwe": null,
+        "line": 0,
+        "reference_url": null
+      },
       "map": {
-        "id": {"concat": [{"from": "name"}, "@", {"from": "version"}]},
-        "title": {"concat": ["Unsafe code in ", {"from": "name"}]},
-        "evidence": {"concat": [{"from": "name"}, "@", {"from": "version"}, ": used unsafe functions=", {"from": "unsafe_fns"}, ", exprs=", {"from": "unsafe_exprs"}]}
-      }
+        "id": {
+          "concat": [
+            {
+              "from": "package.id.name"
+            },
+            "@",
+            {
+              "from": "package.id.version"
+            }
+          ]
+        },
+        "title": {
+          "concat": [
+            "Unsafe code in ",
+            {
+              "from": "package.id.name"
+            }
+          ]
+        },
+        "file": "package.id.name",
+        "evidence": {
+          "concat": [
+            {
+              "from": "package.id.name"
+            },
+            "@",
+            {
+              "from": "package.id.version"
+            },
+            ": unsafe code used — functions=",
+            {
+              "from": "unsafety.used.functions.unsafe_"
+            },
+            ", exprs=",
+            {
+              "from": "unsafety.used.exprs.unsafe_"
+            },
+            ", methods=",
+            {
+              "from": "unsafety.used.methods.unsafe_"
+            },
+            ", impls=",
+            {
+              "from": "unsafety.used.item_impls.unsafe_"
+            }
+          ]
+        }
+      },
+      "_note": "Only packages whose USED unsafe expression count is non-zero become findings; the rest of the tree is listed by the tool but is not a signal. INFO is a ceiling (rust-runner.md hard rule 7)."
     }
   ]
 }
