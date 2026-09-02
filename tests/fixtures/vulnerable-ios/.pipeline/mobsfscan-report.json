@@ -1,79 +1,297 @@
 {
-  "results": {
-    "ios_ats_arbitrary_loads": {
-      "metadata": {
-        "description": "NSAllowsArbitraryLoads globally disables App Transport Security; all HTTP traffic proceeds over cleartext",
-        "severity": "ERROR",
-        "cwe": "CWE-319: Cleartext Transmission of Sensitive Information",
-        "owasp-mobile": "M3: Insecure Communication",
-        "masvs": "MSTG-NETWORK-1",
-        "reference": "https://developer.apple.com/documentation/security/preventing_insecure_network_connections"
-      },
-      "files": [
-        {
-          "file_path": "VulnerableiOS/Info.plist",
-          "match_lines": [20, 22],
-          "match_position": [5, 11],
-          "match_string": "<key>NSAllowsArbitraryLoads</key>\n    <true/>"
-        }
-      ]
-    },
-    "ios_userdefaults_secret": {
-      "metadata": {
-        "description": "Secret stored in UserDefaults is not encrypted and is included in device backups",
-        "severity": "ERROR",
-        "cwe": "CWE-312: Cleartext Storage of Sensitive Information",
-        "owasp-mobile": "M2: Insecure Data Storage",
-        "masvs": "MSTG-STORAGE-1",
-        "reference": "https://developer.apple.com/documentation/foundation/userdefaults"
-      },
-      "files": [
-        {
-          "file_path": "VulnerableiOS/AppDelegate.swift",
-          "match_lines": [16],
-          "match_position": [9, 80],
-          "match_string": "UserDefaults.standard.set(\"sk_live_DEADBEEFCAFEBABE1234567890ABCDEF\", forKey: \"api_key\")"
-        }
-      ]
-    },
-    "ios_keychain_accessible_always": {
-      "metadata": {
-        "description": "Keychain item stored with kSecAttrAccessibleAlways — accessible even while device is locked",
-        "severity": "WARNING",
-        "cwe": "CWE-522: Insufficiently Protected Credentials",
-        "owasp-mobile": "M2: Insecure Data Storage",
-        "masvs": "MSTG-STORAGE-2",
-        "reference": "https://developer.apple.com/documentation/security/keychain_services"
-      },
-      "files": [
-        {
-          "file_path": "VulnerableiOS/AppDelegate.swift",
-          "match_lines": [28],
-          "match_position": [13, 50],
-          "match_string": "kSecAttrAccessible: kSecAttrAccessibleAlways"
-        }
-      ]
-    },
-    "ios_webview_js_bridge": {
-      "metadata": {
-        "description": "WKWebView userContentController.add exposes the native app to arbitrary JavaScript running in loaded pages",
-        "severity": "WARNING",
-        "cwe": "CWE-749: Exposed Dangerous Method or Function",
-        "owasp-mobile": "M7: Client Code Quality",
-        "masvs": "MSTG-PLATFORM-7",
-        "reference": "https://developer.apple.com/documentation/webkit/wkwebview"
-      },
-      "files": [
-        {
-          "file_path": "VulnerableiOS/AppDelegate.swift",
-          "match_lines": [36],
-          "match_position": [9, 65],
-          "match_string": "cfg.userContentController.add(self as! WKScriptMessageHandler, name: \"VulnerableBridge\")"
-        }
-      ]
-    }
-  },
   "errors": [],
-  "total_findings": 4,
-  "version": "0.4.2"
+  "mobsfscan_version": "0.4.5",
+  "results": {
+    "ios_cert_pinning": {
+      "metadata": {
+        "cwe": "CWE-295: Improper Certificate Validation",
+        "description": "This app does not have Certificate Pinning implemented in code.",
+        "masvs": "MSTG-NETWORK-4",
+        "owasp-mobile": "M3: Insecure Communication",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x05g-Testing-Network-Communication.md#testing-custom-certificate-stores-and-certificate-pinning-mstg-network-4",
+        "severity": "INFO"
+      }
+    },
+    "ios_custom_keyboard_disabled": {
+      "metadata": {
+        "cwe": "CWE-919: Weaknesses in Mobile Applications",
+        "description": "This app does not have custom keyboards disabled.",
+        "masvs": "MSTG-PLATFORM-11",
+        "owasp-mobile": "M1: Improper Platform Usage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#app-extensions",
+        "severity": "INFO"
+      }
+    },
+    "ios_detect_reversing": {
+      "metadata": {
+        "cwe": "CWE-919: Weaknesses in Mobile Applications",
+        "description": "This app does not have Reverse engineering detection capabilities.",
+        "masvs": "MSTG-RESILIENCE-4",
+        "owasp-mobile": "M9: Reverse Engineering",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#ios-anti-reversing-defenses",
+        "severity": "INFO"
+      }
+    },
+    "ios_file_no_special": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            54,
+            54
+          ],
+          "match_position": [
+            2354,
+            2371
+          ],
+          "match_string": ".noFileProtection"
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-311: Missing Encryption of Sensitive Data",
+        "description": "The file has no special protections associated with it.",
+        "masvs": "MSTG-STORAGE-1",
+        "owasp-mobile": "M2: Insecure Data Storage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage",
+        "severity": "ERROR"
+      }
+    },
+    "ios_hardcoded_secret": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            23,
+            24
+          ],
+          "match_position": [
+            866,
+            921
+          ],
+          "match_string": "key = \"fixture-api-key-deadbeefcafebabe1234567890\"\n    "
+        },
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            24,
+            25
+          ],
+          "match_position": [
+            929,
+            967
+          ],
+          "match_string": "password = \"hunter2-fixture-only\"\n    "
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-312: Cleartext Storage of Sensitive Information",
+        "description": "Files may contain hardcoded sensitive information like usernames, passwords, keys etc.",
+        "masvs": "MSTG-STORAGE-14",
+        "owasp-mobile": "M9: Reverse Engineering",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x05d-Testing-Data-Storage.md#checking-memory-for-sensitive-data-mstg-storage-10",
+        "severity": "WARNING"
+      }
+    },
+    "ios_insecure_random_no_generator": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            49,
+            49
+          ],
+          "match_position": [
+            2100,
+            2111
+          ],
+          "match_string": "Int.random("
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-330: Use of Insufficiently Random Values",
+        "description": "The App uses an insecure Random Number Generator.",
+        "input_case": "exact",
+        "masvs": "MSTG-CRYPTO-6",
+        "owasp-mobile": "M5: Insufficient Cryptography",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#weak-random-number-generators",
+        "severity": "WARNING"
+      }
+    },
+    "ios_jailbreak_detect": {
+      "metadata": {
+        "cwe": "CWE-919: Weaknesses in Mobile Applications",
+        "description": "This app does not have Jailbreak detection capabilities.",
+        "masvs": "MSTG-RESILIENCE-1",
+        "owasp-mobile": "M8: Code Tampering",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1",
+        "severity": "INFO"
+      }
+    },
+    "ios_keyboard_cache": {
+      "metadata": {
+        "cwe": "CWE-919: Weaknesses in Mobile Applications",
+        "description": "This app does not disable Keyboard cache. It must be disabled for all sensitive data inputs.",
+        "masvs": "MSTG-STORAGE-5",
+        "owasp-mobile": "M2: Insecure Data Storage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#finding-sensitive-data-in-the-keyboard-cache-mstg-storage-5",
+        "severity": "INFO"
+      }
+    },
+    "ios_keychain_weak_accessibility_value": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            39,
+            39
+          ],
+          "match_position": [
+            1648,
+            1672
+          ],
+          "match_string": "kSecAttrAccessibleAlways"
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-305: Authentication Bypass by Primary Weakness",
+        "description": "A key stored in the Keychain is using a weak accessibility value. Use stronger ACLs like `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly/kSecAttrAccessibleWhenUnlocked/kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.",
+        "masvs": "MSTG-AUTH-8",
+        "owasp-mobile": "M1: Improper Platform Usage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md",
+        "severity": "WARNING"
+      }
+    },
+    "ios_load_html_string": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            62,
+            62
+          ],
+          "match_position": [
+            2766,
+            2780
+          ],
+          "match_string": "loadHTMLString"
+        },
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            58,
+            58
+          ],
+          "match_position": [
+            2550,
+            2557
+          ],
+          "match_string": "webView"
+        },
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            62,
+            62
+          ],
+          "match_position": [
+            2758,
+            2765
+          ],
+          "match_string": "webView"
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')",
+        "description": "User input in \"loadHTMLString\" will result in JavaScript Injection.",
+        "masvs": "MSTG-PLATFORM-5",
+        "owasp-mobile": "M7: Client Code Quality",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-webview-protocol-handlers-mstg-platform-6",
+        "severity": "INFO"
+      }
+    },
+    "ios_log": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            29,
+            29
+          ],
+          "match_position": [
+            1167,
+            1173
+          ],
+          "match_string": "print("
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-532: Insertion of Sensitive Information into Log File",
+        "description": "The App logs information. Sensitive information should never be logged.",
+        "masvs": "MSTG-STORAGE-3",
+        "owasp-mobile": "M1: Improper Platform Usage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06i-Testing-Code-Quality-and-Build-Settings.md#finding-debugging-code-and-verbose-error-logging-mstg-code-4",
+        "severity": "INFO"
+      }
+    },
+    "ios_uiwebview": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            65,
+            65
+          ],
+          "match_position": [
+            2935,
+            2944
+          ],
+          "match_string": "UIWebView"
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-919: Weaknesses in Mobile Applications",
+        "description": "This app uses UIWebView. For security reasons, It is recommended to use WKWebView instead.",
+        "masvs": "MSTG-PLATFORM-5",
+        "owasp-mobile": "M1: Improper Platform Usage",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-ios-webviews-mstg-platform-5",
+        "severity": "INFO"
+      }
+    },
+    "ios_weak_hash": {
+      "files": [
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            45,
+            45
+          ],
+          "match_position": [
+            1901,
+            1908
+          ],
+          "match_string": "CC_MD5("
+        },
+        {
+          "file_path": "VulnerableiOS/AppDelegate.swift",
+          "match_lines": [
+            45,
+            45
+          ],
+          "match_position": [
+            1904,
+            1908
+          ],
+          "match_string": "MD5("
+        }
+      ],
+      "metadata": {
+        "cwe": "CWE-327: Use of a Broken or Risky Cryptographic Algorithm",
+        "description": "Weak Hash algorithm used. The hash algorithm is known to have hash collisions.",
+        "masvs": "MSTG-CRYPTO-4",
+        "owasp-mobile": "M5: Insufficient Cryptography",
+        "reference": "https://github.com/MobSF/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4",
+        "severity": "WARNING"
+      }
+    }
+  }
 }

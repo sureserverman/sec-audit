@@ -60,10 +60,21 @@ for lane_json in scripts/secaudit/lanes/*.json; do
         continue
     fi
 
+    # Run against a STAGED COPY, never the tree under tests/fixtures/. Two
+    # reasons, both learned the hard way: mobsfscan hard-codes `fixtures` (and
+    # `spec`) as ignored path segments, so a lane run in place scanned nothing
+    # and reported the absence-of-best-practice rules only; and some tools
+    # write next to their input (mobsfscan `--output -` left a file named `-`,
+    # cargo tools fill `target/`), which would dirty the checkout. The copy
+    # drops `.pipeline/` so a recording is never scanned as if it were source.
+    stage="$(mktemp -d)"
+    cp -a "tests/fixtures/$fixture" "$stage/"
+    rm -rf "$stage/$fixture/.pipeline"
     out="$(mktemp)"; err="$(mktemp)"
     timeout "$PER_LANE_TIMEOUT" python3 scripts/secaudit/runner.py \
-        "$lane" "tests/fixtures/$fixture" >"$out" 2>"$err"
+        "$lane" "$stage/$fixture" >"$out" 2>"$err"
     rc=$?
+    rm -rf "$stage"
     if [ "$rc" -ne 0 ]; then
         echo "lane-live-gate: FAIL — $lane exited $rc" >&2
         sed 's/^/  | /' "$err" | tail -n 8 >&2

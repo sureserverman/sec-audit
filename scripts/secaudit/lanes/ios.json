@@ -6,7 +6,7 @@
   "finding_const": {
     "fix_recipe": null
   },
-  "_note": "mobsfscan is an ordinary lane entry (cross-platform, one pass over the source). The Apple signing tools need per-artifact discovery AND per-artifact attribution, which this schema cannot express, so they go through the bundled macscan.py \u2014 one entry per tool, so each keeps its own probe, skip reason and sentinel line. Doing the discovery in Python also removes macos-runner's `done < <(cat ...)` process substitution, which the Bash tool refuses outright whatever is granted, and which therefore never ran.",
+  "_note": "mobsfscan is an ordinary lane entry (cross-platform, one pass over the source). The Apple signing tools need per-artifact discovery AND per-artifact attribution, which this schema cannot express, so they go through the bundled macscan.py — one entry per tool, so each keeps its own probe, skip reason and sentinel line. Doing the discovery in Python also removes macos-runner's `done < <(cat ...)` process substitution, which the Bash tool refuses outright whatever is granted, and which therefore never ran.",
   "tools": [
     {
       "name": "mobsfscan",
@@ -41,7 +41,10 @@
           "default": null
         },
         "title": "_parent.metadata.description",
-        "file": "file_path",
+        "file": {
+          "from": "file_path",
+          "default": "."
+        },
         "line": {
           "from": "match_lines.0",
           "default": 0
@@ -55,7 +58,9 @@
           "default": null
         }
       },
-      "_note": "Identical to the android lane's entry \u2014 same tool, same shapes. `--json` writes to stdout; `--output -` does NOT, it creates a file literally named `-` and leaves stdout empty."
+      "_note": "Identical to the android lane's entry — same tool, same shapes. `--json` writes to stdout; `--output -` does NOT, it creates a file literally named `-` and leaves stdout empty.",
+      "flatten_missing": "self",
+      "_note_app_wide": "Rules with no `files` array are app-wide claims (\"does not use certificate pinning\") — `flatten_missing: \"self\"` keeps them as findings at file \".\", line 0, with the rule's description as title and no evidence, instead of discarding them. Decided 2026-09-02 (BL-00A open decision); the three mobsfscan lanes share it."
     },
     {
       "name": "codesign",
