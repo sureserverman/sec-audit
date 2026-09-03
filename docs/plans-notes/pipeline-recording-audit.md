@@ -141,6 +141,9 @@ recordings.
 | `rust` mappings | cargo-deny and cargo-geiger were mapped against hand-authored shapes; both remapped against captures (deny writes to **stderr**, word codes under `fields`). |
 | mobsfscan metadata-only rules | Decided: kept as app-wide findings at file `.`, line 0 (`flatten_missing: "self"`) on ios, macos and android. |
 | `windows` recording | Was "not assessable"; now a capture of binskim 4.4.9 + osslsigncode 2.14 over two real PEs added to the fixture (BL-002 windows port). The old recording claimed findings on a fixture that contained no PE at all. |
+| `linux` recording (2026-09-03) | Regenerated over a real `.deb` built into the fixture by `build/make-deb.sh`: lintian 9 + systemd-analyze 11. Two more engine defects fell out: `linuxscan.py` pruned `build/`/`dist/`/`target/` — where built packages and ELFs live — and its lintian regex dropped every tag carrying context text (10 of 16). |
+| `android-lint --xml -` suspect (2026-09-03) | **Confirmed**: lint 8.9 writes a file named `-`. Worse, standalone lint refuses Gradle projects outright. `lintscan.py` now prefers the project's own lint report and skips a report-less Gradle project honestly; the android recording is a real run (lint 8 + mobsfscan 13, apkleaks `no-apk`). |
+| `zap-baseline -J -` suspect (2026-09-03) | **Confirmed**, and the invocation also carried no target URL. Engine gains `--url`; `zapscan.py` runs ZAP locally or via docker; the dast recording is a real ZAP 2.16 scan of the fixture site (11 findings), and the live gate scans it for real where docker is available. |
 | Redundant recording-only e2e assertions | Decided: **not trimmed.** With every recording now a capture of a real run, the e2e suites are the hermetic shape/contract check the live gate cannot be on CI (where no scanner is installed). What was wrong was the recordings, not the assertions. |
 
 ### Why the 2026-08-27 comparison saw "0 live" for ios and macos
@@ -155,6 +158,5 @@ to their input (mobsfscan `-`, cargo `target/`) from dirtying the checkout.
 
 ### Still not assessable here
 
-`android-lint --xml -` and `zap-baseline -J -` — tools not installed on any
-reachable host. Unconfirmed, and still worth checking first on a host that
-has them. `windows` (BL-002) likewise.
+Nothing from this audit. `sigcheck` (windows) remains unexecuted because it
+is a Windows-only binary; its mapping is marked unverified.

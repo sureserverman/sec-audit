@@ -254,6 +254,36 @@ else
     echo "  secrets/history   SKIPPED      (trufflehog or git not on PATH)"
 fi
 
+# ---------------------------------------------------------------------------
+# Lane scenario: dast — the only URL-driven lane. The generic loop above runs
+# it with no URL and can only prove the `no-target-url` skip. Here the fixture
+# site is served on a loopback port and the lane is given `--url`, so ZAP
+# actually scans something. Needs a local zap-baseline.py or a reachable
+# docker daemon (the official image is pulled on first use); otherwise
+# reported as skipped, never as passed. Takes 1-2 minutes with docker.
+# ---------------------------------------------------------------------------
+if [ "${SECAUDIT_LIVE_DAST:-1}" != "0" ] && { command -v zap-baseline.py >/dev/null 2>&1 \
+     || { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }; }; then
+    port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
+    ( cd tests/fixtures/dast-target/site && exec python3 -m http.server "$port" --bind 127.0.0.1 ) >/dev/null 2>&1 &
+    http_pid=$!
+    sleep 1
+    out="$(mktemp)"
+    if timeout 900 python3 scripts/secaudit/runner.py dast tests/fixtures/dast-target \
+            --url "http://127.0.0.1:$port" >"$out" 2>/dev/null \
+       && [ "$(tail -n 1 "$out" | jq -r '.__dast_status__')" = "ok" ] \
+       && [ "$(jq -rs 'map(select(.tool=="zap-baseline" and .origin=="dast")) | length' "$out")" -ge 1 ]; then
+        echo "  dast/live-url     ok           zap-baseline scanned the served fixture: $(jq -rs 'map(select(.tool=="zap-baseline")) | length' "$out") findings"
+    else
+        echo "lane-live-gate: FAIL — dast live-url scenario" >&2
+        tail -n 2 "$out" | cut -c1-200 | sed 's/^/  | /' >&2
+        failures=$((failures + 1))
+    fi
+    kill "$http_pid" 2>/dev/null; rm -f "$out"
+else
+    echo "  dast/live-url     SKIPPED      (no zap-baseline.py and no docker daemon, or SECAUDIT_LIVE_DAST=0)"
+fi
+
 echo ""
 if [ "$failures" -ne 0 ]; then
     echo "lane-live-gate: FAIL — $failures of $checked lane(s)" >&2

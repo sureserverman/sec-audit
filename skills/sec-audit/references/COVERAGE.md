@@ -259,6 +259,11 @@ Dispatch discipline.
   `android-data.md`, `android-runtime.md`,
   `references/mobile-tools.md`.
 - **Host-OS gate:** none.
+- **Engine:** android-lint via `lintscan.py` (project's own Gradle lint
+  report first; standalone `lint --xml <file>` on non-Gradle trees;
+  `gradle-project-no-lint-report` skip otherwise). Verified 2026-09-03 with
+  lint 8.9.0 — `--xml -` never wrote to stdout, and standalone lint refuses
+  Gradle projects.
 - **Skip reasons:** `no-apk` (apkleaks needs compiled APK),
   `tool-missing`.
 - **Origin tag:** `"android"`. Tool whitelist: `mobsfscan`,
@@ -1005,7 +1010,30 @@ Hybrid model: the engine extracts faithful findings (id/file/line/cwe/tool/
 severity/evidence from tool output); the agent polishes title/severity only.
 Script-backed lanes: every lane (25) since v1.39.0 — the last six host-OS
 runners (`ai-tools`, `netcfg`, `linux`, `ios`, `macos`, `windows`) go through
-bundled wrappers (`mcpscan.py`, `linuxscan.py`, `macscan.py`, `winscan.py`). Parity is proven per lane by `tests/script-runner.sh
+bundled wrappers (`mcpscan.py`, `linuxscan.py`, `macscan.py`, `winscan.py`,
+`lintscan.py`, `zapscan.py`). The engine takes `--url` for URL-driven tools
+(`requires_url`), and an `unavailable` sentinel keeps its `skipped` reasons.
+
+**Grant end state (BL-00B, decided 2026-09-03):** every runner is on
+`Bash(python3:*)`, and that is the accepted end state, not a stopgap.
+Measured under real enforcement (`docs/plans-notes/interpreter-grant-probe.sh`):
+a rule scoped to the script path — `Bash(python3 /abs/path/runner.py:*)` —
+does match (P1) and does exclude other python3 invocations (P5), but only
+with the absolute path; a rule written with the variable the agents use
+(`${CLAUDE_PLUGIN_ROOT}`) never matches (P3), and the install path differs
+per machine, so no narrower rule can be written statically into an agent's
+frontmatter. `agentscan` continues to flag `interpreter-grant` on this repo
+(25 of 25) by design — it is the correct finding for any other plugin, and
+here it is a known, reviewed condition.
+
+**mcp-scan (BL-00C, decided 2026-09-03):** kept in the ai-tools lane as an
+*enumeration* of MCP servers and skills, not as a finding source. `inspect`
+(the only mode the lane permits) returns `issues: 0` for every server and
+skill in the deliberately poisoned fixture — verification happens only in
+`scan`, which launches the audited project's MCP servers locally, a
+supply-chain hazard this plugin will not take on. The lane's findings come
+from `agentscan.py`; a report line saying mcp-scan "ran" means "it listed
+what exists", never "it found nothing wrong". Parity is proven per lane by `tests/script-runner.sh
 <lane>`. The config-driven engine (`runner.py` + `lanes/<lane>.json`) supports:
 dotted/numeric paths, `concat`, `map`/`lookup`, `int`/`truncate`/`before`/
 `cvss_band` transforms, single- and nested-`flatten` (`_parent`), multi-
@@ -1090,6 +1118,9 @@ semantic category:
 | Reason            | Lane(s)              | Meaning                                                                 |
 |-------------------|----------------------|-------------------------------------------------------------------------|
 | `no-apk`          | android              | No `*.apk` / `*.aab` under target (apkleaks-specific).                  |
+| `gradle-project-no-lint-report` | android | Standalone `lint` refuses Gradle projects and no `build/reports/lint-results*.xml` exists under target; run `gradlew lint` and re-audit. NEW in v1.40. |
+| `no-target-url`   | dast                 | The lane was dispatched without `--url` / `$DAST_TARGET_URL`; ZAP has nothing to scan. NEW in v1.40. |
+| `invalid-target-url` | dast              | The URL is not `http://` or `https://`. NEW in v1.40. |
 | `no-bundle`       | ios, macos           | No `.app` / `.framework` / `.xcarchive` under target.                   |
 | `no-pkg`          | macos                | No `.pkg` under target (pkgutil-specific).                              |
 | `no-debian-package`| linux                | No built .deb/.dsc/.changes/.buildinfo under target (lintian-specific). |

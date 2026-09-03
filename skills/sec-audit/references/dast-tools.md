@@ -116,6 +116,19 @@ zap-baseline.py \
 
 Source: https://www.zaproxy.org/docs/docker/baseline-scan/
 
+**How the engine invokes it (2026-09-03, verified against ZAP 2.16 through
+`ghcr.io/zaproxy/zaproxy:stable`):** `scripts/secaudit/zapscan.py` runs the
+local form when `zap-baseline.py` is on PATH, else
+`docker run --rm --network host -u zap -v <scratch>:/zap/wrk:rw <image>
+zap-baseline.py -t <url> -J report.json -I`, and prints the report. Two
+things the lane got wrong before that date: it passed **no `-t <url>` at
+all**, and it passed `-J -`, which names a report file literally called `-`
+(stdout carries only the progress log) — so no host could ever have produced
+a finding. The URL reaches the engine as `runner.py dast <path> --url <url>`
+(or `$DAST_TARGET_URL`); without one the tool skips `no-target-url`, and a
+non-http(s) URL skips `invalid-target-url`. ZAP's `reference` field is HTML
+(`<p>https://…</p>`); the map extracts the first URL.
+
 ```bash
 # Non-gating with runtime cap — -m <minutes> bounds the passive-rule
 # wait after the spider completes. Use this in CI lanes where a slow

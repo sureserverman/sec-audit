@@ -56,7 +56,11 @@ import sys
 
 REF = "linux-tools.md"
 PRUNE = {
-    ".git", "node_modules", ".venv", "venv", "dist", "build", "target",
+    # Deliberately NOT pruning build/dist/target: those hold exactly the BUILT
+    # artifacts lintian (.deb) and checksec (ELF) analyse. Pruning them (as this
+    # list did until 2026-09-03) meant a package built into build/ was never
+    # found and the lane reported `no-debian-package` over it.
+    ".git", "node_modules", ".venv", "venv",
     "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache", "vendor",
     ".tox", "htmlcov", ".cache",
 }
@@ -89,7 +93,12 @@ SYSTEMD_CWE = {
 }
 LINTIAN_CWE = {
     "maintainer-script-without-set-e": "CWE-390",
+    # lintian >= 2.104 renamed the set -e check; same defect, same CWE.
+    # https://lintian.debian.org/tags/maintainer-script-ignores-errors
+    "maintainer-script-ignores-errors": "CWE-390",
     "setuid-binary": "CWE-250",
+    # https://lintian.debian.org/tags/elevated-privileges — setuid/setgid file.
+    "elevated-privileges": "CWE-250",
 }
 
 LINTIAN_ARTIFACTS = (".deb", ".udeb", ".ddeb", ".dsc", ".changes", ".buildinfo")
@@ -97,7 +106,11 @@ LINTIAN_ARTIFACTS = (".deb", ".udeb", ".ddeb", ".dsc", ".changes", ".buildinfo")
 # `C:` classification, `O:` overridden.
 LINTIAN_SEVERITY = {"E": "HIGH", "W": "MEDIUM", "I": "LOW", "P": "LOW",
                     "X": "LOW", "C": "INFO", "O": "INFO"}
-LINTIAN_RE = re.compile(r"^([EWIPXCO]): (\S+): (\S+)(?:\s+\[(.*)\])?\s*$")
+# lintian 2.117 prints `<L>: <pkg>: <tag> [<context words>] [<file>]` — the
+# context is free text ("0664 != 0644 [etc/cron.d/x]"), not only a bracketed
+# file. The previous pattern accepted a bracket-only tail and so silently
+# dropped every tag that carries context (10 of 16 on the fixture package).
+LINTIAN_RE = re.compile(r"^([EWIPXCO]): (\S+): (\S+)(?:\s+(.*?))?\s*$")
 
 
 def walk(target):

@@ -526,3 +526,30 @@ re-run after the limit cleared.
 `agentscan` on this repo now reports 25 interpreter-grants and 0 unscoped
 grants — which is BL-00B's question, not BL-002's.
 
+## BL-00B (2026-09-03): can the interpreter grant be narrower? Measured — no
+
+Harness `docs/plans-notes/interpreter-grant-probe.sh`, Claude Code 2.1.258,
+same controls as every probe above (both behaved). The command under test is
+the shell lane's real engine call.
+
+| # | Rule | Command | Verdict |
+|---|---|---|---|
+| P1 | `Bash(python3 <abs>/runner.py:*)` | `python3 <abs>/runner.py shell <fx>` | **ALLOWED** |
+| P2 | same | `python3 "<abs>/runner.py" shell <fx>` (quoted path) | **DENIED** |
+| P3 | `Bash(python3 "$SECAUDIT_ROOT/scripts/secaudit/runner.py":*)` | `SECAUDIT_ROOT=<abs>; python3 "$SECAUDIT_ROOT/…/runner.py" shell <fx>` | **DENIED** |
+| P4 | `Bash(python3 <abs>/runner.py:*)` | same command as P3 | **ALLOWED** |
+| P5 | `Bash(python3 <abs>/runner.py:*)` | `python3 -c '…'` | **DENIED** |
+
+Reading: a path-scoped rule works (P1) and constrains (P5), and the matcher
+compares something closer to the expanded command than the literal text (P4
+allowed with the variable expanded to the rule's path; P3 denied with the
+variable left literal in the rule). P2's denial with a quoted literal path
+is not explained by that reading and is recorded, not interpreted.
+
+What decides BL-00B is P3 + P4 together: the only rule shape that matches
+contains the **absolute install path**, and every agent's command is
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" …` where that
+root differs per machine and per plugin version. A narrower rule cannot be
+written statically into `tools:` frontmatter. `Bash(python3:*)` is therefore
+the accepted end state, recorded in COVERAGE.md.
+

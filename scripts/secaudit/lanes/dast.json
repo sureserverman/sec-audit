@@ -1,20 +1,86 @@
 {
-  "lane": "dast", "status_key": "__dast_status__", "origin": "dast", "reference": "dast-tools.md",
-  "finding_const": {"fix_recipe": null},
-  "tools": [{
-    "name": "zap-baseline", "probe": "zap-baseline.py",
-    "invoke": ["zap-baseline.py", "-J", "-"], "output": "stdout",
-    "findings_path": "site", "flatten": "alerts",
-    "const": {"confidence": "medium", "line": 0},
-    "map": {
-      "id": "pluginid",
-      "severity": {"from": "riskcode", "map": {"3": "HIGH", "2": "MEDIUM", "1": "LOW", "0": "INFO"}, "default": "INFO"},
-      "cwe": {"concat": ["CWE-", {"from": "cweid"}], "default": null},
-      "title": "alert",
-      "file": "instances.0.uri",
-      "evidence": {"from": "instances.0.evidence", "default": ""},
-      "reference_url": {"from": "reference", "default": null},
-      "notes": {"concat": [{"from": "instances.0.method"}, " ", {"from": "instances.0.uri"}]}
+  "lane": "dast",
+  "status_key": "__dast_status__",
+  "origin": "dast",
+  "reference": "dast-tools.md",
+  "finding_const": {
+    "fix_recipe": null
+  },
+  "tools": [
+    {
+      "name": "zap-baseline",
+      "probe": [
+        "zap-baseline.py",
+        "docker"
+      ],
+      "invoke": [
+        "python3",
+        "{scripts}/zapscan.py",
+        "{target}",
+        "--url",
+        "{url}",
+        "--runner",
+        "{probe}"
+      ],
+      "output": "stdout",
+      "findings_path": "site",
+      "flatten": "alerts",
+      "const": {
+        "confidence": "medium",
+        "line": 0
+      },
+      "map": {
+        "id": "pluginid",
+        "severity": {
+          "from": "riskcode",
+          "map": {
+            "3": "HIGH",
+            "2": "MEDIUM",
+            "1": "LOW",
+            "0": "INFO"
+          },
+          "default": "INFO"
+        },
+        "cwe": {
+          "concat": [
+            "CWE-",
+            {
+              "from": "cweid"
+            }
+          ],
+          "default": null
+        },
+        "title": "alert",
+        "file": "instances.0.uri",
+        "evidence": {
+          "from": "instances.0.evidence",
+          "default": ""
+        },
+        "reference_url": {
+          "from": "reference",
+          "regex": "https?://[^<\\s\"]+",
+          "default": null
+        },
+        "notes": {
+          "concat": [
+            {
+              "from": "instances.0.method"
+            },
+            " ",
+            {
+              "from": "instances.0.uri"
+            }
+          ]
+        }
+      },
+      "requires_url": true,
+      "rc_reasons": {
+        "1": "tool-missing",
+        "3": "no-target-url",
+        "4": "invalid-target-url",
+        "*": "run-incomplete"
+      },
+      "_note": "URL-driven: the engine passes `--url` (or $DAST_TARGET_URL); with no URL the tool skips `no-target-url` — until 2026-09-03 the invocation was `zap-baseline.py -J -` with no target and a report path of `-`, so it never scanned anything. zapscan.py runs a local zap-baseline.py or the official docker image (`{probe}` says which was found), with `-I` so WARN alerts do not read as a tool failure, and prints the JSON report."
     }
-  }]
+  ]
 }
