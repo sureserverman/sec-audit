@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.9.0 [13114758] ">
+
+    <issue
+        id="MissingClass"
+        severity="Error"
+        message="Class referenced in the manifest, `com.example.fixture.MainActivity`, was not found in the project or the libraries"
+        category="Correctness"
+        priority="8"
+        summary="Missing registered class"
+        explanation="If a class is referenced in the manifest or in a layout file, it must also exist in the project (or in one of the libraries included by the project. This check helps uncover typos in registration names, or attempts to rename or move classes without updating the XML references properly."
+        url="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        urls="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        errorLine1="            android:name=&quot;.MainActivity&quot;"
+        errorLine2="                          ~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="14"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="MissingClass"
+        severity="Error"
+        message="Class referenced in the manifest, `com.example.fixture.DangerousReceiver`, was not found in the project or the libraries"
+        category="Correctness"
+        priority="8"
+        summary="Missing registered class"
+        explanation="If a class is referenced in the manifest or in a layout file, it must also exist in the project (or in one of the libraries included by the project. This check helps uncover typos in registration names, or attempts to rename or move classes without updating the XML references properly."
+        url="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        urls="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        errorLine1="            android:name=&quot;.DangerousReceiver&quot;"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="24"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="MissingClass"
+        severity="Error"
+        message="Class referenced in the manifest, `com.example.fixture.DeepLinkActivity`, was not found in the project or the libraries"
+        category="Correctness"
+        priority="8"
+        summary="Missing registered class"
+        explanation="If a class is referenced in the manifest or in a layout file, it must also exist in the project (or in one of the libraries included by the project. This check helps uncover typos in registration names, or attempts to rename or move classes without updating the XML references properly."
+        url="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        urls="https://developer.android.com/guide/topics/manifest/manifest-intro.html"
+        errorLine1="        &lt;activity android:name=&quot;.DeepLinkActivity&quot; android:exported=&quot;true&quot;>"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="32"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="MissingVersion"
+        severity="Warning"
+        message="Should set `android:versionCode` to specify the application version"
+        category="Correctness"
+        priority="2"
+        summary="Missing application name/version"
+        explanation="You should define the version information for your application.&#xA;&#xA;`android:versionCode`: An integer value that represents the version of the application code, relative to other versions.&#xA;&#xA;`android:versionName`: A string value that represents the release version of the application code, as it should be shown to users."
+        url="https://developer.android.com/studio/publish/versioning#appversioning"
+        urls="https://developer.android.com/studio/publish/versioning#appversioning"
+        errorLine1="&lt;manifest xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="2"
+            column="2"/>
+    </issue>
+
+    <issue
+        id="MissingVersion"
+        severity="Warning"
+        message="Should set `android:versionName` to specify the application version"
+        category="Correctness"
+        priority="2"
+        summary="Missing application name/version"
+        explanation="You should define the version information for your application.&#xA;&#xA;`android:versionCode`: An integer value that represents the version of the application code, relative to other versions.&#xA;&#xA;`android:versionName`: A string value that represents the release version of the application code, as it should be shown to users."
+        url="https://developer.android.com/studio/publish/versioning#appversioning"
+        urls="https://developer.android.com/studio/publish/versioning#appversioning"
+        errorLine1="&lt;manifest xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="2"
+            column="2"/>
+    </issue>
+
+    <issue
+        id="ExportedReceiver"
+        severity="Warning"
+        message="Exported receiver does not require permission"
+        category="Security"
+        priority="5"
+        summary="Receiver does not require permission"
+        explanation="Exported receivers (receivers which either set `exported=true` or contain an intent-filter and do not specify `exported=false`) should define a permission that an entity must have in order to launch the receiver or bind to it. Without this, any application can use this receiver."
+        url="https://goo.gle/ExportedReceiver"
+        urls="https://goo.gle/ExportedReceiver"
+        errorLine1="        &lt;receiver"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="23"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="HardcodedDebugMode"
+        severity="Fatal"
+        message="Avoid hardcoding the debug mode; leaving it out allows debug and release builds to automatically assign one"
+        category="Security"
+        priority="5"
+        summary="Hardcoded value of `android:debuggable` in the manifest"
+        explanation="It&apos;s best to leave out the `android:debuggable` attribute from the manifest. If you do, then the tools will automatically insert `android:debuggable=true` when building an APK to debug on an emulator or device. And when you perform a release build, such as Exporting APK, it will automatically set it to `false`.&#xA;&#xA;If on the other hand you specify a specific value in the manifest file, then the tools will always use it. This can lead to accidentally publishing your app with debug information."
+        url="https://goo.gle/HardcodedDebugMode"
+        urls="https://goo.gle/HardcodedDebugMode"
+        errorLine1="        android:debuggable=&quot;true&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="9"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="MissingApplicationIcon"
+        severity="Warning"
+        message="Should explicitly set `android:icon`, there is no default"
+        category="Usability:Icons"
+        priority="5"
+        summary="Missing application icon"
+        explanation="You should set an icon for the application as whole because there is no default. This attribute must be set as a reference to a drawable resource containing the image (for example `@drawable/icon`)."
+        url="https://developer.android.com/studio/publish/preparing#publishing-configure"
+        urls="https://developer.android.com/studio/publish/preparing#publishing-configure"
+        errorLine1="    &lt;application"
+        errorLine2="     ~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="7"
+            column="6"/>
+    </issue>
+
+</issues>

@@ -175,12 +175,28 @@ package. Not pip-installable. Two invocation modes:
 
 1. **Gradle (preferred):** `./gradlew :app:lintDebug` — produces
    `app/build/reports/lint-results-debug.xml`.
-2. **Standalone fallback:** `lint --xml - <module-dir>` — prints XML to
-   stdout.
+2. **Standalone fallback:** `lint --xml <report.xml> <module-dir>` — writes
+   XML to the named file. **`--xml -` is not stdout**: lint 8.9 creates a
+   file literally named `-` and prints nothing (the same shape as
+   mobsfscan's `--output -`); the lane parsed empty stdout for as long as it
+   used that form (fixed 2026-09-03).
 
-The runner MUST prefer the Gradle invocation when a `gradlew` wrapper is
-present at the project root. Fall back to the standalone `lint` binary only
-when no `gradlew` is found.
+**Standalone lint refuses a Gradle project** (verified lint 8.9.0): the only
+issue it emits is `LintError` / "`app` is a Gradle project. To correctly
+analyze Gradle projects, you should run `gradlew lint` instead." Since real
+Android projects are Gradle projects, and the runner contract forbids running
+the build, the engine's `lintscan.py` does this, in order:
+
+1. parse a lint report the project already produced —
+   `**/build/reports/lint-results*.xml`, what `gradlew lint` writes —
+   merging several modules' reports and making `<location file>` paths
+   target-relative (module-relative paths are resolved against the module);
+2. otherwise run `lint --xml <scratch> <target>` — works on non-Gradle trees
+   (manifest and source checks; `MissingClass` noise because there is no
+   bytecode);
+3. if that run reports only the Gradle refusal, exit 3 → clean skip
+   `gradle-project-no-lint-report`, telling the caller to run `gradlew lint`
+   and re-audit. Never a finding blaming the caller's code.
 
 **Preferred run command (Gradle):**
 
@@ -189,11 +205,11 @@ when no `gradlew` is found.
 # XML report written to: app/build/reports/lint-results-debug.xml
 ```
 
-**Fallback run command (standalone):**
+**Fallback run command (standalone, non-Gradle trees only):**
 
 ```bash
-lint --xml - <module-dir>
-# XML written to stdout
+lint --xml /tmp/lint-results.xml <module-dir>
+# XML written to the named file; `--xml -` writes a file called `-`
 ```
 
 Gradle exits non-zero when lint errors are present (configurable via
@@ -266,10 +282,10 @@ for issue in tree.getroot().findall('.//issue'):
     print(issue.attrib.get('id'), issue.attrib.get('severity'))
 "
 
-# Fallback: standalone lint binary, XML to stdout
-lint --xml - ./app/ | python3 -c "
-import sys, xml.etree.ElementTree as ET
-root = ET.fromstring(sys.stdin.read())
+# Fallback: standalone lint binary (non-Gradle tree), XML to a file
+lint --xml /tmp/lint-results.xml ./app/ && python3 -c "
+import xml.etree.ElementTree as ET
+root = ET.parse('/tmp/lint-results.xml').getroot()
 for issue in root.findall('.//issue'):
     print(issue.attrib.get('id'), issue.attrib.get('severity'))
 "

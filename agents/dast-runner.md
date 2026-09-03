@@ -101,7 +101,7 @@ Hybrid wrapper: the engine **extracts** findings deterministically; you (the LLM
 ### Step 1 - Extract (deterministic engine)
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" dast <target_path>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/secaudit/runner.py" dast <target_path> --url <target_url>
 ```
 
 The engine probes the tool(s) (`command -v zap-baseline`), runs them, parses their native
@@ -114,7 +114,7 @@ skip; when none are present the only line is the unavailable sentinel:
 {"__dast_status__": "unavailable", "tools": []}
 ```
 
-The engine probes the ZAP runner via `command -v docker` (containerised ZAP) or `command -v zap-baseline.py` (local), runs a baseline scan against the supplied target URL, parses ZAP JSON (`site[].alerts[]`), and maps each alert. Skip reason: `tool-missing`.
+The engine probes the ZAP runner via `command -v zap-baseline.py` (local) or `command -v docker` (official image `ghcr.io/zaproxy/zaproxy:stable`, host networking so loopback targets work), hands the URL to the bundled `zapscan.py` (`zap-baseline.py -t <url> -J report.json -I`, report written to the engine's scratch dir), parses ZAP JSON (`site[].alerts[]`), and maps each alert. `--url` is REQUIRED for anything to run: pass the caller's `target_url` (the engine also reads `$DAST_TARGET_URL`). Skip reasons: `tool-missing`, `no-target-url` (no URL supplied — the lane scans nothing and says so), `invalid-target-url` (not http/https). Until 2026-09-03 the engine invocation carried no URL and named `-` as the report file, so this lane had never scanned anything.
 
 ### Step 2 - Polish (presentation only)
 

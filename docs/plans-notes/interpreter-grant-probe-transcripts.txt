@@ -1,0 +1,106 @@
+CONTROL-ALLOW [ALLOWED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp/mk_a && echo MARKER_OK_A
+allow: Bash(touch:*)
+---
+The command ran without being blocked. Complete stdout:
+
+```
+MARKER_OK_A
+```
+
+DONE
+===
+CONTROL-DENY [DENIED]
+cmd: touch /home/user/dev/ai-tools/sec-audit/probe-tmp/mk_b && echo MARKER_OK_B
+allow: Bash(echo:*)
+---
+The harness blocked the command. It did not run, and no stdout was produced.
+
+Exact refusal text:
+
+```
+touch in '/home/user/dev/ai-tools/sec-audit/probe-tmp/mk_b' was blocked. For security, Claude Code may only create or modify files in the allowed working directories for this session: '/home/user/dev/ai-tools/sec-audit'.
+```
+
+Note for the measurement: the target path is inside the stated allowed directory, yet the matcher still blocked it. I did not retry or substitute an equivalent command.
+
+DONE
+===
+P1-abs-path-unquoted [ALLOWED]
+cmd: python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py shell /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-shell
+allow: Bash(python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py:*)
+---
+The command ran without being blocked. Complete stdout, verbatim:
+
+```
+{"fix_recipe": null, "id": "shellcheck:SC2162", "severity": "LOW", "cwe": "CWE-117", "title": "read without -r will mangle backslashes.", "file": "install.sh", "line": 18, "evidence": "read without -r will mangle backslashes.", "reference_url": "https://www.shellcheck.net/wiki/SC2162", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2115", "severity": "MEDIUM", "cwe": null, "title": "Use \"${var:?}\" to ensure this never expands to /* .", "file": "install.sh", "line": 22, "evidence": "Use \"${var:?}\" to ensure this never expands to /* .", "reference_url": "https://www.shellcheck.net/wiki/SC2115", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2086", "severity": "LOW", "cwe": "CWE-78", "title": "Double quote to prevent globbing and word splitting.", "file": "install.sh", "line": 22, "evidence": "Double quote to prevent globbing and word splitting.", "reference_url": "https://www.shellcheck.net/wiki/SC2086", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2164", "severity": "MEDIUM", "cwe": null, "title": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.", "file": "install.sh", "line": 24, "evidence": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.", "reference_url": "https://www.shellcheck.net/wiki/SC2164", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2046", "severity": "MEDIUM", "cwe": "CWE-78", "title": "Quote this to prevent word splitting.", "file": "install.sh", "line": 24, "evidence": "Quote this to prevent word splitting.", "reference_url": "https://www.shellcheck.net/wiki/SC2046", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2038", "severity": "MEDIUM", "cwe": "CWE-78", "title": "Use 'find .. -print0 | xargs -0 ..' or 'find .. -exec .. +' to allow non-alphanumeric filenames.", "file": "install.sh", "line": 26, "evidence": "Use 'find .. -print0 | xargs -0 ..' or 'find .. -exec .. +' to allow non-alphanumeric filenames.", "reference_url": "https://www.shellcheck.net/wiki/SC2038", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"__shell_status__": "ok", "tools": ["shellcheck"], "runs": 1, "findings": 6}
+```
+
+DONE
+===
+P2-abs-path-quoted-cmd [DENIED]
+cmd: python3 "/home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py" shell /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-shell
+allow: Bash(python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py:*)
+---
+The harness blocked the command. It was not run.
+
+Exact refusal text:
+
+```
+This command requires approval
+```
+
+DONE
+===
+P3-var-literal-both [DENIED]
+cmd: SECAUDIT_ROOT=/home/user/dev/ai-tools/sec-audit; python3 "$SECAUDIT_ROOT/scripts/secaudit/runner.py" shell /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-shell
+allow: Bash(python3 "$SECAUDIT_ROOT/scripts/secaudit/runner.py":*)
+---
+The harness blocked the command. The exact refusal text was:
+
+```
+This command requires approval
+```
+
+No stdout was produced, so there is nothing to paste. Per the test instructions, I did not retry, substitute an equivalent command, or expand the variable myself.
+
+DONE
+===
+P4-var-cmd-abs-rule [ALLOWED]
+cmd: SECAUDIT_ROOT=/home/user/dev/ai-tools/sec-audit; python3 "$SECAUDIT_ROOT/scripts/secaudit/runner.py" shell /home/user/dev/ai-tools/sec-audit/tests/fixtures/vulnerable-shell
+allow: Bash(python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py:*)
+---
+The command was not blocked. It ran once and exited normally. Complete stdout, verbatim:
+
+```
+{"fix_recipe": null, "id": "shellcheck:SC2162", "severity": "LOW", "cwe": "CWE-117", "title": "read without -r will mangle backslashes.", "file": "install.sh", "line": 18, "evidence": "read without -r will mangle backslashes.", "reference_url": "https://www.shellcheck.net/wiki/SC2162", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2115", "severity": "MEDIUM", "cwe": null, "title": "Use \"${var:?}\" to ensure this never expands to /* .", "file": "install.sh", "line": 22, "evidence": "Use \"${var:?}\" to ensure this never expands to /* .", "reference_url": "https://www.shellcheck.net/wiki/SC2115", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2086", "severity": "LOW", "cwe": "CWE-78", "title": "Double quote to prevent globbing and word splitting.", "file": "install.sh", "line": 22, "evidence": "Double quote to prevent globbing and word splitting.", "reference_url": "https://www.shellcheck.net/wiki/SC2086", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2164", "severity": "MEDIUM", "cwe": null, "title": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.", "file": "install.sh", "line": 24, "evidence": "Use 'cd ... || exit' or 'cd ... || return' in case cd fails.", "reference_url": "https://www.shellcheck.net/wiki/SC2164", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2046", "severity": "MEDIUM", "cwe": "CWE-78", "title": "Quote this to prevent word splitting.", "file": "install.sh", "line": 24, "evidence": "Quote this to prevent word splitting.", "reference_url": "https://www.shellcheck.net/wiki/SC2046", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"fix_recipe": null, "id": "shellcheck:SC2038", "severity": "MEDIUM", "cwe": "CWE-78", "title": "Use 'find .. -print0 | xargs -0 ..' or 'find .. -exec .. +' to allow non-alphanumeric filenames.", "file": "install.sh", "line": 26, "evidence": "Use 'find .. -print0 | xargs -0 ..' or 'find .. -exec .. +' to allow non-alphanumeric filenames.", "reference_url": "https://www.shellcheck.net/wiki/SC2038", "confidence": "high", "reference": "shell-tools.md", "origin": "shell", "tool": "shellcheck"}
+{"__shell_status__": "ok", "tools": ["shellcheck"], "runs": 1, "findings": 6}
+```
+
+DONE
+===
+P5-wrong-script-denied [DENIED]
+cmd: python3 -c 'print("__shell_status__ FAKE")'
+allow: Bash(python3 /home/user/dev/ai-tools/sec-audit/scripts/secaudit/runner.py:*)
+---
+The harness blocked the command. It was not executed and produced no stdout.
+
+Exact refusal text:
+
+```
+This command requires approval
+```
+
+DONE
+===

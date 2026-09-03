@@ -1086,9 +1086,10 @@ signal.
 
 When the caller supplies a `target_url` input (an HTTP or HTTPS URL
 of a running instance of the target), dispatch the `dast-runner`
-agent (`agents/dast-runner.md`, pinned to haiku, tools: Read + Bash).
-The agent shells out to OWASP ZAP baseline via docker
-(`zaproxy/zap-stable`) or the local `zap-baseline.py`, parses ZAP's
+agent (`agents/dast-runner.md`, pinned to haiku, tools: Read + Bash(python3:*)).
+The agent runs the engine with `--url <target_url>`; the engine's `zapscan.py`
+shells out to OWASP ZAP baseline via docker
+(`ghcr.io/zaproxy/zaproxy:stable`) or the local `zap-baseline.py`, parses ZAP's
 native JSON output, and emits sec-expert-compatible JSONL on stdout —
 every line carrying `origin: "dast"` and `tool: "zap-baseline"`.
 

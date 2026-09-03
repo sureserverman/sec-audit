@@ -110,3 +110,7 @@ dist/
 # Cargo.lock note above). The blanket build/ rule would drop the windows fixture.
 !tests/fixtures/vulnerable-windows/build/
 !tests/fixtures/vulnerable-windows/build/**
+!tests/fixtures/vulnerable-linux/build/
+!tests/fixtures/vulnerable-linux/build/**
+!tests/fixtures/vulnerable-android/app/build/
+!tests/fixtures/vulnerable-android/app/build/**

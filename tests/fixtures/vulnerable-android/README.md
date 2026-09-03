@@ -42,3 +42,17 @@ lane's E2E assertions (Stage 2 Task 2.3 of v0.8.0).
 All `.pipeline/*.json` files are synthetic, not output from live
 runs, so contract-check passes without mobsfscan / apkleaks /
 android-lint installed.
+
+
+## `app/build/reports/lint-results-debug.xml` (added 2026-09-03)
+
+Real Android Lint 8.9.0 output over this module's sources (8 issues:
+`HardcodedDebugMode`, `ExportedReceiver`, `MissingVersion`,
+`MissingApplicationIcon`, `MissingClass`×3). It stands in for what
+`gradlew lint` would write: the standalone `lint` binary refuses a Gradle
+project, and the runner contract forbids running the build, so the engine's
+`lintscan.py` parses a project's existing report first. This one was
+produced by running standalone lint over a copy of the module with
+`build.gradle` removed; paths are module-relative, as lint writes them.
+`.pipeline/android.jsonl` is the engine's real output (lint 8 + mobsfscan
+13, apkleaks `no-apk`).

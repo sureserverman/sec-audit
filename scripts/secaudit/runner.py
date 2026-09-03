@@ -479,7 +479,7 @@ def _relativize(fobj, target):
         fobj["file"] = rel
 
 
-def run_live(lane, target, scope=None):
+def run_live(lane, target, scope=None, url=None):
     findings = []
     # `failed` is the third outcome the runner contracts have always documented
     # (windows-runner.md: "Build tools_available, tools_clean_skipped,
@@ -530,7 +530,14 @@ def run_live(lane, target, scope=None):
             skipped.append({"tool": tc["name"],
                             "reason": tc.get("inapplicable_reason", "tool-missing")})
             continue
-        argv = _build_argv(tc["invoke"], target, tmp, scope, probe_bin)
+        if tc.get("requires_url") and not url:
+            # A URL-driven tool (ZAP) with no URL has nothing to scan. Until
+            # 2026-09-03 the dast lane's invocation carried no URL at all and
+            # could not have scanned anything on any host.
+            skipped.append({"tool": tc["name"], "reason": "no-target-url"})
+            continue
+        argv = [a.replace("{url}", url or "") for a in
+                _build_argv(tc["invoke"], target, tmp, scope, probe_bin)]
         env = os.environ.copy()
         # `{tmp}`/`{target}` substitute in env values too, so a tool that
         # writes build output next to its input (cargo-geiger compiles the
@@ -604,6 +611,11 @@ def run_live(lane, target, scope=None):
         sentinel["failed"] = failed
     if not ran:
         sentinel = {lane["status_key"]: "unavailable", "tools": []}
+        # Keep the per-tool reasons: a one-tool lane that skipped
+        # `no-target-url` used to collapse to a bare `unavailable`, which reads
+        # as "tool not installed" and hides why nothing ran.
+        if skipped:
+            sentinel["skipped"] = skipped
         if failed:
             sentinel["failed"] = failed
     sys.stdout.write(json.dumps(sentinel) + "\n")
@@ -616,6 +628,8 @@ def main():
     ap.add_argument("--map-only")
     ap.add_argument("--tool")
     ap.add_argument("--files", help="changed-file list (--diff scoping): one relpath per line")
+    ap.add_argument("--url", help="live HTTP(S) target for URL-driven lanes (dast); "
+                                  "falls back to $DAST_TARGET_URL")
     args = ap.parse_args()
     lane = load_lane(args.lane)
     if args.map_only:
@@ -630,7 +644,7 @@ def main():
     if args.files:
         with open(args.files, encoding="utf-8") as f:
             scope = {ln.strip() for ln in f if ln.strip()}
-    run_live(lane, args.target, scope)
+    run_live(lane, args.target, scope, url=args.url or os.environ.get("DAST_TARGET_URL"))
 
 
 if __name__ == "__main__":

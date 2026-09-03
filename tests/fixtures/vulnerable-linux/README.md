@@ -32,3 +32,15 @@ E2E assertions (Stage 2 Task 2.3 of v0.10.0).
 
 All synthetic — contract-check passes without systemd-analyze /
 lintian / checksec installed on the runner host.
+
+
+## `build/` (added 2026-09-03)
+
+`build/vulnerableapp_0.1.0_all.deb` is a real package built by
+`build/make-deb.sh` (dpkg-deb) from this fixture's own `postinst`, with a
+setuid binary under `/usr/local`, a cron.d file not marked as a conffile,
+and no copyright or changelog. lintian analyses BUILT packages only, so
+this is what gives the linux lane's lintian coverage something to read; the
+recording `.pipeline/linux.jsonl` is the engine's real output over it
+(lintian 9 findings, systemd-analyze 11, checksec `no-elf`). It replaces a
+hand-authored recording in a lintian JSON format no lintian emits.

@@ -26,7 +26,7 @@ live host, not a source tree); packaging-format linters beyond
 Debian/RPM; kernel module review.
 
 Each tool has asymmetric applicability: `systemd-analyze security`
-requires a systemd host; `lintian` requires `debian/` source; `checksec`
+requires a systemd host; `lintian` requires a BUILT package (`.deb`/`.dsc`/`.changes`/`.buildinfo` — it cannot open a source tree, and the engine looks inside `build/`, `dist/` and `target/` for one, which it wrongly pruned until 2026-09-03); `checksec`
 requires an ELF binary artifact. The runner clean-skips per-tool when
 preconditions are unmet, extending the skipped-list primitive
 introduced in v0.8 and elaborated in v0.9.

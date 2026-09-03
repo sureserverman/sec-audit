@@ -119,7 +119,7 @@ skip; when none are present the only line is the unavailable sentinel:
 {"__android_status__": "unavailable", "tools": []}
 ```
 
-mobsfscan is a rule-keyed object; android-lint emits XML (parsed into findings); apkleaks needs a compiled APK. Skip reasons: `tool-missing`, `no-apk` (apkleaks — CLEAN SKIP when no .apk/.aab is present).
+mobsfscan is a rule-keyed object (`--json` to stdout; app-wide rules with no `files` array become findings at file `.`); android-lint goes through the bundled `lintscan.py`, which parses the project's own `build/reports/lint-results*.xml` when present, runs standalone `lint --xml <scratch>` on a non-Gradle tree otherwise, and cleanly skips a Gradle project that has no report (standalone lint refuses those); apkleaks needs a compiled APK. Skip reasons: `tool-missing`, `no-apk` (apkleaks — CLEAN SKIP when no .apk/.aab is present), `gradle-project-no-lint-report` (android-lint — run `gradlew lint` and re-audit).
 
 ### Step 2 - Polish (presentation only)
 

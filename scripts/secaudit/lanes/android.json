@@ -105,9 +105,8 @@
       "input_format": "xml",
       "xml_item": "issue",
       "invoke": [
-        "lint",
-        "--xml",
-        "-",
+        "python3",
+        "{scripts}/lintscan.py",
         "{target}"
       ],
       "output": "stdout",
@@ -148,7 +147,13 @@
           "default": 0
         },
         "reference_url": null
-      }
+      },
+      "rc_reasons": {
+        "1": "tool-missing",
+        "3": "gradle-project-no-lint-report",
+        "*": "run-incomplete"
+      },
+      "_note": "`lint --xml -` does NOT write to stdout (a file named `-` appears, stdout stays empty) and standalone lint refuses Gradle projects outright. lintscan.py prefers the project's own `build/reports/lint-results*.xml` (what `gradlew lint` writes), falls back to `lint --xml <scratch>` for non-Gradle trees, and exits 3 for a Gradle project without a report so the lane skips it with a reason instead of mapping lint's refusal into a finding. Decided 2026-09-03 (BL-00D)."
     }
   ]
 }
